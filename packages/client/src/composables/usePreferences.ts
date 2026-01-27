@@ -15,7 +15,7 @@ export function usePreferences() {
 
     return {
       zone: zoneParam,
-      layout: layoutParam && ['minimal', 'detailed', 'fullscreen'].includes(layoutParam)
+      layout: layoutParam && ['minimal', 'detailed', 'fullscreen', 'ambient'].includes(layoutParam)
         ? layoutParam
         : null,
     };
@@ -39,7 +39,7 @@ export function usePreferences() {
       layout.value = urlParams.layout;
     } else {
       const stored = localStorage.getItem(STORAGE_KEY_LAYOUT) as LayoutType | null;
-      if (stored && ['minimal', 'detailed', 'fullscreen'].includes(stored)) {
+      if (stored && ['minimal', 'detailed', 'fullscreen', 'ambient'].includes(stored)) {
         layout.value = stored;
       }
     }

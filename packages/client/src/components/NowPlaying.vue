@@ -5,6 +5,7 @@ import { useNowPlaying } from '../composables/useNowPlaying';
 import MinimalLayout from '../layouts/MinimalLayout.vue';
 import DetailedLayout from '../layouts/DetailedLayout.vue';
 import FullscreenLayout from '../layouts/FullscreenLayout.vue';
+import AmbientLayout from '../layouts/AmbientLayout.vue';
 
 const props = defineProps<{
   nowPlaying: NowPlayingType | null;
@@ -33,6 +34,8 @@ const layoutComponent = computed(() => {
       return MinimalLayout;
     case 'fullscreen':
       return FullscreenLayout;
+    case 'ambient':
+      return AmbientLayout;
     default:
       return DetailedLayout;
   }

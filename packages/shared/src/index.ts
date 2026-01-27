@@ -25,7 +25,7 @@ export interface NowPlaying {
 }
 
 // Layout options
-export type LayoutType = 'minimal' | 'detailed' | 'fullscreen';
+export type LayoutType = 'minimal' | 'detailed' | 'fullscreen' | 'ambient';
 
 // WebSocket message types
 export interface ClientSubscribeMessage {

@@ -93,8 +93,8 @@ describe('Shared Types', () => {
 
   describe('LayoutType', () => {
     it('should only allow valid layouts', () => {
-      const layouts: LayoutType[] = ['minimal', 'detailed', 'fullscreen'];
-      expect(layouts).toHaveLength(3);
+      const layouts: LayoutType[] = ['minimal', 'detailed', 'fullscreen', 'ambient'];
+      expect(layouts).toHaveLength(4);
     });
   });
 
