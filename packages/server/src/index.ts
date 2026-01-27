@@ -63,7 +63,7 @@ async function main(): Promise<void> {
   app.use(express.static(clientDistPath));
 
   // SPA fallback - serve index.html for all non-API routes
-  app.get('*', (req, res, next) => {
+  app.get('/{*path}', (req, res, next) => {
     // Skip API routes
     if (req.path.startsWith('/api')) {
       next();

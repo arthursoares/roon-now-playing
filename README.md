@@ -2,6 +2,10 @@
 
 A Roon extension that displays real-time album artwork and track metadata on any web-connected client. Perfect for "always-on" displays like tablets and wall-mounted screens.
 
+<p align="center">
+  <img src="assets/example03.jpeg" alt="Minimal Layout" width="800">
+</p>
+
 ## Features
 
 - Real-time album artwork and track metadata display
@@ -87,6 +91,19 @@ Example: `http://localhost:3000/?zone=Office&layout=detailed&background=gradient
 | `fullscreen` | Album artwork centered on screen, scaled to fit. No text overlays. |
 | `ambient` | Color-extracted background with artwork and full track info. Great for 10-foot UI / TV displays. |
 | `cover` | Clean album cover centered with subtle shadow. Artwork crossfades on track changes. |
+
+### Screenshots
+
+<table>
+  <tr>
+    <td align="center"><img src="assets/example01.jpeg" alt="Detailed with Dominant Color" width="400"><br><em>Detailed + Dominant Color</em></td>
+    <td align="center"><img src="assets/example02.jpeg" alt="Detailed with White Background" width="400"><br><em>Detailed + White</em></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/example05.jpeg" alt="Detailed with Warm Colors" width="400"><br><em>Detailed + Dominant Color</em></td>
+    <td align="center"><img src="assets/example04.jpeg" alt="Cover with Gradient" width="400"><br><em>Cover + Radial Gradient</em></td>
+  </tr>
+</table>
 
 ## Backgrounds
 

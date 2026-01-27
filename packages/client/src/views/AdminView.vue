@@ -102,12 +102,23 @@ function getBackgroundDisplayName(background: BackgroundType): string {
 <template>
   <div class="admin-view">
     <header class="admin-header">
-      <h1>Admin Panel</h1>
-      <div class="connection-indicator" :class="connectionStatus">
-        <span class="dot"></span>
-        <span v-if="connectionStatus === 'connecting'">Connecting...</span>
-        <span v-else-if="connectionStatus === 'waiting-roon'">Waiting for Roon</span>
-        <span v-else>Connected</span>
+      <div class="brand">
+        <h1>Roon Now Playing</h1>
+        <span class="subtitle">Admin Panel</span>
+      </div>
+      <div class="header-right">
+        <a href="/" class="back-link" title="Back to Now Playing">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+          </svg>
+          <span>Now Playing</span>
+        </a>
+        <div class="connection-indicator" :class="connectionStatus">
+          <span class="dot"></span>
+          <span v-if="connectionStatus === 'connecting'">Connecting...</span>
+          <span v-else-if="connectionStatus === 'waiting-roon'">Waiting for Roon</span>
+          <span v-else>Connected</span>
+        </div>
       </div>
     </header>
 
@@ -230,12 +241,20 @@ function getBackgroundDisplayName(background: BackgroundType): string {
         </table>
       </section>
     </main>
+
+    <footer class="admin-footer">
+      <span>Roon Now Playing</span>
+      <span class="separator">·</span>
+      <a href="https://github.com/arthursoares/roon-now-playing" target="_blank" rel="noopener">GitHub</a>
+    </footer>
   </div>
 </template>
 
 <style scoped>
 .admin-view {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   background: #1a1a2e;
   color: #eee;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -250,10 +269,49 @@ function getBackgroundDisplayName(background: BackgroundType): string {
   border-bottom: 1px solid #0f3460;
 }
 
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
 .admin-header h1 {
   margin: 0;
   font-size: 1.5rem;
   font-weight: 600;
+}
+
+.brand .subtitle {
+  font-size: 0.875rem;
+  color: #888;
+  font-weight: 400;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.back-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #888;
+  text-decoration: none;
+  font-size: 0.875rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.back-link:hover {
+  color: #fff;
+  background: #0f3460;
+}
+
+.back-link svg {
+  opacity: 0.8;
 }
 
 .connection-indicator {
@@ -294,9 +352,12 @@ function getBackgroundDisplayName(background: BackgroundType): string {
 }
 
 .admin-content {
+  flex: 1;
   padding: 2rem;
   max-width: 1400px;
   margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .clients-section h2 {
@@ -464,5 +525,31 @@ select:focus {
 .device-cell {
   color: #888;
   font-size: 0.875rem;
+}
+
+.admin-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.5rem;
+  color: #555;
+  font-size: 0.8rem;
+  border-top: 1px solid #0f3460;
+  margin-top: auto;
+}
+
+.admin-footer a {
+  color: #888;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.admin-footer a:hover {
+  color: #4ade80;
+}
+
+.admin-footer .separator {
+  color: #333;
 }
 </style>
