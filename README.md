@@ -1,4 +1,4 @@
-# Roon Screen Cover
+# Roon Now Playing
 
 A Roon extension that displays real-time album artwork and track metadata on any web-connected client. Perfect for "always-on" displays like tablets and wall-mounted screens.
 
@@ -6,18 +6,27 @@ A Roon extension that displays real-time album artwork and track metadata on any
 
 - Real-time album artwork and track metadata display
 - Multiple simultaneous clients viewing different zones
-- Three display layouts: Detailed, Minimal, and Fullscreen
+- Five display layouts: Detailed, Minimal, Fullscreen, Ambient, and Cover
+- Customizable fonts via URL parameter
+- Admin panel for managing connected clients
 - Automatic zone selection via URL parameters
 - WebSocket-based real-time updates
 - Artwork caching for performance
 - Auto-reconnect on connection loss
+- Multi-platform Docker images (amd64, arm64)
 
 ## Quick Start
 
 ### Docker (Recommended)
 
 ```bash
-docker-compose up -d
+docker compose up -d
+```
+
+Or pull the image directly:
+
+```bash
+docker pull ghcr.io/arthursoares/roon-now-playing:latest
 ```
 
 Then open `http://localhost:3000` in your browser.
@@ -55,9 +64,10 @@ pnpm dev
 ### URL Parameters
 
 - `?zone=<name>` - Auto-select zone by name (e.g., `?zone=Living%20Room`)
-- `?layout=<type>` - Set layout: `detailed`, `minimal`, or `fullscreen`
+- `?layout=<type>` - Set layout: `detailed`, `minimal`, `fullscreen`, `ambient`, or `cover`
+- `?font=<type>` - Set font style (see Fonts section)
 
-Example: `http://localhost:3000/?zone=Office&layout=minimal`
+Example: `http://localhost:3000/?zone=Office&layout=minimal&font=serif`
 
 ### Interactions
 
@@ -70,7 +80,29 @@ Example: `http://localhost:3000/?zone=Office&layout=minimal`
 |--------|-------------|
 | `detailed` | Artwork, title, artist, album, progress bar |
 | `minimal` | Full-bleed artwork with title overlay |
-| `fullscreen` | Artwork only (ambient mode) |
+| `fullscreen` | Clean full-screen artwork with subtle track info |
+| `ambient` | Artwork only, no text overlays |
+| `cover` | Album cover centered on screen |
+
+## Fonts
+
+Customize the display font using the `?font=` URL parameter:
+
+| Font | Description |
+|------|-------------|
+| `sans` | Clean sans-serif (default) |
+| `serif` | Classic serif typeface |
+| `mono` | Monospace/terminal style |
+| `display` | Decorative display font |
+
+## Admin Panel
+
+Access the admin panel at `/admin` to manage connected clients.
+
+Features:
+- View all connected clients with their current zone and layout
+- Push settings (layout, font, zone) to any client remotely
+- Set friendly names for clients for easy identification
 
 ## Configuration
 
@@ -93,6 +125,15 @@ Environment variables (or `.env` file):
 | `GET` | `/api/artwork/:key` | Get cached/proxied artwork |
 | `GET` | `/api/health` | Health check |
 
+### Admin API
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/clients` | List all connected clients |
+| `GET` | `/api/admin/zones` | List available zones |
+| `POST` | `/api/admin/clients/:id/name` | Set client friendly name |
+| `POST` | `/api/admin/clients/:id/push` | Push settings to client |
+
 ### WebSocket
 
 Connect to `/ws` for real-time updates.
@@ -108,6 +149,7 @@ Connect to `/ws` for real-time updates.
 { "type": "zones", "zones": [...] }
 { "type": "now_playing", "zone_id": "...", "state": "playing", "track": {...}, "seek_position": 0 }
 { "type": "seek", "zone_id": "...", "seek_position": 42 }
+{ "type": "push_settings", "layout": "minimal", "font": "serif", "zoneId": "..." }
 ```
 
 ## Development
@@ -124,12 +166,15 @@ pnpm typecheck
 
 # Build for production
 pnpm build
+
+# Build Docker image locally
+docker compose -f docker-compose.dev.yml up --build
 ```
 
 ## Project Structure
 
 ```
-roon-screen-cover/
+roon-now-playing/
 ├── packages/
 │   ├── shared/          # Shared TypeScript types
 │   ├── server/          # Node.js backend
@@ -137,17 +182,47 @@ roon-screen-cover/
 │   │       ├── index.ts      # Entry point
 │   │       ├── roon.ts       # Roon API client
 │   │       ├── websocket.ts  # WebSocket handling
-│   │       └── artwork.ts    # Artwork cache
+│   │       ├── artwork.ts    # Artwork cache
+│   │       └── admin.ts      # Admin API routes
 │   └── client/          # Vue 3 frontend
 │       └── src/
 │           ├── App.vue
+│           ├── router.ts
+│           ├── views/
+│           │   ├── NowPlayingView.vue
+│           │   └── AdminView.vue
 │           ├── components/
 │           ├── layouts/
+│           │   ├── DetailedLayout.vue
+│           │   ├── MinimalLayout.vue
+│           │   ├── FullscreenLayout.vue
+│           │   ├── AmbientLayout.vue
+│           │   └── CoverLayout.vue
 │           └── composables/
+├── .github/
+│   └── workflows/
+│       └── docker-publish.yml
 ├── Dockerfile
 ├── docker-compose.yml
+├── docker-compose.dev.yml
 └── README.md
 ```
+
+## Docker Images
+
+Pre-built images are available from GitHub Container Registry:
+
+```bash
+# Latest from main branch
+docker pull ghcr.io/arthursoares/roon-now-playing:latest
+
+# Specific version
+docker pull ghcr.io/arthursoares/roon-now-playing:1.0.0
+```
+
+Supported platforms:
+- `linux/amd64`
+- `linux/arm64`
 
 ## License
 

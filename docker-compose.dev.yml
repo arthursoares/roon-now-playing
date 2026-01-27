@@ -1,9 +1,12 @@
 version: '3.8'
 
+# Development override - builds locally instead of pulling from registry
+# Usage: docker compose -f docker-compose.dev.yml up --build
+
 services:
   roon-now-playing:
-    image: ghcr.io/arthursoares/roon-now-playing:latest
-    container_name: roon-now-playing
+    build: .
+    container_name: roon-now-playing-dev
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -16,7 +19,7 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - HOST=0.0.0.0
-      - LOG_LEVEL=info
+      - LOG_LEVEL=debug
     # Use host network for Roon discovery (alternative to port mapping)
     # network_mode: host
 
