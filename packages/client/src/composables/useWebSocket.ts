@@ -7,6 +7,7 @@ import type {
   NowPlaying,
   LayoutType,
   FontType,
+  BackgroundType,
   ClientMetadata,
 } from '@roon-screen-cover/shared';
 import { useClientId } from './useClientId';
@@ -24,6 +25,7 @@ export interface RemoteSettingsHandler {
   onRemoteSettings?: (settings: {
     layout?: LayoutType;
     font?: FontType;
+    background?: BackgroundType;
     zoneId?: string;
     zoneName?: string;
   }) => void;
@@ -35,11 +37,13 @@ export interface UseWebSocketOptions {
   isAdmin?: boolean;
   layout?: Ref<LayoutType>;
   font?: Ref<FontType>;
+  background?: Ref<BackgroundType>;
   zoneId?: Ref<string | null>;
   zoneName?: Ref<string | null>;
   onRemoteSettings?: (settings: {
     layout?: LayoutType;
     font?: FontType;
+    background?: BackgroundType;
     zoneId?: string;
     zoneName?: string;
   }) => void;
@@ -76,6 +80,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       clientId,
       layout: options.layout?.value || 'detailed',
       font: options.font?.value || 'system',
+      background: options.background?.value || 'black',
       zoneId: subscribedZoneId,
       zoneName: subscribedZoneName,
       userAgent: navigator.userAgent,
@@ -197,6 +202,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
             options.onRemoteSettings({
               layout: message.layout,
               font: message.font,
+              background: message.background,
               zoneId: message.zoneId,
               zoneName: message.zoneName,
             });

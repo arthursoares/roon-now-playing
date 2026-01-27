@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import type { Track, PlaybackState } from '@roon-screen-cover/shared';
+import { computed } from 'vue';
+import type { Track, PlaybackState, BackgroundType } from '@roon-screen-cover/shared';
 import ProgressBar from '../components/ProgressBar.vue';
+import { useColorExtraction } from '../composables/useColorExtraction';
+import { useBackgroundStyle } from '../composables/useBackgroundStyle';
 
 const props = defineProps<{
   track: Track | null;
@@ -11,11 +14,17 @@ const props = defineProps<{
   duration: string;
   artworkUrl: string | null;
   zoneName: string;
+  background: BackgroundType;
 }>();
+
+const backgroundRef = computed(() => props.background);
+const artworkUrlRef = computed(() => props.artworkUrl);
+const { colors } = useColorExtraction(artworkUrlRef);
+const { style: backgroundStyle, needsColorExtraction } = useBackgroundStyle(backgroundRef, colors);
 </script>
 
 <template>
-  <div class="detailed-layout">
+  <div class="detailed-layout" :style="backgroundStyle">
     <div class="artwork-container">
       <img
         v-if="artworkUrl"
@@ -69,9 +78,10 @@ const props = defineProps<{
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #000;
   padding: 2rem;
   gap: 2rem;
+  color: var(--text-color, #fff);
+  transition: background 0.5s ease-out;
 }
 
 @media (min-width: 768px) {
@@ -146,7 +156,7 @@ const props = defineProps<{
 
 .artist {
   font-size: clamp(1rem, 2.5vw, 1.5rem);
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-secondary, rgba(255, 255, 255, 0.8));
   margin-bottom: 0.25rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -155,7 +165,7 @@ const props = defineProps<{
 
 .album {
   font-size: clamp(0.875rem, 2vw, 1.25rem);
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.5));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -183,7 +193,7 @@ const props = defineProps<{
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.5));
   font-size: 0.875rem;
 }
 

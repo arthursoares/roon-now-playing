@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { Track, PlaybackState } from '@roon-screen-cover/shared';
+import type { Track, PlaybackState, BackgroundType } from '@roon-screen-cover/shared';
 import { useColorExtraction } from '../composables/useColorExtraction';
+import { useBackgroundStyle } from '../composables/useBackgroundStyle';
 import ProgressBar from '../components/ProgressBar.vue';
 
 const props = defineProps<{
@@ -13,10 +14,13 @@ const props = defineProps<{
   duration: string;
   artworkUrl: string | null;
   zoneName: string;
+  background: BackgroundType;
 }>();
 
+const backgroundRef = computed(() => props.background);
 const artworkUrlRef = computed(() => props.artworkUrl);
 const { colors, isTransitioning } = useColorExtraction(artworkUrlRef);
+const { style: backgroundStyle, needsColorExtraction } = useBackgroundStyle(backgroundRef, colors);
 
 // Track previous artwork for crossfade
 const displayedArtwork = ref<string | null>(null);
@@ -40,30 +44,46 @@ watch(
   { immediate: true }
 );
 
-const backgroundStyle = computed(() => ({
-  '--bg-color': colors.value.background,
-  '--bg-edge': colors.value.backgroundEdge,
-  '--shadow-color': colors.value.shadow,
-  '--text-color': colors.value.text,
-  '--text-secondary': colors.value.textSecondary,
-  '--text-tertiary': colors.value.textTertiary,
-  // Progress bar customization
-  '--progress-bar-height': '6px',
-  '--progress-time-size': 'clamp(14px, 1.5vw, 18px)',
-  '--progress-bar-bg': colors.value.mode === 'dark'
-    ? 'rgba(255, 255, 255, 0.15)'
-    : 'rgba(0, 0, 0, 0.15)',
-  '--progress-bar-fill': colors.value.mode === 'dark'
-    ? 'rgba(255, 255, 255, 0.8)'
-    : 'rgba(0, 0, 0, 0.6)',
-}));
+// Compute the effective color mode based on background type and extracted colors
+const effectiveColorMode = computed(() => {
+  if (props.background === 'white') return 'light';
+  if (props.background === 'black') return 'dark';
+  return colors.value.mode;
+});
+
+const ambientStyle = computed(() => {
+  // Start with base background style
+  const baseStyle = { ...backgroundStyle.value };
+
+  // For ambient layout, use radial gradient when gradient-radial or dominant is selected
+  if (props.background === 'gradient-radial' || props.background === 'dominant') {
+    baseStyle.background = `radial-gradient(ellipse 120% 100% at 30% 50%, ${colors.value.background} 0%, ${colors.value.backgroundEdge} 100%)`;
+  }
+
+  // Add CSS variables for ambient-specific styling
+  return {
+    ...baseStyle,
+    '--bg-color': colors.value.background,
+    '--bg-edge': colors.value.backgroundEdge,
+    '--shadow-color': colors.value.shadow,
+    // Progress bar customization
+    '--progress-bar-height': '6px',
+    '--progress-time-size': 'clamp(14px, 1.5vw, 18px)',
+    '--progress-bar-bg': effectiveColorMode.value === 'dark'
+      ? 'rgba(255, 255, 255, 0.15)'
+      : 'rgba(0, 0, 0, 0.15)',
+    '--progress-bar-fill': effectiveColorMode.value === 'dark'
+      ? 'rgba(255, 255, 255, 0.8)'
+      : 'rgba(0, 0, 0, 0.6)',
+  };
+});
 </script>
 
 <template>
   <div
     class="ambient-layout"
     :class="{ transitioning: isTransitioning }"
-    :style="backgroundStyle"
+    :style="ambientStyle"
   >
     <div class="safe-zone">
       <div class="content">
@@ -135,12 +155,6 @@ const backgroundStyle = computed(() => ({
 .ambient-layout {
   width: 100%;
   height: 100%;
-  background:
-    radial-gradient(
-      ellipse 120% 100% at 30% 50%,
-      var(--bg-color) 0%,
-      var(--bg-edge) 100%
-    );
   color: var(--text-color);
   transition: background 0.5s ease-out;
   overflow: hidden;

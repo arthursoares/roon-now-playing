@@ -51,6 +51,19 @@ export const FONT_CONFIG: Record<FontType, { displayName: string; googleFont: st
   'big-shoulders': { displayName: 'Big Shoulders Display', googleFont: 'Big+Shoulders+Display:wght@400;500;600;700' },
 };
 
+// Background options
+export const BACKGROUNDS = ['black', 'white', 'dominant', 'gradient-radial', 'gradient-linear'] as const;
+export type BackgroundType = (typeof BACKGROUNDS)[number];
+
+// Background display names
+export const BACKGROUND_CONFIG: Record<BackgroundType, { displayName: string }> = {
+  'black': { displayName: 'Black' },
+  'white': { displayName: 'White' },
+  'dominant': { displayName: 'Dominant Color' },
+  'gradient-radial': { displayName: 'Radial Gradient' },
+  'gradient-linear': { displayName: 'Linear Gradient' },
+};
+
 // WebSocket message types
 export interface ClientSubscribeMessage {
   type: 'subscribe';
@@ -98,6 +111,7 @@ export interface ClientMetadata {
   friendlyName: string | null;
   layout: LayoutType;
   font: FontType;
+  background: BackgroundType;
   zoneId: string | null;
   zoneName: string | null;
   connectedAt: number;
@@ -110,6 +124,7 @@ export interface ClientMetadataMessage {
   clientId: string;
   layout: LayoutType;
   font: FontType;
+  background: BackgroundType;
   zoneId: string | null;
   zoneName: string | null;
   userAgent: string | null;
@@ -140,6 +155,7 @@ export interface ServerRemoteSettingsMessage {
   type: 'remote_settings';
   layout?: LayoutType;
   font?: FontType;
+  background?: BackgroundType;
   zoneId?: string;
   zoneName?: string;
 }

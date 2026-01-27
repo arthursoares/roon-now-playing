@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import type { Track, PlaybackState } from '@roon-screen-cover/shared';
+import { computed } from 'vue';
+import type { Track, PlaybackState, BackgroundType } from '@roon-screen-cover/shared';
+import { useColorExtraction } from '../composables/useColorExtraction';
+import { useBackgroundStyle } from '../composables/useBackgroundStyle';
 
 const props = defineProps<{
   track: Track | null;
@@ -10,11 +13,17 @@ const props = defineProps<{
   duration: string;
   artworkUrl: string | null;
   zoneName: string;
+  background: BackgroundType;
 }>();
+
+const backgroundRef = computed(() => props.background);
+const artworkUrlRef = computed(() => props.artworkUrl);
+const { colors } = useColorExtraction(artworkUrlRef);
+const { style: backgroundStyle } = useBackgroundStyle(backgroundRef, colors);
 </script>
 
 <template>
-  <div class="fullscreen-layout">
+  <div class="fullscreen-layout" :style="backgroundStyle">
     <img
       v-if="artworkUrl"
       :src="artworkUrl"
@@ -34,10 +43,11 @@ const props = defineProps<{
 .fullscreen-layout {
   width: 100%;
   height: 100%;
-  background: #000;
   display: flex;
   align-items: center;
   justify-content: center;
+  color: var(--text-color, #fff);
+  transition: background 0.5s ease-out;
 }
 
 .artwork {
@@ -52,7 +62,7 @@ const props = defineProps<{
   align-items: center;
   justify-content: center;
   gap: 2rem;
-  color: #333;
+  color: var(--text-tertiary, #333);
 }
 
 .artwork-placeholder svg {
@@ -62,6 +72,6 @@ const props = defineProps<{
 
 .artwork-placeholder p {
   font-size: 1.5rem;
-  color: #444;
+  color: var(--text-tertiary, #444);
 }
 </style>

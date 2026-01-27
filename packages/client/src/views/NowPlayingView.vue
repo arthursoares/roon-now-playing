@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
-import { LAYOUTS, type Zone, type LayoutType, type FontType } from '@roon-screen-cover/shared';
+import { LAYOUTS, type Zone, type LayoutType, type FontType, type BackgroundType } from '@roon-screen-cover/shared';
 import { useWebSocket } from '../composables/useWebSocket';
 import { usePreferences } from '../composables/usePreferences';
 import { useFontLoader } from '../composables/useFontLoader';
@@ -11,9 +11,11 @@ const {
   preferredZone,
   layout,
   font,
+  background,
   saveZonePreference,
   saveLayoutPreference,
   saveFontPreference,
+  saveBackgroundPreference,
   clearZonePreference,
   loadPreferences,
 } = usePreferences();
@@ -25,6 +27,7 @@ const selectedZoneName = ref<string | null>(null);
 function handleRemoteSettings(settings: {
   layout?: LayoutType;
   font?: FontType;
+  background?: BackgroundType;
   zoneId?: string;
   zoneName?: string;
 }) {
@@ -33,6 +36,9 @@ function handleRemoteSettings(settings: {
   }
   if (settings.font) {
     saveFontPreference(settings.font);
+  }
+  if (settings.background) {
+    saveBackgroundPreference(settings.background);
   }
   if (settings.zoneId) {
     selectedZoneId.value = settings.zoneId;
@@ -48,6 +54,7 @@ function handleRemoteSettings(settings: {
 const { state: wsState, subscribeToZone, unsubscribe, updateMetadata } = useWebSocket({
   layout,
   font,
+  background,
   zoneId: selectedZoneId,
   zoneName: selectedZoneName,
   onRemoteSettings: handleRemoteSettings,
@@ -131,8 +138,8 @@ watch(
   { immediate: true }
 );
 
-// Watch for layout/font changes to update metadata
-watch([layout, font], () => {
+// Watch for layout/font/background changes to update metadata
+watch([layout, font, background], () => {
   updateMetadata();
 });
 
@@ -167,6 +174,7 @@ onMounted(() => {
       :now-playing="wsState.nowPlaying"
       :zone="selectedZone"
       :layout="layout"
+      :background="background"
       @change-zone="changeZone"
       @cycle-layout="cycleLayout"
     />

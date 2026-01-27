@@ -12,6 +12,7 @@ import type {
   Zone,
   LayoutType,
   FontType,
+  BackgroundType,
   ClientMetadata,
   ServerClientsListMessage,
   ServerClientConnectedMessage,
@@ -29,6 +30,7 @@ interface ClientState {
   friendlyName: string | null;
   layout: LayoutType;
   font: FontType;
+  background: BackgroundType;
   subscribedZoneId: string | null;
   subscribedZoneName: string | null;
   connectedAt: number;
@@ -81,6 +83,7 @@ export class WebSocketManager {
         friendlyName: null,
         layout: 'detailed',
         font: 'system',
+        background: 'black',
         subscribedZoneId: null,
         subscribedZoneName: null,
         connectedAt: Date.now(),
@@ -223,6 +226,7 @@ export class WebSocketManager {
       clientId: string;
       layout: LayoutType;
       font: FontType;
+      background: BackgroundType;
       zoneId: string | null;
       zoneName: string | null;
       userAgent: string | null;
@@ -240,6 +244,7 @@ export class WebSocketManager {
     clientState.deviceId = deviceId;
     clientState.layout = message.layout;
     clientState.font = message.font;
+    clientState.background = message.background;
     clientState.subscribedZoneId = message.zoneId;
     clientState.subscribedZoneName = message.zoneName;
     if (message.userAgent) {
@@ -372,6 +377,7 @@ export class WebSocketManager {
       friendlyName: clientState.friendlyName,
       layout: clientState.layout,
       font: clientState.font,
+      background: clientState.background,
       zoneId: clientState.subscribedZoneId,
       zoneName: clientState.subscribedZoneName,
       connectedAt: clientState.connectedAt,
@@ -397,7 +403,7 @@ export class WebSocketManager {
 
   pushSettingsToClient(
     clientId: string,
-    settings: { layout?: LayoutType; font?: FontType; zoneId?: string }
+    settings: { layout?: LayoutType; font?: FontType; background?: BackgroundType; zoneId?: string }
   ): boolean {
     const clientState = this.clientsById.get(clientId);
     if (!clientState || clientState.ws.readyState !== WebSocket.OPEN) {
@@ -415,6 +421,7 @@ export class WebSocketManager {
       type: 'remote_settings',
       layout: settings.layout,
       font: settings.font,
+      background: settings.background,
       zoneId: settings.zoneId,
       zoneName,
     };
@@ -424,6 +431,7 @@ export class WebSocketManager {
     // Update local state
     if (settings.layout) clientState.layout = settings.layout;
     if (settings.font) clientState.font = settings.font;
+    if (settings.background) clientState.background = settings.background;
     if (settings.zoneId) {
       clientState.subscribedZoneId = settings.zoneId;
       clientState.subscribedZoneName = zoneName || null;

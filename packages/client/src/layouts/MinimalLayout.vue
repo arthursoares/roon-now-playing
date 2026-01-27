@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import type { Track, PlaybackState } from '@roon-screen-cover/shared';
+import { computed } from 'vue';
+import type { Track, PlaybackState, BackgroundType } from '@roon-screen-cover/shared';
+import { useColorExtraction } from '../composables/useColorExtraction';
+import { useBackgroundStyle } from '../composables/useBackgroundStyle';
 
 const props = defineProps<{
   track: Track | null;
@@ -10,11 +13,17 @@ const props = defineProps<{
   duration: string;
   artworkUrl: string | null;
   zoneName: string;
+  background: BackgroundType;
 }>();
+
+const backgroundRef = computed(() => props.background);
+const artworkUrlRef = computed(() => props.artworkUrl);
+const { colors } = useColorExtraction(artworkUrlRef);
+const { style: backgroundStyle } = useBackgroundStyle(backgroundRef, colors);
 </script>
 
 <template>
-  <div class="minimal-layout">
+  <div class="minimal-layout" :style="backgroundStyle">
     <div class="artwork-background">
       <img
         v-if="artworkUrl"
@@ -50,7 +59,8 @@ const props = defineProps<{
   width: 100%;
   height: 100%;
   position: relative;
-  background: #000;
+  color: var(--text-color, #fff);
+  transition: background 0.5s ease-out;
 }
 
 .artwork-background {
@@ -113,7 +123,7 @@ const props = defineProps<{
 
 .artist {
   font-size: clamp(1rem, 3vw, 1.5rem);
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-secondary, rgba(255, 255, 255, 0.8));
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -126,7 +136,7 @@ const props = defineProps<{
 
 .no-playback p {
   font-size: 1.5rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.6));
 }
 
 .progress-line {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Zone, NowPlaying as NowPlayingType, LayoutType } from '@roon-screen-cover/shared';
+import type { Zone, NowPlaying as NowPlayingType, LayoutType, BackgroundType } from '@roon-screen-cover/shared';
 import { useNowPlaying } from '../composables/useNowPlaying';
 import MinimalLayout from '../layouts/MinimalLayout.vue';
 import DetailedLayout from '../layouts/DetailedLayout.vue';
@@ -12,6 +12,7 @@ const props = defineProps<{
   nowPlaying: NowPlayingType | null;
   zone: Zone;
   layout: LayoutType;
+  background: BackgroundType;
 }>();
 
 const emit = defineEmits<{
@@ -69,6 +70,7 @@ function handleDoubleClick(): void {
       :duration="durationFormatted"
       :artwork-url="artworkUrl"
       :zone-name="zone.display_name"
+      :background="background"
     />
   </div>
 </template>

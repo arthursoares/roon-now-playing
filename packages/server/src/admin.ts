@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { WebSocketManager } from './websocket.js';
-import type { LayoutType, FontType } from '@roon-screen-cover/shared';
-import { LAYOUTS, FONTS } from '@roon-screen-cover/shared';
+import type { LayoutType, FontType, BackgroundType } from '@roon-screen-cover/shared';
+import { LAYOUTS, FONTS, BACKGROUNDS } from '@roon-screen-cover/shared';
 import { logger } from './logger.js';
 
 export function createAdminRouter(wsManager: WebSocketManager): Router {
@@ -41,9 +41,10 @@ export function createAdminRouter(wsManager: WebSocketManager): Router {
   // Push settings to client
   router.post('/clients/:clientId/push', (req, res) => {
     const { clientId } = req.params;
-    const { layout, font, zoneId } = req.body as {
+    const { layout, font, background, zoneId } = req.body as {
       layout?: LayoutType;
       font?: FontType;
+      background?: BackgroundType;
       zoneId?: string;
     };
 
@@ -59,16 +60,22 @@ export function createAdminRouter(wsManager: WebSocketManager): Router {
       return;
     }
 
-    // Check if any settings provided
-    if (layout === undefined && font === undefined && zoneId === undefined) {
-      res.status(400).json({ error: 'At least one setting (layout, font, or zoneId) is required' });
+    // Validate background
+    if (background !== undefined && !(BACKGROUNDS as readonly string[]).includes(background)) {
+      res.status(400).json({ error: `Invalid background. Must be one of: ${BACKGROUNDS.join(', ')}` });
       return;
     }
 
-    const success = wsManager.pushSettingsToClient(clientId, { layout, font, zoneId });
+    // Check if any settings provided
+    if (layout === undefined && font === undefined && background === undefined && zoneId === undefined) {
+      res.status(400).json({ error: 'At least one setting (layout, font, background, or zoneId) is required' });
+      return;
+    }
+
+    const success = wsManager.pushSettingsToClient(clientId, { layout, font, background, zoneId });
     if (success) {
       logger.info(
-        `Pushed settings to ${clientId}: layout=${layout}, font=${font}, zoneId=${zoneId}`
+        `Pushed settings to ${clientId}: layout=${layout}, font=${font}, background=${background}, zoneId=${zoneId}`
       );
       res.json({ success: true });
     } else {

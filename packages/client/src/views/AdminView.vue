@@ -5,8 +5,11 @@ import {
   LAYOUTS,
   FONTS,
   FONT_CONFIG,
+  BACKGROUNDS,
+  BACKGROUND_CONFIG,
   type LayoutType,
   type FontType,
+  type BackgroundType,
   type ClientMetadata,
 } from '@roon-screen-cover/shared';
 
@@ -67,7 +70,7 @@ async function saveName(clientId: string): Promise<void> {
 
 async function pushSetting(
   clientId: string,
-  setting: { layout?: LayoutType; font?: FontType; zoneId?: string }
+  setting: { layout?: LayoutType; font?: FontType; background?: BackgroundType; zoneId?: string }
 ): Promise<void> {
   pushing.value[clientId] = true;
   try {
@@ -89,6 +92,10 @@ function getLayoutDisplayName(layout: LayoutType): string {
 
 function getFontDisplayName(font: FontType): string {
   return FONT_CONFIG[font]?.displayName || font;
+}
+
+function getBackgroundDisplayName(background: BackgroundType): string {
+  return BACKGROUND_CONFIG[background]?.displayName || background;
 }
 </script>
 
@@ -120,6 +127,7 @@ function getFontDisplayName(font: FontType): string {
               <th>Zone</th>
               <th>Layout</th>
               <th>Font</th>
+              <th>Background</th>
               <th>Connected</th>
               <th>Device</th>
             </tr>
@@ -196,6 +204,22 @@ function getFontDisplayName(font: FontType): string {
                 >
                   <option v-for="f in FONTS" :key="f" :value="f">
                     {{ getFontDisplayName(f) }}
+                  </option>
+                </select>
+              </td>
+              <td>
+                <select
+                  :value="client.background"
+                  :disabled="pushing[client.clientId]"
+                  @change="
+                    (e) =>
+                      pushSetting(client.clientId, {
+                        background: (e.target as HTMLSelectElement).value as BackgroundType,
+                      })
+                  "
+                >
+                  <option v-for="b in BACKGROUNDS" :key="b" :value="b">
+                    {{ getBackgroundDisplayName(b) }}
                   </option>
                 </select>
               </td>
