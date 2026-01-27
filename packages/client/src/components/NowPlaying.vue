@@ -6,6 +6,7 @@ import MinimalLayout from '../layouts/MinimalLayout.vue';
 import DetailedLayout from '../layouts/DetailedLayout.vue';
 import FullscreenLayout from '../layouts/FullscreenLayout.vue';
 import AmbientLayout from '../layouts/AmbientLayout.vue';
+import CoverLayout from '../layouts/CoverLayout.vue';
 
 const props = defineProps<{
   nowPlaying: NowPlayingType | null;
@@ -36,6 +37,8 @@ const layoutComponent = computed(() => {
       return FullscreenLayout;
     case 'ambient':
       return AmbientLayout;
+    case 'cover':
+      return CoverLayout;
     default:
       return DetailedLayout;
   }

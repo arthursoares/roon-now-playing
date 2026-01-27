@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import type { Track, PlaybackState } from '@roon-screen-cover/shared';
 import { useColorExtraction } from '../composables/useColorExtraction';
+import ProgressBar from '../components/ProgressBar.vue';
 
 const props = defineProps<{
   track: Track | null;
@@ -46,10 +47,15 @@ const backgroundStyle = computed(() => ({
   '--text-color': colors.value.text,
   '--text-secondary': colors.value.textSecondary,
   '--text-tertiary': colors.value.textTertiary,
-}));
-
-const progressStyle = computed(() => ({
-  width: `${props.progress}%`,
+  // Progress bar customization
+  '--progress-bar-height': '6px',
+  '--progress-time-size': 'clamp(14px, 1.5vw, 18px)',
+  '--progress-bar-bg': colors.value.mode === 'dark'
+    ? 'rgba(255, 255, 255, 0.15)'
+    : 'rgba(0, 0, 0, 0.15)',
+  '--progress-bar-fill': colors.value.mode === 'dark'
+    ? 'rgba(255, 255, 255, 0.8)'
+    : 'rgba(0, 0, 0, 0.6)',
 }));
 </script>
 
@@ -85,29 +91,39 @@ const progressStyle = computed(() => ({
               </svg>
             </div>
           </div>
-
-          <!-- Progress bar below artwork -->
-          <div v-if="track" class="progress-container">
-            <div class="progress-bar">
-              <div class="progress-fill" :style="progressStyle"></div>
-            </div>
-            <div class="progress-times">
-              <span>{{ currentTime }}</span>
-              <span>{{ duration }}</span>
-            </div>
-          </div>
         </div>
 
         <!-- Right column: Metadata -->
         <div class="metadata-column">
           <div v-if="track" class="track-info">
-            <h1 class="artist">{{ track.artist }}</h1>
-            <h2 class="title">{{ track.title }}</h2>
+            <h1 class="title">{{ track.title }}</h1>
+            <p class="artist">{{ track.artist }}</p>
             <p class="album">{{ track.album }}</p>
           </div>
           <div v-else class="no-playback">
             <p class="no-playback-text">No playback</p>
-            <p class="zone-name">{{ zoneName }}</p>
+            <p class="zone-hint">{{ zoneName }}</p>
+          </div>
+
+          <!-- Progress bar -->
+          <div v-if="track" class="progress-container">
+            <ProgressBar
+              :progress="progress"
+              :current-time="currentTime"
+              :duration="duration"
+              :show-time="true"
+            />
+          </div>
+
+          <!-- Zone indicator -->
+          <div class="zone-indicator">
+            <span class="zone-name">{{ zoneName }}</span>
+            <span v-if="isPlaying" class="playing-indicator">
+              <span class="bar"></span>
+              <span class="bar"></span>
+              <span class="bar"></span>
+            </span>
+            <span v-else-if="state === 'paused'" class="paused-indicator">⏸</span>
           </div>
         </div>
       </div>
@@ -233,38 +249,6 @@ const progressStyle = computed(() => ({
   opacity: 0.5;
 }
 
-/* Progress Bar */
-.progress-container {
-  width: 100%;
-  margin-top: 1.5rem;
-  padding: 0 2%;
-}
-
-.progress-bar {
-  height: 6px;
-  background: var(--text-tertiary);
-  border-radius: 3px;
-  overflow: hidden;
-  opacity: 0.4;
-}
-
-.progress-fill {
-  height: 100%;
-  background: var(--text-color);
-  border-radius: 3px;
-  transition: width 0.2s linear;
-  opacity: 0.8;
-}
-
-.progress-times {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 0.75rem;
-  font-size: clamp(14px, 1.5vw, 20px);
-  color: var(--text-tertiary);
-  font-variant-numeric: tabular-nums;
-}
-
 /* Metadata Column */
 .metadata-column {
   flex: 1;
@@ -282,33 +266,17 @@ const progressStyle = computed(() => ({
 }
 
 .track-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25em;
+  margin-bottom: 2rem;
 }
 
-/* Typography - 10ft UI Scale */
-.artist {
-  font-size: clamp(32px, 5vw, 64px);
-  font-weight: 700;
-  line-height: 1.1;
-  margin: 0;
-  color: var(--text-color);
-
-  /* Single line with ellipsis */
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 90%;
-}
-
+/* Typography - 10ft UI Scale, Title-first like Detailed */
 .title {
-  font-size: clamp(24px, 3.5vw, 48px);
-  font-weight: 400;
-  line-height: 1.2;
+  font-size: clamp(28px, 4.5vw, 56px);
+  font-weight: 600;
+  line-height: 1.15;
   margin: 0;
-  margin-top: 0.1em;
-  color: var(--text-secondary);
+  margin-bottom: 0.4em;
+  color: var(--text-color);
 
   /* Two lines with ellipsis */
   overflow: hidden;
@@ -316,22 +284,97 @@ const progressStyle = computed(() => ({
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  max-width: 90%;
+}
+
+.artist {
+  font-size: clamp(20px, 3vw, 40px);
+  font-weight: 400;
+  line-height: 1.2;
+  margin: 0;
+  margin-bottom: 0.2em;
+  color: var(--text-secondary);
+
+  /* Single line with ellipsis */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .album {
-  font-size: clamp(18px, 2.5vw, 36px);
+  font-size: clamp(16px, 2vw, 28px);
   font-weight: 400;
   line-height: 1.3;
   margin: 0;
-  margin-top: 1em; /* Larger gap before secondary info */
   color: var(--text-tertiary);
 
   /* Single line with ellipsis */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 85%;
+}
+
+/* Progress Bar */
+.progress-container {
+  margin-bottom: 2rem;
+}
+
+/* Zone Indicator */
+.zone-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-tertiary);
+  font-size: clamp(14px, 1.5vw, 20px);
+}
+
+.zone-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playing-indicator {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 18px;
+}
+
+.playing-indicator .bar {
+  width: 4px;
+  background: currentColor;
+  border-radius: 2px;
+  animation: equalizer 0.8s ease-in-out infinite;
+  opacity: 0.8;
+}
+
+.playing-indicator .bar:nth-child(1) {
+  height: 40%;
+  animation-delay: 0s;
+}
+
+.playing-indicator .bar:nth-child(2) {
+  height: 100%;
+  animation-delay: 0.2s;
+}
+
+.playing-indicator .bar:nth-child(3) {
+  height: 60%;
+  animation-delay: 0.4s;
+}
+
+@keyframes equalizer {
+  0%, 100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.paused-indicator {
+  font-size: 1em;
+  opacity: 0.8;
 }
 
 /* No playback state */
@@ -345,8 +388,8 @@ const progressStyle = computed(() => ({
   margin: 0;
 }
 
-.zone-name {
-  font-size: clamp(18px, 2vw, 32px);
+.zone-hint {
+  font-size: clamp(16px, 2vw, 28px);
   color: var(--text-tertiary);
   margin: 0;
   margin-top: 0.5em;
@@ -364,14 +407,20 @@ const progressStyle = computed(() => ({
     padding-right: 0;
   }
 
-  .artist,
   .title,
+  .artist,
   .album {
     max-width: 100%;
   }
 
   .track-info {
+    display: flex;
+    flex-direction: column;
     align-items: center;
+  }
+
+  .zone-indicator {
+    justify-content: center;
   }
 
   .no-playback {
