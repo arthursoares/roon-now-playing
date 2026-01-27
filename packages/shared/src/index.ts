@@ -25,7 +25,31 @@ export interface NowPlaying {
 }
 
 // Layout options
-export type LayoutType = 'minimal' | 'detailed' | 'fullscreen' | 'ambient';
+export const LAYOUTS = ['detailed', 'minimal', 'fullscreen', 'ambient'] as const;
+export type LayoutType = (typeof LAYOUTS)[number];
+
+// Font options
+export const FONTS = [
+  'system',
+  'patua-one',
+  'comfortaa',
+  'noto-sans-display',
+  'coda',
+  'bellota-text',
+  'big-shoulders',
+] as const;
+export type FontType = (typeof FONTS)[number];
+
+// Font display names and Google Font URLs
+export const FONT_CONFIG: Record<FontType, { displayName: string; googleFont: string | null }> = {
+  'system': { displayName: 'System', googleFont: null },
+  'patua-one': { displayName: 'Patua One', googleFont: 'Patua+One:wght@400' },
+  'comfortaa': { displayName: 'Comfortaa', googleFont: 'Comfortaa:wght@300;400;500;600;700' },
+  'noto-sans-display': { displayName: 'Noto Sans Display', googleFont: 'Noto+Sans+Display:wght@400;500;600;700' },
+  'coda': { displayName: 'Coda', googleFont: 'Coda:wght@400;800' },
+  'bellota-text': { displayName: 'Bellota Text', googleFont: 'Bellota+Text:wght@300;400;700' },
+  'big-shoulders': { displayName: 'Big Shoulders Display', googleFont: 'Big+Shoulders+Display:wght@400;500;600;700' },
+};
 
 // WebSocket message types
 export interface ClientSubscribeMessage {

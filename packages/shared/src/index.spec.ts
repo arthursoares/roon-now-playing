@@ -8,14 +8,18 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type {
-  Zone,
-  Track,
-  NowPlaying,
-  PlaybackState,
-  LayoutType,
-  ClientMessage,
-  ServerMessage,
+import {
+  LAYOUTS,
+  FONTS,
+  FONT_CONFIG,
+  type Zone,
+  type Track,
+  type NowPlaying,
+  type PlaybackState,
+  type LayoutType,
+  type FontType,
+  type ClientMessage,
+  type ServerMessage,
 } from './index';
 
 describe('Shared Types', () => {
@@ -92,9 +96,47 @@ describe('Shared Types', () => {
   });
 
   describe('LayoutType', () => {
-    it('should only allow valid layouts', () => {
-      const layouts: LayoutType[] = ['minimal', 'detailed', 'fullscreen', 'ambient'];
-      expect(layouts).toHaveLength(4);
+    it('should export LAYOUTS constant', () => {
+      expect(LAYOUTS).toContain('detailed');
+      expect(LAYOUTS).toContain('minimal');
+      expect(LAYOUTS).toContain('fullscreen');
+      expect(LAYOUTS).toContain('ambient');
+    });
+
+    it('should have correct number of layouts', () => {
+      expect(LAYOUTS).toHaveLength(4);
+    });
+  });
+
+  describe('FontType', () => {
+    it('should export FONTS constant', () => {
+      expect(FONTS).toContain('system');
+      expect(FONTS).toContain('patua-one');
+      expect(FONTS).toContain('comfortaa');
+      expect(FONTS).toContain('noto-sans-display');
+      expect(FONTS).toContain('coda');
+      expect(FONTS).toContain('bellota-text');
+      expect(FONTS).toContain('big-shoulders');
+    });
+
+    it('should have correct number of fonts', () => {
+      expect(FONTS).toHaveLength(7);
+    });
+
+    it('should have FONT_CONFIG for each font', () => {
+      for (const font of FONTS) {
+        expect(FONT_CONFIG[font]).toBeDefined();
+        expect(FONT_CONFIG[font].displayName).toBeTruthy();
+      }
+    });
+
+    it('should have null googleFont for system font only', () => {
+      expect(FONT_CONFIG['system'].googleFont).toBeNull();
+      for (const font of FONTS) {
+        if (font !== 'system') {
+          expect(FONT_CONFIG[font].googleFont).toBeTruthy();
+        }
+      }
     });
   });
 

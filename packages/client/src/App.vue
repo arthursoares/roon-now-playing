@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
-import type { Zone, LayoutType } from '@roon-screen-cover/shared';
+import { LAYOUTS, type Zone, type LayoutType } from '@roon-screen-cover/shared';
 import { useWebSocket } from './composables/useWebSocket';
 import { usePreferences } from './composables/usePreferences';
+import { useFontLoader } from './composables/useFontLoader';
 import ZonePicker from './components/ZonePicker.vue';
 import NowPlaying from './components/NowPlaying.vue';
 
 const { state: wsState, subscribeToZone, unsubscribe } = useWebSocket();
-const { preferredZone, layout, saveZonePreference, saveLayoutPreference, clearZonePreference, loadPreferences } = usePreferences();
+const { preferredZone, layout, font, saveZonePreference, saveLayoutPreference, saveFontPreference, clearZonePreference, loadPreferences } = usePreferences();
+const { isLoaded: fontLoaded, getFontFamily } = useFontLoader(font);
+
+const fontFamily = computed(() => getFontFamily(font.value));
 
 const selectedZoneId = ref<string | null>(null);
 const showZonePicker = ref(false);
@@ -55,10 +59,9 @@ function changeZone(): void {
 }
 
 function cycleLayout(): void {
-  const layouts: LayoutType[] = ['detailed', 'minimal', 'fullscreen'];
-  const currentIndex = layouts.indexOf(layout.value);
-  const nextIndex = (currentIndex + 1) % layouts.length;
-  saveLayoutPreference(layouts[nextIndex]);
+  const currentIndex = LAYOUTS.indexOf(layout.value);
+  const nextIndex = (currentIndex + 1) % LAYOUTS.length;
+  saveLayoutPreference(LAYOUTS[nextIndex]);
 }
 
 // Watch for zones to become available and auto-select
@@ -91,7 +94,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="app">
+  <div class="app" :style="{ fontFamily }">
     <!-- Connection overlay -->
     <div v-if="connectionStatus !== 'connected'" class="connection-overlay">
       <div class="connection-status">
