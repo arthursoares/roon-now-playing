@@ -1,8 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import type { Track, PlaybackState, BackgroundType } from '@roon-screen-cover/shared';
-import { useColorExtraction } from '../composables/useColorExtraction';
-import { useBackgroundStyle } from '../composables/useBackgroundStyle';
 
 const props = defineProps<{
   track: Track | null;
@@ -16,14 +13,12 @@ const props = defineProps<{
   background: BackgroundType;
 }>();
 
-const backgroundRef = computed(() => props.background);
-const artworkUrlRef = computed(() => props.artworkUrl);
-const { colors } = useColorExtraction(artworkUrlRef);
-const { style: backgroundStyle } = useBackgroundStyle(backgroundRef, colors);
+// Note: MinimalLayout ignores background setting because the artwork covers the entire screen
+// with a gradient overlay on top. Text is always white on the dark overlay.
 </script>
 
 <template>
-  <div class="minimal-layout" :style="backgroundStyle">
+  <div class="minimal-layout">
     <div class="artwork-background">
       <img
         v-if="artworkUrl"
@@ -59,8 +54,8 @@ const { style: backgroundStyle } = useBackgroundStyle(backgroundRef, colors);
   width: 100%;
   height: 100%;
   position: relative;
-  color: var(--text-color, #fff);
-  transition: background 0.5s ease-out;
+  background: #000;
+  color: #fff;
 }
 
 .artwork-background {
@@ -123,7 +118,7 @@ const { style: backgroundStyle } = useBackgroundStyle(backgroundRef, colors);
 
 .artist {
   font-size: clamp(1rem, 3vw, 1.5rem);
-  color: var(--text-secondary, rgba(255, 255, 255, 0.8));
+  color: rgba(255, 255, 255, 0.8);
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -136,7 +131,7 @@ const { style: backgroundStyle } = useBackgroundStyle(backgroundRef, colors);
 
 .no-playback p {
   font-size: 1.5rem;
-  color: var(--text-tertiary, rgba(255, 255, 255, 0.6));
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .progress-line {

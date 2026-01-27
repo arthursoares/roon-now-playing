@@ -19,8 +19,8 @@ const props = defineProps<{
 
 const backgroundRef = computed(() => props.background);
 const artworkUrlRef = computed(() => props.artworkUrl);
-const { colors, isTransitioning } = useColorExtraction(artworkUrlRef);
-const { style: backgroundStyle, needsColorExtraction } = useBackgroundStyle(backgroundRef, colors);
+const { colors, vibrantGradient, isTransitioning } = useColorExtraction(artworkUrlRef);
+const { style: backgroundStyle } = useBackgroundStyle(backgroundRef, colors, vibrantGradient);
 
 // Track previous artwork for crossfade
 const displayedArtwork = ref<string | null>(null);

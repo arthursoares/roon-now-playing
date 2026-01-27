@@ -19,8 +19,8 @@ const props = defineProps<{
 
 const backgroundRef = computed(() => props.background);
 const artworkUrlRef = computed(() => props.artworkUrl);
-const { colors } = useColorExtraction(artworkUrlRef);
-const { style: backgroundStyle, needsColorExtraction } = useBackgroundStyle(backgroundRef, colors);
+const { colors, vibrantGradient } = useColorExtraction(artworkUrlRef);
+const { style: backgroundStyle } = useBackgroundStyle(backgroundRef, colors, vibrantGradient);
 </script>
 
 <template>

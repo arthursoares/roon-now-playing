@@ -1,6 +1,7 @@
 import { computed, type Ref, type ComputedRef } from 'vue';
 import type { BackgroundType } from '@roon-screen-cover/shared';
 import type { ExtractedColors } from './colorUtils';
+import type { VibrantGradient } from './useColorExtraction';
 
 export interface BackgroundStyleResult {
   style: ComputedRef<Record<string, string>>;
@@ -10,11 +11,13 @@ export interface BackgroundStyleResult {
 /**
  * Composable for generating background styles based on background type
  * @param backgroundType - The selected background type
- * @param colors - Optional extracted colors from artwork (required for dominant/gradient types)
+ * @param colors - Optional extracted colors from artwork (for dominant background)
+ * @param vibrantGradient - Optional vibrant gradient colors (for gradient backgrounds)
  */
 export function useBackgroundStyle(
   backgroundType: Ref<BackgroundType>,
-  colors?: Ref<ExtractedColors>
+  colors?: Ref<ExtractedColors>,
+  vibrantGradient?: Ref<VibrantGradient>
 ): BackgroundStyleResult {
   const needsColorExtraction = computed(() => {
     return ['dominant', 'gradient-radial', 'gradient-linear'].includes(backgroundType.value);
@@ -28,6 +31,8 @@ export function useBackgroundStyle(
           '--text-color': '#ffffff',
           '--text-secondary': 'rgba(255, 255, 255, 0.8)',
           '--text-tertiary': 'rgba(255, 255, 255, 0.6)',
+          '--progress-bar-bg': 'rgba(255, 255, 255, 0.2)',
+          '--progress-bar-fill': 'rgba(255, 255, 255, 0.9)',
         };
 
       case 'white':
@@ -36,15 +41,21 @@ export function useBackgroundStyle(
           '--text-color': '#1a1a1a',
           '--text-secondary': 'rgba(26, 26, 26, 0.8)',
           '--text-tertiary': 'rgba(26, 26, 26, 0.6)',
+          '--progress-bar-bg': 'rgba(26, 26, 26, 0.15)',
+          '--progress-bar-fill': 'rgba(26, 26, 26, 0.7)',
         };
 
       case 'dominant':
-        if (colors?.value) {
+        // Use vibrant colors for a more punchy dominant background
+        if (vibrantGradient?.value?.ready) {
+          const isDark = vibrantGradient.value.mode === 'dark';
           return {
-            background: colors.value.background,
-            '--text-color': colors.value.text,
-            '--text-secondary': colors.value.textSecondary,
-            '--text-tertiary': colors.value.textTertiary,
+            background: vibrantGradient.value.center,
+            '--text-color': vibrantGradient.value.text,
+            '--text-secondary': vibrantGradient.value.textSecondary,
+            '--text-tertiary': vibrantGradient.value.textTertiary,
+            '--progress-bar-bg': isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(26, 26, 26, 0.15)',
+            '--progress-bar-fill': isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(26, 26, 26, 0.7)',
           };
         }
         // Fallback to black if no colors available
@@ -53,15 +64,20 @@ export function useBackgroundStyle(
           '--text-color': '#ffffff',
           '--text-secondary': 'rgba(255, 255, 255, 0.8)',
           '--text-tertiary': 'rgba(255, 255, 255, 0.6)',
+          '--progress-bar-bg': 'rgba(255, 255, 255, 0.2)',
+          '--progress-bar-fill': 'rgba(255, 255, 255, 0.9)',
         };
 
       case 'gradient-radial':
-        if (colors?.value) {
+        if (vibrantGradient?.value?.ready) {
+          const isDark = vibrantGradient.value.mode === 'dark';
           return {
-            background: `radial-gradient(ellipse 120% 100% at 50% 50%, ${colors.value.background} 0%, ${colors.value.backgroundEdge} 100%)`,
-            '--text-color': colors.value.text,
-            '--text-secondary': colors.value.textSecondary,
-            '--text-tertiary': colors.value.textTertiary,
+            background: `radial-gradient(ellipse 120% 100% at 50% 50%, ${vibrantGradient.value.center} 0%, ${vibrantGradient.value.edge} 100%)`,
+            '--text-color': vibrantGradient.value.text,
+            '--text-secondary': vibrantGradient.value.textSecondary,
+            '--text-tertiary': vibrantGradient.value.textTertiary,
+            '--progress-bar-bg': isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(26, 26, 26, 0.15)',
+            '--progress-bar-fill': isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(26, 26, 26, 0.7)',
           };
         }
         // Fallback gradient
@@ -70,15 +86,20 @@ export function useBackgroundStyle(
           '--text-color': '#ffffff',
           '--text-secondary': 'rgba(255, 255, 255, 0.8)',
           '--text-tertiary': 'rgba(255, 255, 255, 0.6)',
+          '--progress-bar-bg': 'rgba(255, 255, 255, 0.2)',
+          '--progress-bar-fill': 'rgba(255, 255, 255, 0.9)',
         };
 
       case 'gradient-linear':
-        if (colors?.value) {
+        if (vibrantGradient?.value?.ready) {
+          const isDark = vibrantGradient.value.mode === 'dark';
           return {
-            background: `linear-gradient(135deg, ${colors.value.background} 0%, ${colors.value.backgroundEdge} 100%)`,
-            '--text-color': colors.value.text,
-            '--text-secondary': colors.value.textSecondary,
-            '--text-tertiary': colors.value.textTertiary,
+            background: `linear-gradient(135deg, ${vibrantGradient.value.center} 0%, ${vibrantGradient.value.edge} 100%)`,
+            '--text-color': vibrantGradient.value.text,
+            '--text-secondary': vibrantGradient.value.textSecondary,
+            '--text-tertiary': vibrantGradient.value.textTertiary,
+            '--progress-bar-bg': isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(26, 26, 26, 0.15)',
+            '--progress-bar-fill': isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(26, 26, 26, 0.7)',
           };
         }
         // Fallback gradient
@@ -87,6 +108,8 @@ export function useBackgroundStyle(
           '--text-color': '#ffffff',
           '--text-secondary': 'rgba(255, 255, 255, 0.8)',
           '--text-tertiary': 'rgba(255, 255, 255, 0.6)',
+          '--progress-bar-bg': 'rgba(255, 255, 255, 0.2)',
+          '--progress-bar-fill': 'rgba(255, 255, 255, 0.9)',
         };
 
       default:
@@ -95,6 +118,8 @@ export function useBackgroundStyle(
           '--text-color': '#ffffff',
           '--text-secondary': 'rgba(255, 255, 255, 0.8)',
           '--text-tertiary': 'rgba(255, 255, 255, 0.6)',
+          '--progress-bar-bg': 'rgba(255, 255, 255, 0.2)',
+          '--progress-bar-fill': 'rgba(255, 255, 255, 0.9)',
         };
     }
   });

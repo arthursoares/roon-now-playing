@@ -280,6 +280,50 @@ export function extractDominantColor(imageData: ImageData): HSL {
 }
 
 /**
+ * Generate vibrant gradient colors that preserve more of the original saturation
+ * Used for gradient-radial and gradient-linear backgrounds
+ */
+export function generateVibrantGradient(dominant: HSL): {
+  center: string;
+  edge: string;
+  text: string;
+  textSecondary: string;
+  textTertiary: string;
+  mode: 'light' | 'dark';
+} {
+  const isDarkMode = dominant.l <= 50;
+
+  // Preserve much more of the original saturation
+  // For vibrant images, keep saturation high; for muted images, boost it slightly
+  const centerS = Math.max(dominant.s * 0.85, 50);
+
+  // Center lightness: keep it visible but not too bright
+  const centerL = isDarkMode
+    ? Math.max(25, Math.min(40, dominant.l * 0.8))
+    : Math.min(75, Math.max(60, dominant.l * 0.9));
+
+  // Edge: much darker and can be even more saturated for drama
+  const edgeS = Math.min(centerS + 15, 95);
+  const edgeL = isDarkMode
+    ? Math.max(5, centerL - 20)
+    : Math.max(40, centerL - 25);
+
+  // Calculate text color based on center luminance
+  const centerRgb = hslToRgb(dominant.h, centerS, centerL);
+  const luminance = getLuminance(centerRgb.r, centerRgb.g, centerRgb.b);
+  const useDarkText = luminance > 0.35;
+
+  return {
+    center: hslToString(dominant.h, centerS, centerL),
+    edge: hslToString(dominant.h, edgeS, edgeL),
+    text: useDarkText ? '#1a1a1a' : '#f5f5f5',
+    textSecondary: useDarkText ? 'rgba(26, 26, 26, 0.8)' : 'rgba(245, 245, 245, 0.85)',
+    textTertiary: useDarkText ? 'rgba(26, 26, 26, 0.6)' : 'rgba(245, 245, 245, 0.7)',
+    mode: isDarkMode ? 'dark' : 'light',
+  };
+}
+
+/**
  * Generate full color scheme from a dominant color
  */
 export function generateColors(dominant: HSL): ExtractedColors {

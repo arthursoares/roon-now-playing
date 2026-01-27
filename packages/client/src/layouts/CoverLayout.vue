@@ -18,8 +18,8 @@ const props = defineProps<{
 
 const backgroundRef = computed(() => props.background);
 const artworkUrlRef = computed(() => props.artworkUrl);
-const { colors } = useColorExtraction(artworkUrlRef);
-const { style: backgroundStyle } = useBackgroundStyle(backgroundRef, colors);
+const { colors, vibrantGradient } = useColorExtraction(artworkUrlRef);
+const { style: backgroundStyle } = useBackgroundStyle(backgroundRef, colors, vibrantGradient);
 
 // Determine if dark mode based on background type
 const isDarkMode = computed(() => {
