@@ -1,0 +1,31 @@
+{
+  "name": "roon-screen-cover",
+  "version": "1.0.0",
+  "description": "Roon Now Playing Display - Real-time album artwork and track metadata for web clients",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm run --parallel dev:server dev:client",
+    "dev:server": "pnpm --filter @roon-screen-cover/server dev",
+    "dev:client": "pnpm --filter @roon-screen-cover/client dev",
+    "build": "pnpm run build:shared && pnpm run build:client && pnpm run build:server",
+    "build:shared": "pnpm --filter @roon-screen-cover/shared build",
+    "build:client": "pnpm --filter @roon-screen-cover/client build",
+    "build:server": "pnpm --filter @roon-screen-cover/server build",
+    "start": "pnpm --filter @roon-screen-cover/server start",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint packages --ext .ts,.vue"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "jsdom": "^24.0.0",
+    "typescript": "~5.6.0",
+    "vitest": "^1.2.0"
+  },
+  "packageManager": "pnpm@8.14.0",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

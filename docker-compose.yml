@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  roon-screen-cover:
+    build: .
+    container_name: roon-screen-cover
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      # Persist artwork cache
+      - artwork-cache:/app/cache
+      # Persist Roon pairing configuration
+      - roon-config:/app/config
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOST=0.0.0.0
+      - LOG_LEVEL=info
+    # Use host network for Roon discovery (alternative to port mapping)
+    # network_mode: host
+
+volumes:
+  artwork-cache:
+  roon-config:

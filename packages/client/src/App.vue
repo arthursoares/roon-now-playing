@@ -1,0 +1,202 @@
+<script setup lang="ts">
+import { ref, computed, watch, onMounted } from 'vue';
+import type { Zone, LayoutType } from '@roon-screen-cover/shared';
+import { useWebSocket } from './composables/useWebSocket';
+import { usePreferences } from './composables/usePreferences';
+import ZonePicker from './components/ZonePicker.vue';
+import NowPlaying from './components/NowPlaying.vue';
+
+const { state: wsState, subscribeToZone, unsubscribe } = useWebSocket();
+const { preferredZone, layout, saveZonePreference, saveLayoutPreference, clearZonePreference, loadPreferences } = usePreferences();
+
+const selectedZoneId = ref<string | null>(null);
+const showZonePicker = ref(false);
+
+const selectedZone = computed(() => {
+  if (!selectedZoneId.value) return null;
+  return wsState.value.zones.find((z) => z.id === selectedZoneId.value) ?? null;
+});
+
+const connectionStatus = computed(() => {
+  if (!wsState.value.connected) return 'connecting';
+  if (!wsState.value.roonConnected) return 'waiting-roon';
+  return 'connected';
+});
+
+function findZoneByPreference(zones: Zone[], preference: string | null): Zone | null {
+  if (!preference || zones.length === 0) return null;
+
+  // Try to match by ID first
+  const byId = zones.find((z) => z.id === preference);
+  if (byId) return byId;
+
+  // Try to match by display name (case-insensitive)
+  const byName = zones.find(
+    (z) => z.display_name.toLowerCase() === preference.toLowerCase()
+  );
+  if (byName) return byName;
+
+  // Try partial match
+  const byPartial = zones.find(
+    (z) => z.display_name.toLowerCase().includes(preference.toLowerCase())
+  );
+  return byPartial ?? null;
+}
+
+function selectZone(zone: Zone): void {
+  selectedZoneId.value = zone.id;
+  saveZonePreference(zone.display_name);
+  subscribeToZone(zone.id);
+  showZonePicker.value = false;
+}
+
+function changeZone(): void {
+  showZonePicker.value = true;
+}
+
+function cycleLayout(): void {
+  const layouts: LayoutType[] = ['detailed', 'minimal', 'fullscreen'];
+  const currentIndex = layouts.indexOf(layout.value);
+  const nextIndex = (currentIndex + 1) % layouts.length;
+  saveLayoutPreference(layouts[nextIndex]);
+}
+
+// Watch for zones to become available and auto-select
+watch(
+  () => wsState.value.zones,
+  (zones) => {
+    if (zones.length === 0) return;
+
+    // If we don't have a selection yet, try to use preference
+    if (!selectedZoneId.value) {
+      const matched = findZoneByPreference(zones, preferredZone.value);
+      if (matched) {
+        selectZone(matched);
+      } else if (zones.length === 1) {
+        // Auto-select if only one zone
+        selectZone(zones[0]);
+      } else {
+        // Show picker
+        showZonePicker.value = true;
+      }
+    }
+  },
+  { immediate: true }
+);
+
+// Load preferences on mount
+onMounted(() => {
+  loadPreferences();
+});
+</script>
+
+<template>
+  <div class="app">
+    <!-- Connection overlay -->
+    <div v-if="connectionStatus !== 'connected'" class="connection-overlay">
+      <div class="connection-status">
+        <div class="spinner"></div>
+        <p v-if="connectionStatus === 'connecting'">Connecting to server...</p>
+        <p v-else>Waiting for Roon Core...</p>
+      </div>
+    </div>
+
+    <!-- Zone picker modal -->
+    <ZonePicker
+      v-if="showZonePicker && connectionStatus === 'connected'"
+      :zones="wsState.zones"
+      :selected-zone-id="selectedZoneId"
+      @select="selectZone"
+    />
+
+    <!-- Now Playing display -->
+    <NowPlaying
+      v-else-if="selectedZone && connectionStatus === 'connected'"
+      :now-playing="wsState.nowPlaying"
+      :zone="selectedZone"
+      :layout="layout"
+      @change-zone="changeZone"
+      @cycle-layout="cycleLayout"
+    />
+
+    <!-- No zone selected fallback -->
+    <div v-else-if="connectionStatus === 'connected' && !showZonePicker" class="no-zone">
+      <p>No zone selected</p>
+      <button @click="showZonePicker = true">Select Zone</button>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.app {
+  width: 100%;
+  height: 100%;
+  background: #000;
+  color: #fff;
+}
+
+.connection-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  z-index: 1000;
+}
+
+.connection-status {
+  text-align: center;
+}
+
+.connection-status p {
+  margin-top: 1rem;
+  font-size: 1.2rem;
+  color: #888;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #333;
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.no-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 1rem;
+}
+
+.no-zone p {
+  color: #888;
+  font-size: 1.2rem;
+}
+
+.no-zone button {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  background: #333;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.no-zone button:hover {
+  background: #444;
+}
+</style>
