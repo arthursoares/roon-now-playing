@@ -101,10 +101,11 @@ describe('Shared Types', () => {
       expect(LAYOUTS).toContain('minimal');
       expect(LAYOUTS).toContain('fullscreen');
       expect(LAYOUTS).toContain('ambient');
+      expect(LAYOUTS).toContain('cover');
     });
 
     it('should have correct number of layouts', () => {
-      expect(LAYOUTS).toHaveLength(4);
+      expect(LAYOUTS).toHaveLength(5);
     });
   });
 

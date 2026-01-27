@@ -5,6 +5,8 @@ import { fileURLToPath } from 'url';
 import { getRoonClient } from './roon.js';
 import { WebSocketManager } from './websocket.js';
 import { createArtworkRouter } from './artwork.js';
+import { createAdminRouter } from './admin.js';
+import { ClientNameStore } from './clientNames.js';
 import { logger } from './logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -20,11 +22,24 @@ async function main(): Promise<void> {
   // Initialize Roon client
   const roonClient = getRoonClient();
 
+  // Initialize client name store
+  const clientNameStore = new ClientNameStore();
+
   // Initialize WebSocket manager
   const wsManager = new WebSocketManager(server, roonClient);
 
+  // Load saved friendly names into WebSocket manager
+  wsManager.loadFriendlyNames(clientNameStore.getAll());
+
+  // Set up persistence callback for name changes
+  wsManager.setFriendlyNameChangeCallback((clientId, name) => {
+    clientNameStore.set(clientId, name);
+  });
+
   // API routes
+  app.use(express.json());
   app.use('/api', createArtworkRouter(roonClient));
+  app.use('/api/admin', createAdminRouter(wsManager));
 
   // Zones endpoint
   app.get('/api/zones', (_req, res) => {

@@ -25,7 +25,7 @@ export interface NowPlaying {
 }
 
 // Layout options
-export const LAYOUTS = ['detailed', 'minimal', 'fullscreen', 'ambient'] as const;
+export const LAYOUTS = ['detailed', 'minimal', 'fullscreen', 'ambient', 'cover'] as const;
 export type LayoutType = (typeof LAYOUTS)[number];
 
 // Font options
@@ -61,7 +61,6 @@ export interface ClientUnsubscribeMessage {
   type: 'unsubscribe';
 }
 
-export type ClientMessage = ClientSubscribeMessage | ClientUnsubscribeMessage;
 
 export interface ServerZonesMessage {
   type: 'zones';
@@ -93,9 +92,71 @@ export interface ServerConnectionMessage {
   roon_connected: boolean;
 }
 
+// Admin panel types
+export interface ClientMetadata {
+  clientId: string;
+  friendlyName: string | null;
+  layout: LayoutType;
+  font: FontType;
+  zoneId: string | null;
+  zoneName: string | null;
+  connectedAt: number;
+  userAgent: string | null;
+  isAdmin: boolean;
+}
+
+export interface ClientMetadataMessage {
+  type: 'client_metadata';
+  clientId: string;
+  layout: LayoutType;
+  font: FontType;
+  zoneId: string | null;
+  zoneName: string | null;
+  userAgent: string | null;
+  isAdmin?: boolean;
+}
+
+export interface ServerClientsListMessage {
+  type: 'clients_list';
+  clients: ClientMetadata[];
+}
+
+export interface ServerClientConnectedMessage {
+  type: 'client_connected';
+  client: ClientMetadata;
+}
+
+export interface ServerClientDisconnectedMessage {
+  type: 'client_disconnected';
+  clientId: string;
+}
+
+export interface ServerClientUpdatedMessage {
+  type: 'client_updated';
+  client: ClientMetadata;
+}
+
+export interface ServerRemoteSettingsMessage {
+  type: 'remote_settings';
+  layout?: LayoutType;
+  font?: FontType;
+  zoneId?: string;
+  zoneName?: string;
+}
+
+export type ClientMessage =
+  | ClientSubscribeMessage
+  | ClientUnsubscribeMessage
+  | ClientMetadataMessage;
+
 export type ServerMessage =
   | ServerZonesMessage
   | ServerNowPlayingMessage
   | ServerSeekMessage
   | ServerErrorMessage
-  | ServerConnectionMessage;
+  | ServerConnectionMessage
+  | ServerClientsListMessage
+  | ServerClientConnectedMessage
+  | ServerClientDisconnectedMessage
+  | ServerClientUpdatedMessage
+  | ServerRemoteSettingsMessage;
