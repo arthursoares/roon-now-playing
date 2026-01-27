@@ -137,8 +137,13 @@ export class RoonClient extends EventEmitter {
   private subscribeToTransport(): void {
     if (!this.transport) return;
 
-    this.transport.subscribe_zones((cmd: string, data: { zones?: RoonZoneState[]; zones_removed?: string[]; zones_changed?: RoonZoneState[]; zones_seek_changed?: Array<{ zone_id: string; seek_position: number }> }) => {
-      logger.debug(`Transport event: ${cmd}`);
+    this.transport.subscribe_zones((cmd: string, data: { zones?: RoonZoneState[]; zones_added?: RoonZoneState[]; zones_removed?: string[]; zones_changed?: RoonZoneState[]; zones_seek_changed?: Array<{ zone_id: string; seek_position: number }> }) => {
+      logger.debug(`Transport event: ${cmd}`, {
+        zones: data.zones?.length,
+        zones_added: data.zones_added?.length,
+        zones_removed: data.zones_removed?.length,
+        zones_changed: data.zones_changed?.length,
+      });
 
       if (cmd === 'Subscribed' && data.zones) {
         this.zones.clear();
@@ -151,20 +156,47 @@ export class RoonClient extends EventEmitter {
       }
 
       if (cmd === 'Changed') {
-        if (data.zones_removed) {
-          for (const zoneId of data.zones_removed) {
-            this.zones.delete(zoneId);
+        let zonesListChanged = false;
+
+        // Handle explicitly added zones
+        if (data.zones_added) {
+          for (const zone of data.zones_added) {
+            logger.info(`Zone added: ${zone.display_name} (${zone.zone_id})`);
+            this.zones.set(zone.zone_id, zone);
+            this.emit('now_playing', this.mapZoneToNowPlaying(zone));
           }
-          this.emitZones();
+          zonesListChanged = true;
         }
 
+        // Handle removed zones
+        if (data.zones_removed) {
+          for (const zoneId of data.zones_removed) {
+            const zone = this.zones.get(zoneId);
+            logger.info(`Zone removed: ${zone?.display_name || zoneId}`);
+            this.zones.delete(zoneId);
+          }
+          zonesListChanged = true;
+        }
+
+        // Handle changed zones (may include new zones in some Roon versions)
         if (data.zones_changed) {
           for (const zone of data.zones_changed) {
+            const isNewZone = !this.zones.has(zone.zone_id);
+            if (isNewZone) {
+              logger.info(`Zone appeared via change: ${zone.display_name} (${zone.zone_id})`);
+              zonesListChanged = true;
+            }
             this.zones.set(zone.zone_id, zone);
             this.emit('now_playing', this.mapZoneToNowPlaying(zone));
           }
         }
 
+        // Emit updated zones list if the list changed
+        if (zonesListChanged) {
+          this.emitZones();
+        }
+
+        // Handle seek position changes
         if (data.zones_seek_changed) {
           for (const seekChange of data.zones_seek_changed) {
             const zone = this.zones.get(seekChange.zone_id);
