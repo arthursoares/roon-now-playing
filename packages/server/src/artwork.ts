@@ -15,7 +15,8 @@ export function createArtworkRouter(roonClient: RoonClient): Router {
   });
 
   router.get('/artwork/:key', async (req: Request, res: Response) => {
-    const { key } = req.params;
+    const keyParam = req.params.key;
+    const key = Array.isArray(keyParam) ? keyParam[0] : keyParam;
 
     if (!key || key.length < 1) {
       res.status(400).send('Invalid artwork key');
