@@ -56,7 +56,7 @@ export class RoonClient extends EventEmitter {
     this.roon = new RoonApi({
       extension_id: 'com.github.roon-now-playing',
       display_name: 'Roon Now Playing',
-      display_version: '1.3.6',
+      display_version: '1.3.7',
       publisher: 'roon-screen-cover',
       email: 'noreply@example.com',
       website: 'https://github.com/arthursoares/roon-screen-cover',
@@ -138,13 +138,15 @@ export class RoonClient extends EventEmitter {
   private subscribeToTransport(): void {
     if (!this.transport) return;
 
-    this.transport.subscribe_zones((cmd: string, data: { zones?: RoonZoneState[]; zones_added?: RoonZoneState[]; zones_removed?: string[]; zones_changed?: RoonZoneState[]; zones_seek_changed?: Array<{ zone_id: string; seek_position: number }> }) => {
+    this.transport.subscribe_zones((cmd: string, data?: { zones?: RoonZoneState[]; zones_added?: RoonZoneState[]; zones_removed?: string[]; zones_changed?: RoonZoneState[]; zones_seek_changed?: Array<{ zone_id: string; seek_position: number }> }) => {
       logger.debug(`Transport event: ${cmd}`, {
-        zones: data.zones?.length,
-        zones_added: data.zones_added?.length,
-        zones_removed: data.zones_removed?.length,
-        zones_changed: data.zones_changed?.length,
+        zones: data?.zones?.length,
+        zones_added: data?.zones_added?.length,
+        zones_removed: data?.zones_removed?.length,
+        zones_changed: data?.zones_changed?.length,
       });
+
+      if (!data) return; // Guard against undefined data (e.g., on disconnect)
 
       if (cmd === 'Subscribed' && data.zones) {
         this.zones.clear();
