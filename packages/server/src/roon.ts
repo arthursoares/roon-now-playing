@@ -56,10 +56,11 @@ export class RoonClient extends EventEmitter {
     this.roon = new RoonApi({
       extension_id: 'com.github.roon-now-playing',
       display_name: 'Roon Now Playing',
-      display_version: '1.3.4',
+      display_version: '1.3.6',
       publisher: 'roon-screen-cover',
       email: 'noreply@example.com',
       website: 'https://github.com/arthursoares/roon-screen-cover',
+      log_level: 'none',
 
       core_paired: (core: RoonCore) => {
         logger.info(`Paired with Roon Core: ${core.display_name}`);

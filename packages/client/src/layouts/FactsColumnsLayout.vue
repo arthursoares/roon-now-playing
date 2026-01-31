@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import type { Track, PlaybackState, BackgroundType } from '@roon-screen-cover/shared';
 import { useColorExtraction } from '../composables/useColorExtraction';
 import { useBackgroundStyle } from '../composables/useBackgroundStyle';
@@ -27,6 +27,64 @@ const artworkUrlRef = computed(() => props.artworkUrl);
 const { colors, vibrantGradient, palette } = useColorExtraction(artworkUrlRef);
 const { style: backgroundStyle } = useBackgroundStyle(backgroundRef, colors, vibrantGradient);
 const { facts, currentFactIndex, currentFact, isLoading, error } = useFacts(trackRef, stateRef);
+
+// Refs for height matching and overflow detection
+const artworkWrapperRef = ref<HTMLDivElement | null>(null);
+const factsColumnRef = ref<HTMLDivElement | null>(null);
+const factTextRef = ref<HTMLParagraphElement | null>(null);
+const factContainerRef = ref<HTMLDivElement | null>(null);
+const needsScroll = ref(false);
+const scrollDuration = ref(12);
+const factsColumnMaxHeight = ref<string | null>(null);
+
+function updateLayout() {
+  nextTick(() => {
+    // Match facts column height to artwork height
+    if (artworkWrapperRef.value && factsColumnRef.value) {
+      const artworkHeight = artworkWrapperRef.value.offsetHeight;
+      if (artworkHeight > 0) {
+        factsColumnMaxHeight.value = `${artworkHeight}px`;
+      }
+    }
+
+    // Check for text overflow after height is set
+    setTimeout(() => {
+      if (factTextRef.value && factContainerRef.value) {
+        const textHeight = factTextRef.value.scrollHeight;
+        const containerHeight = factContainerRef.value.clientHeight;
+        needsScroll.value = textHeight > containerHeight + 5;
+        if (needsScroll.value) {
+          const overflowAmount = textHeight - containerHeight;
+          scrollDuration.value = Math.max(10, Math.min(25, 10 + overflowAmount / 20));
+        }
+      } else {
+        needsScroll.value = false;
+      }
+    }, 50);
+  });
+}
+
+// Handler for when artwork image loads
+function onArtworkLoad() {
+  updateLayout();
+}
+
+watch(currentFact, updateLayout);
+watch(() => props.track, updateLayout);
+watch(() => props.artworkUrl, () => {
+  // Reset height when artwork changes, will be recalculated after image loads
+  factsColumnMaxHeight.value = null;
+});
+
+onMounted(() => {
+  // Initial layout with delay to ensure DOM is ready
+  setTimeout(updateLayout, 100);
+  window.addEventListener('resize', updateLayout);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updateLayout);
+});
 
 // Background types handled by DynamicBackground component
 const dynamicBackgroundTypes: BackgroundType[] = [
@@ -80,7 +138,7 @@ watch(
       <div class="content">
         <!-- Left column: Artwork -->
         <div class="artwork-column">
-          <div class="artwork-wrapper">
+          <div ref="artworkWrapperRef" class="artwork-wrapper">
             <img
               v-if="previousArtwork && artworkTransitioning"
               :src="previousArtwork"
@@ -93,6 +151,7 @@ watch(
               :alt="track?.album || 'Album artwork'"
               class="artwork"
               :class="{ 'artwork-entering': artworkTransitioning }"
+              @load="onArtworkLoad"
             />
             <div v-else class="artwork-placeholder">
               <svg viewBox="0 0 24 24" fill="currentColor">
@@ -103,9 +162,9 @@ watch(
         </div>
 
         <!-- Right column: Facts + Metadata -->
-        <div class="facts-column">
-          <!-- Facts Area (fixed height) -->
-          <div class="facts-area">
+        <div ref="factsColumnRef" class="facts-column" :style="factsColumnMaxHeight ? { height: factsColumnMaxHeight } : {}">
+          <!-- Facts Area (constrained height with auto-scroll) -->
+          <div ref="factContainerRef" class="facts-area">
             <div v-if="!track" class="no-playback">
               <p class="no-playback-text">No playback</p>
               <p class="zone-hint">{{ zoneName }}</p>
@@ -113,7 +172,13 @@ watch(
 
             <template v-else>
               <p v-if="isLoading" class="loading-hint">Loading facts...</p>
-              <p v-else-if="currentFact" class="fact-text">{{ currentFact }}</p>
+              <p
+                v-else-if="currentFact"
+                ref="factTextRef"
+                class="fact-text"
+                :class="{ 'fact-text--scrolling': needsScroll }"
+                :style="needsScroll ? { '--scroll-duration': scrollDuration + 's' } : {}"
+              >{{ currentFact }}</p>
               <p v-else-if="error && error.type === 'no-key'" class="error-message">
                 Configure API key in <a href="/admin">Admin Panel</a>
               </p>
@@ -170,7 +235,7 @@ watch(
       <div class="content">
         <!-- Left column: Artwork -->
         <div class="artwork-column">
-          <div class="artwork-wrapper">
+          <div ref="artworkWrapperRef" class="artwork-wrapper">
             <img
               v-if="previousArtwork && artworkTransitioning"
               :src="previousArtwork"
@@ -183,6 +248,7 @@ watch(
               :alt="track?.album || 'Album artwork'"
               class="artwork"
               :class="{ 'artwork-entering': artworkTransitioning }"
+              @load="onArtworkLoad"
             />
             <div v-else class="artwork-placeholder">
               <svg viewBox="0 0 24 24" fill="currentColor">
@@ -193,9 +259,9 @@ watch(
         </div>
 
         <!-- Right column: Facts + Metadata -->
-        <div class="facts-column">
-          <!-- Facts Area (fixed height) -->
-          <div class="facts-area">
+        <div ref="factsColumnRef" class="facts-column" :style="factsColumnMaxHeight ? { height: factsColumnMaxHeight } : {}">
+          <!-- Facts Area (constrained height with auto-scroll) -->
+          <div ref="factContainerRef" class="facts-area">
             <div v-if="!track" class="no-playback">
               <p class="no-playback-text">No playback</p>
               <p class="zone-hint">{{ zoneName }}</p>
@@ -203,7 +269,13 @@ watch(
 
             <template v-else>
               <p v-if="isLoading" class="loading-hint">Loading facts...</p>
-              <p v-else-if="currentFact" class="fact-text">{{ currentFact }}</p>
+              <p
+                v-else-if="currentFact"
+                ref="factTextRef"
+                class="fact-text"
+                :class="{ 'fact-text--scrolling': needsScroll }"
+                :style="needsScroll ? { '--scroll-duration': scrollDuration + 's' } : {}"
+              >{{ currentFact }}</p>
               <p v-else-if="error && error.type === 'no-key'" class="error-message">
                 Configure API key in <a href="/admin">Admin Panel</a>
               </p>
@@ -285,7 +357,7 @@ watch(
 @media (min-width: 900px) {
   .content {
     flex-direction: row;
-    align-items: center;
+    align-items: center; /* Center vertically - artwork defines its own height */
     gap: 5%;
   }
 }
@@ -366,32 +438,65 @@ watch(
   flex-direction: column;
   justify-content: space-between;
   min-width: 0;
+  min-height: 0;
   padding-right: 2.5%;
-  height: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 @media (min-width: 900px) {
   .facts-column {
     flex: 0 0 40%;
+    align-self: flex-start; /* Don't stretch, use maxHeight from JS */
   }
 }
 
-/* Facts area - fixed height, main content */
+/* Facts area - constrained height with overflow scroll */
 .facts-area {
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: 40%;
+  min-height: 0; /* Allow flex shrink */
+  max-height: 100%;
+  overflow: hidden;
+  position: relative;
 }
 
 .fact-text {
-  font-size: clamp(24px, 3.5vw, 48px);
+  font-size: clamp(22px, 3vw, 42px);
   font-weight: 400;
-  line-height: 1.4;
+  line-height: 1.35;
   margin: 0;
   color: var(--text-color);
   animation: fadeIn 0.5s ease-out;
+
+  /* Typography improvements */
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  hyphenate-limit-chars: 8 4 4;
+  word-spacing: 0.02em;
+  letter-spacing: -0.01em;
+  text-wrap: pretty; /* Better line breaking */
+  overflow-wrap: break-word;
+  text-rendering: optimizeLegibility;
+}
+
+/* Auto-scrolling animation for overflowing text */
+.fact-text--scrolling {
+  animation: factScroll var(--scroll-duration, 12s) ease-in-out infinite;
+}
+
+@keyframes factScroll {
+  0%, 15% {
+    transform: translateY(0); /* Hold at top */
+  }
+  40%, 60% {
+    transform: translateY(calc(-100% + 4em)); /* Scroll to show end, hold */
+  }
+  85%, 100% {
+    transform: translateY(0); /* Return to top, hold */
+  }
 }
 
 .loading-hint {
