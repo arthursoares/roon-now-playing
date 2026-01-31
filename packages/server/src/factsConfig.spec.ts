@@ -107,4 +107,35 @@ describe('FactsConfigStore', () => {
     expect(DEFAULT_CONFIG.rotationInterval).toBe(25);
     expect(DEFAULT_CONFIG.prompt).toContain('Generate');
   });
+
+  it('should reject API key updates containing non-ASCII characters', () => {
+    // Masked keys contain bullet points (character 8226)
+    const maskedKey = '••••••••1234';
+    store.update({ apiKey: maskedKey });
+
+    const config = store.get();
+    expect(config.apiKey).toBe(''); // Should not be saved
+  });
+
+  it('should accept valid ASCII API keys', () => {
+    const validKey = 'sk-ant-api03-test-key-12345';
+    store.update({ apiKey: validKey });
+
+    const config = store.get();
+    expect(config.apiKey).toBe(validKey);
+  });
+
+  it('should clear corrupted API key on load', () => {
+    // Manually write a corrupted config file
+    const corruptedConfig = {
+      ...DEFAULT_CONFIG,
+      apiKey: '••••••••abcd', // Contains bullet points
+    };
+    fs.writeFileSync(TEST_CONFIG_PATH, JSON.stringify(corruptedConfig));
+
+    // New instance should clear the corrupted key
+    const store2 = new FactsConfigStore(TEST_CONFIG_PATH);
+    const config = store2.get();
+    expect(config.apiKey).toBe(''); // Should be cleared
+  });
 });

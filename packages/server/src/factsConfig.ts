@@ -32,11 +32,28 @@ export class FactsConfigStore {
         const data = fs.readFileSync(this.configPath, 'utf-8');
         const parsed = JSON.parse(data) as Partial<FactsConfig>;
         this.config = { ...DEFAULT_CONFIG, ...parsed };
+
+        // Clear any corrupted API key (e.g., contains mask characters)
+        if (this.config.apiKey && this.containsNonAscii(this.config.apiKey)) {
+          logger.warn('Clearing corrupted API key from config');
+          this.config.apiKey = '';
+          this.save();
+        }
+
         logger.info(`Loaded facts config from ${this.configPath}`);
       }
     } catch (error) {
       logger.error(`Failed to load facts config: ${error}`);
     }
+  }
+
+  private containsNonAscii(str: string): boolean {
+    for (let i = 0; i < str.length; i++) {
+      if (str.charCodeAt(i) > 127) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private save(): void {
@@ -64,6 +81,12 @@ export class FactsConfigStore {
   }
 
   update(partial: Partial<FactsConfig>): void {
+    // Don't save API keys containing non-ASCII characters (e.g., masked keys with bullets)
+    if (partial.apiKey && this.containsNonAscii(partial.apiKey)) {
+      logger.warn('Rejecting API key update: contains non-ASCII characters');
+      delete partial.apiKey;
+    }
+
     this.config = { ...this.config, ...partial };
     this.save();
   }
