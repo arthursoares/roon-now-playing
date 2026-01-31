@@ -6,6 +6,7 @@ import { getRoonClient } from './roon.js';
 import { WebSocketManager } from './websocket.js';
 import { createArtworkRouter } from './artwork.js';
 import { createAdminRouter } from './admin.js';
+import { createFactsRouter } from './facts.js';
 import { ClientNameStore } from './clientNames.js';
 import { logger } from './logger.js';
 
@@ -40,6 +41,7 @@ async function main(): Promise<void> {
   app.use(express.json());
   app.use('/api', createArtworkRouter(roonClient));
   app.use('/api/admin', createAdminRouter(wsManager));
+  app.use('/api', createFactsRouter());
 
   // Zones endpoint
   app.get('/api/zones', (_req, res) => {
