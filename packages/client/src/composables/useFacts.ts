@@ -2,10 +2,7 @@ import { ref, computed, watch, onUnmounted, type Ref, type ComputedRef } from 'v
 import type { Track, PlaybackState, FactsResponse, FactsError } from '@roon-screen-cover/shared';
 
 const DEBOUNCE_DELAY = 500;
-const MIN_DISPLAY_TIME = 8000;
-const MAX_DISPLAY_TIME = 30000;
-const MS_PER_WORD = 250;
-const PADDING_TIME = 3000;
+const DEFAULT_ROTATION_INTERVAL = 25; // seconds, can be overridden by server config
 
 interface CachedFacts {
   facts: string[];
@@ -36,12 +33,6 @@ function saveToSessionStorage(key: string, data: CachedFacts): void {
   }
 }
 
-function calculateDisplayTime(fact: string): number {
-  const wordCount = fact.split(/\s+/).length;
-  const readingTime = wordCount * MS_PER_WORD + PADDING_TIME;
-  return Math.max(MIN_DISPLAY_TIME, Math.min(MAX_DISPLAY_TIME, readingTime));
-}
-
 export interface UseFactsReturn {
   facts: Ref<string[]>;
   currentFactIndex: Ref<number>;
@@ -60,9 +51,27 @@ export function useFacts(
   const isLoading = ref(false);
   const error = ref<FactsError | null>(null);
   const cached = ref(false);
+  const rotationIntervalSec = ref(DEFAULT_ROTATION_INTERVAL);
 
   let debounceTimer: number | null = null;
   let rotationTimer: number | null = null;
+
+  // Fetch rotation interval from server config (immediately on composable init)
+  fetch('/api/facts/config')
+    .then((response) => {
+      if (response.ok) {
+        return response.json();
+      }
+      return null;
+    })
+    .then((config) => {
+      if (config && typeof config.rotationInterval === 'number' && config.rotationInterval > 0) {
+        rotationIntervalSec.value = config.rotationInterval;
+      }
+    })
+    .catch(() => {
+      // Use default on error
+    });
 
   const currentFact = computed(() => {
     if (facts.value.length === 0) {
@@ -101,7 +110,8 @@ export function useFacts(
       return;
     }
 
-    const displayTime = calculateDisplayTime(currentFactText);
+    // Use the configured rotation interval (in seconds, convert to ms)
+    const displayTime = rotationIntervalSec.value * 1000;
 
     rotationTimer = window.setTimeout(() => {
       currentFactIndex.value = (currentFactIndex.value + 1) % facts.value.length;

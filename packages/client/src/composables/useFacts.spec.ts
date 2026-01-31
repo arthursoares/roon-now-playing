@@ -26,9 +26,9 @@
  *   When fetch completes
  *   Then error state should be set with type discrimination
  *
- * Scenario: Auto-rotate facts based on reading time
+ * Scenario: Auto-rotate facts using server-configured interval
  *   Given multiple facts are loaded and playback is 'playing'
- *   When rotation timer fires
+ *   When rotation timer fires after configured interval
  *   Then currentFactIndex should advance
  *
  * Scenario: Pause rotation when not playing
@@ -57,8 +57,16 @@ describe('useFacts', () => {
       clear: () => mockSessionStorage.clear(),
     });
 
-    // Mock fetch
-    vi.stubGlobal('fetch', vi.fn());
+    // Mock fetch - default implementation returns config with 25s rotation
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/facts/config') {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ rotationInterval: 25 }),
+        });
+      }
+      return Promise.reject(new Error('Unmocked URL: ' + url));
+    }));
   });
 
   afterEach(() => {
@@ -77,18 +85,42 @@ describe('useFacts', () => {
     };
   }
 
-  function mockFetchSuccess(response: FactsResponse): void {
-    vi.mocked(fetch).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(response),
-    } as Response);
+  function mockFetchSuccess(response: FactsResponse, rotationInterval = 25): void {
+    vi.mocked(fetch).mockImplementation((input: string | URL | Request) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url === '/api/facts/config') {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ rotationInterval }),
+        } as Response);
+      }
+      if (url === '/api/facts') {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(response),
+        } as Response);
+      }
+      return Promise.reject(new Error('Unmocked URL: ' + url));
+    });
   }
 
   function mockFetchError(error: FactsError): void {
-    vi.mocked(fetch).mockResolvedValueOnce({
-      ok: false,
-      json: () => Promise.resolve({ error }),
-    } as Response);
+    vi.mocked(fetch).mockImplementation((input: string | URL | Request) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url === '/api/facts/config') {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ rotationInterval: 25 }),
+        } as Response);
+      }
+      if (url === '/api/facts') {
+        return Promise.resolve({
+          ok: false,
+          json: () => Promise.resolve({ error }),
+        } as Response);
+      }
+      return Promise.reject(new Error('Unmocked URL: ' + url));
+    });
   }
 
   describe('initial state', () => {
@@ -140,20 +172,19 @@ describe('useFacts', () => {
         generatedAt: Date.now(),
       });
 
-      const { facts, isLoading } = useFacts(track, playbackState);
+      const { facts } = useFacts(track, playbackState);
+
+      // Let config fetch complete
+      await nextTick();
 
       // Set track
       track.value = createMockTrack();
       await nextTick();
 
-      // Should not fetch immediately (debounced)
-      expect(fetch).not.toHaveBeenCalled();
-      expect(isLoading.value).toBe(false);
-
       // Advance past debounce delay (500ms)
       await vi.advanceTimersByTimeAsync(500);
 
-      expect(fetch).toHaveBeenCalledTimes(1);
+      // Should have called config endpoint + facts endpoint
       expect(fetch).toHaveBeenCalledWith('/api/facts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -174,14 +205,27 @@ describe('useFacts', () => {
       const track = ref<Track | null>(null);
       const playbackState = ref<PlaybackState>('playing');
 
-      let resolvePromise: (value: Response) => void;
-      vi.mocked(fetch).mockReturnValueOnce(
-        new Promise((resolve) => {
-          resolvePromise = resolve;
-        })
-      );
+      let resolveFactsPromise: (value: Response) => void;
+      vi.mocked(fetch).mockImplementation((input: string | URL | Request) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+        if (url === '/api/facts/config') {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ rotationInterval: 25 }),
+          } as Response);
+        }
+        if (url === '/api/facts') {
+          return new Promise((resolve) => {
+            resolveFactsPromise = resolve;
+          });
+        }
+        return Promise.reject(new Error('Unmocked URL: ' + url));
+      });
 
       const { isLoading } = useFacts(track, playbackState);
+
+      // Let config fetch complete
+      await nextTick();
 
       track.value = createMockTrack();
       await nextTick();
@@ -191,8 +235,8 @@ describe('useFacts', () => {
 
       expect(isLoading.value).toBe(true);
 
-      // Resolve the fetch
-      resolvePromise!({
+      // Resolve the facts fetch
+      resolveFactsPromise!({
         ok: true,
         json: () => Promise.resolve({ facts: ['Fact 1'], cached: false, generatedAt: Date.now() }),
       } as Response);
@@ -229,13 +273,33 @@ describe('useFacts', () => {
       const track = ref<Track | null>(null);
       const playbackState = ref<PlaybackState>('playing');
 
-      mockFetchSuccess({
-        facts: ['Final Fact'],
-        cached: false,
-        generatedAt: Date.now(),
+      let factsCallCount = 0;
+      vi.mocked(fetch).mockImplementation((input: string | URL | Request) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+        if (url === '/api/facts/config') {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ rotationInterval: 25 }),
+          } as Response);
+        }
+        if (url === '/api/facts') {
+          factsCallCount++;
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              facts: ['Final Fact'],
+              cached: false,
+              generatedAt: Date.now(),
+            }),
+          } as Response);
+        }
+        return Promise.reject(new Error('Unmocked URL: ' + url));
       });
 
       const { facts } = useFacts(track, playbackState);
+
+      // Let config fetch complete
+      await nextTick();
 
       // Rapid track changes
       track.value = createMockTrack({ title: 'Song 1' });
@@ -249,16 +313,16 @@ describe('useFacts', () => {
       track.value = createMockTrack({ title: 'Song 3' });
       await nextTick();
 
-      // No fetch yet
-      expect(fetch).not.toHaveBeenCalled();
+      // No facts fetch yet (only config was fetched)
+      expect(factsCallCount).toBe(0);
 
       // Advance past debounce
       await vi.advanceTimersByTimeAsync(500);
       await nextTick();
 
-      // Only one fetch for the last track
-      expect(fetch).toHaveBeenCalledTimes(1);
-      expect(fetch).toHaveBeenCalledWith('/api/facts', expect.objectContaining({
+      // Only one facts fetch for the last track
+      expect(factsCallCount).toBe(1);
+      expect(fetch).toHaveBeenLastCalledWith('/api/facts', expect.objectContaining({
         body: expect.stringContaining('Song 3'),
       }));
 
@@ -269,27 +333,47 @@ describe('useFacts', () => {
       const track = ref<Track | null>(createMockTrack());
       const playbackState = ref<PlaybackState>('playing');
 
-      mockFetchSuccess({
-        facts: ['Fact 1'],
-        cached: false,
-        generatedAt: Date.now(),
+      let factsCallCount = 0;
+      vi.mocked(fetch).mockImplementation((input: string | URL | Request) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+        if (url === '/api/facts/config') {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ rotationInterval: 25 }),
+          } as Response);
+        }
+        if (url === '/api/facts') {
+          factsCallCount++;
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              facts: ['Fact 1'],
+              cached: false,
+              generatedAt: Date.now(),
+            }),
+          } as Response);
+        }
+        return Promise.reject(new Error('Unmocked URL: ' + url));
       });
 
       useFacts(track, playbackState);
 
-      // Initial fetch
+      // Let config fetch complete
+      await nextTick();
+
+      // Initial facts fetch
       await vi.advanceTimersByTimeAsync(500);
       await nextTick();
 
-      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(factsCallCount).toBe(1);
 
       // Track becomes null
       track.value = null;
       await nextTick();
       await vi.advanceTimersByTimeAsync(500);
 
-      // No additional fetch
-      expect(fetch).toHaveBeenCalledTimes(1);
+      // No additional facts fetch
+      expect(factsCallCount).toBe(1);
     });
   });
 
@@ -330,15 +414,41 @@ describe('useFacts', () => {
         generatedAt: Date.now(),
       }));
 
+      let factsCallCount = 0;
+      vi.mocked(fetch).mockImplementation((input: string | URL | Request) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+        if (url === '/api/facts/config') {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ rotationInterval: 25 }),
+          } as Response);
+        }
+        if (url === '/api/facts') {
+          factsCallCount++;
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              facts: ['API Fact'],
+              cached: false,
+              generatedAt: Date.now(),
+            }),
+          } as Response);
+        }
+        return Promise.reject(new Error('Unmocked URL: ' + url));
+      });
+
       const { facts, cached } = useFacts(track, playbackState);
+
+      // Let config fetch complete
+      await nextTick();
 
       track.value = createMockTrack();
       await nextTick();
       await vi.advanceTimersByTimeAsync(500);
       await nextTick();
 
-      // Should not call fetch
-      expect(fetch).not.toHaveBeenCalled();
+      // Should not call facts API (used cache)
+      expect(factsCallCount).toBe(0);
       expect(facts.value).toEqual(['Cached Fact']);
       expect(cached.value).toBe(true);
     });
@@ -372,9 +482,24 @@ describe('useFacts', () => {
       const track = ref<Track | null>(null);
       const playbackState = ref<PlaybackState>('playing');
 
-      vi.mocked(fetch).mockRejectedValueOnce(new Error('Network error'));
+      vi.mocked(fetch).mockImplementation((input: string | URL | Request) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+        if (url === '/api/facts/config') {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ rotationInterval: 25 }),
+          } as Response);
+        }
+        if (url === '/api/facts') {
+          return Promise.reject(new Error('Network error'));
+        }
+        return Promise.reject(new Error('Unmocked URL: ' + url));
+      });
 
       const { error } = useFacts(track, playbackState);
+
+      // Let config fetch complete
+      await nextTick();
 
       track.value = createMockTrack();
       await nextTick();
@@ -442,16 +567,16 @@ describe('useFacts', () => {
       expect(currentFact.value).toBe('Fact 1');
     });
 
-    it('should auto-rotate facts when playing', async () => {
+    it('should auto-rotate facts when playing using configured interval', async () => {
       const track = ref<Track | null>(null);
       const playbackState = ref<PlaybackState>('playing');
 
-      // Short facts for faster rotation (8 second minimum)
+      // Use custom rotation interval of 10 seconds for testing
       mockFetchSuccess({
-        facts: ['Short fact', 'Another fact'],
+        facts: ['Fact 1', 'Fact 2'],
         cached: false,
         generatedAt: Date.now(),
-      });
+      }, 10); // 10 second rotation
 
       const { currentFactIndex } = useFacts(track, playbackState);
 
@@ -462,10 +587,14 @@ describe('useFacts', () => {
 
       expect(currentFactIndex.value).toBe(0);
 
-      // Advance by minimum rotation time (8 seconds)
+      // Should not rotate after 8 seconds (less than configured 10s)
       await vi.advanceTimersByTimeAsync(8000);
       await nextTick();
+      expect(currentFactIndex.value).toBe(0);
 
+      // Should rotate after reaching 10 seconds
+      await vi.advanceTimersByTimeAsync(2000);
+      await nextTick();
       expect(currentFactIndex.value).toBe(1);
     });
 
@@ -477,7 +606,7 @@ describe('useFacts', () => {
         facts: ['Fact 1', 'Fact 2'],
         cached: false,
         generatedAt: Date.now(),
-      });
+      }, 10); // 10 second rotation
 
       const { currentFactIndex } = useFacts(track, playbackState);
 
@@ -492,8 +621,8 @@ describe('useFacts', () => {
       playbackState.value = 'paused';
       await nextTick();
 
-      // Advance time
-      await vi.advanceTimersByTimeAsync(10000);
+      // Advance time well past rotation interval
+      await vi.advanceTimersByTimeAsync(30000);
       await nextTick();
 
       // Should still be on first fact
@@ -505,10 +634,10 @@ describe('useFacts', () => {
       const playbackState = ref<PlaybackState>('playing');
 
       mockFetchSuccess({
-        facts: ['Short', 'Facts'],
+        facts: ['Fact 1', 'Fact 2'],
         cached: false,
         generatedAt: Date.now(),
-      });
+      }, 10); // 10 second rotation
 
       const { currentFactIndex } = useFacts(track, playbackState);
 
@@ -526,8 +655,8 @@ describe('useFacts', () => {
       playbackState.value = 'playing';
       await nextTick();
 
-      // Advance past rotation time
-      await vi.advanceTimersByTimeAsync(8000);
+      // Advance past rotation time (10 seconds)
+      await vi.advanceTimersByTimeAsync(10000);
       await nextTick();
 
       expect(currentFactIndex.value).toBe(1);
@@ -541,7 +670,7 @@ describe('useFacts', () => {
         facts: ['A', 'B'],
         cached: false,
         generatedAt: Date.now(),
-      });
+      }, 10); // 10 second rotation
 
       const { currentFactIndex } = useFacts(track, playbackState);
 
@@ -551,30 +680,37 @@ describe('useFacts', () => {
       await nextTick();
 
       // First rotation
-      await vi.advanceTimersByTimeAsync(8000);
+      await vi.advanceTimersByTimeAsync(10000);
       await nextTick();
       expect(currentFactIndex.value).toBe(1);
 
       // Second rotation - should wrap
-      await vi.advanceTimersByTimeAsync(8000);
+      await vi.advanceTimersByTimeAsync(10000);
       await nextTick();
       expect(currentFactIndex.value).toBe(0);
     });
 
-    it('should calculate display time based on word count', async () => {
+    it('should use default rotation interval when config fetch fails', async () => {
       const track = ref<Track | null>(null);
       const playbackState = ref<PlaybackState>('playing');
 
-      // Longer fact with many words (~20 words = 5 seconds + 3 padding = 8 seconds, but min is 8)
-      // 40 words = 10 seconds + 3 padding = 13 seconds
-      const longFact = 'This is a very long fact with many words that should take longer to read ' +
-        'because it contains approximately forty words which means about ten seconds of reading time ' +
-        'plus three seconds padding equals thirteen seconds total display time';
-
-      mockFetchSuccess({
-        facts: [longFact, 'Short'],
-        cached: false,
-        generatedAt: Date.now(),
+      // Mock config fetch to fail, facts fetch to succeed
+      vi.mocked(fetch).mockImplementation((input: string | URL | Request) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+        if (url === '/api/facts/config') {
+          return Promise.reject(new Error('Network error'));
+        }
+        if (url === '/api/facts') {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              facts: ['Fact 1', 'Fact 2'],
+              cached: false,
+              generatedAt: Date.now(),
+            }),
+          } as Response);
+        }
+        return Promise.reject(new Error('Unmocked URL: ' + url));
       });
 
       const { currentFactIndex } = useFacts(track, playbackState);
@@ -584,44 +720,12 @@ describe('useFacts', () => {
       await vi.advanceTimersByTimeAsync(500);
       await nextTick();
 
-      // Should not rotate after 8 seconds (minimum)
-      await vi.advanceTimersByTimeAsync(8000);
+      // Should use default interval of 25 seconds
+      await vi.advanceTimersByTimeAsync(24000);
       await nextTick();
       expect(currentFactIndex.value).toBe(0);
 
-      // Should rotate after more time (13 seconds total from start)
-      await vi.advanceTimersByTimeAsync(5000);
-      await nextTick();
-      expect(currentFactIndex.value).toBe(1);
-    });
-
-    it('should cap display time at 30 seconds maximum', async () => {
-      const track = ref<Track | null>(null);
-      const playbackState = ref<PlaybackState>('playing');
-
-      // Very long fact (200 words = 50 seconds reading time, should be capped at 30)
-      const veryLongFact = Array(200).fill('word').join(' ');
-
-      mockFetchSuccess({
-        facts: [veryLongFact, 'Short'],
-        cached: false,
-        generatedAt: Date.now(),
-      });
-
-      const { currentFactIndex } = useFacts(track, playbackState);
-
-      track.value = createMockTrack();
-      await nextTick();
-      await vi.advanceTimersByTimeAsync(500);
-      await nextTick();
-
-      // Should not rotate after 25 seconds
-      await vi.advanceTimersByTimeAsync(25000);
-      await nextTick();
-      expect(currentFactIndex.value).toBe(0);
-
-      // Should rotate after 30 seconds (max)
-      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(1000);
       await nextTick();
       expect(currentFactIndex.value).toBe(1);
     });
