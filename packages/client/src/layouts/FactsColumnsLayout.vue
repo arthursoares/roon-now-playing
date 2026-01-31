@@ -5,6 +5,7 @@ import { useColorExtraction } from '../composables/useColorExtraction';
 import { useBackgroundStyle } from '../composables/useBackgroundStyle';
 import { useFacts } from '../composables/useFacts';
 import ProgressBar from '../components/ProgressBar.vue';
+import DynamicBackground from '../components/DynamicBackground.vue';
 
 const props = defineProps<{
   track: Track | null;
@@ -23,9 +24,26 @@ const stateRef = computed(() => props.state);
 const backgroundRef = computed(() => props.background);
 const artworkUrlRef = computed(() => props.artworkUrl);
 
-const { colors, vibrantGradient } = useColorExtraction(artworkUrlRef);
+const { colors, vibrantGradient, palette } = useColorExtraction(artworkUrlRef);
 const { style: backgroundStyle } = useBackgroundStyle(backgroundRef, colors, vibrantGradient);
 const { facts, currentFactIndex, currentFact, isLoading, error } = useFacts(trackRef, stateRef);
+
+// Background types handled by DynamicBackground component
+const dynamicBackgroundTypes: BackgroundType[] = [
+  'gradient-linear-multi',
+  'gradient-radial-corner',
+  'gradient-mesh',
+  'blur-subtle',
+  'blur-heavy',
+  'duotone',
+  'posterized',
+  'gradient-noise',
+  'blur-grain',
+];
+
+const usesDynamicBackground = computed(() =>
+  dynamicBackgroundTypes.includes(props.background)
+);
 
 // Track previous artwork for crossfade
 const displayedArtwork = ref<string | null>(null);
@@ -50,7 +68,103 @@ watch(
 </script>
 
 <template>
-  <div class="facts-columns-layout" :style="backgroundStyle">
+  <DynamicBackground
+    v-if="usesDynamicBackground"
+    :type="background"
+    :artwork-url="artworkUrl"
+    :palette="palette"
+    :vibrant-gradient="vibrantGradient"
+    class="facts-columns-layout"
+  >
+    <div class="safe-zone">
+      <div class="content">
+        <!-- Left column: Artwork -->
+        <div class="artwork-column">
+          <div class="artwork-wrapper">
+            <img
+              v-if="previousArtwork && artworkTransitioning"
+              :src="previousArtwork"
+              alt=""
+              class="artwork artwork-previous"
+            />
+            <img
+              v-if="displayedArtwork"
+              :src="displayedArtwork"
+              :alt="track?.album || 'Album artwork'"
+              class="artwork"
+              :class="{ 'artwork-entering': artworkTransitioning }"
+            />
+            <div v-else class="artwork-placeholder">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right column: Facts -->
+        <div class="facts-column">
+          <!-- Loading / Track Info State -->
+          <div v-if="!currentFact || isLoading" class="track-info">
+            <h1 v-if="track" class="title">{{ track.title }}</h1>
+            <p v-if="track" class="artist">{{ track.artist }}</p>
+            <p v-if="track" class="album">{{ track.album }}</p>
+            <p v-if="isLoading" class="loading-hint">Loading facts...</p>
+            <div v-if="!track" class="no-playback">
+              <p class="no-playback-text">No playback</p>
+              <p class="zone-hint">{{ zoneName }}</p>
+            </div>
+          </div>
+
+          <!-- Facts Display -->
+          <div v-else class="facts-display">
+            <p class="fact-text">{{ currentFact }}</p>
+
+            <!-- Dot indicators -->
+            <div class="fact-dots">
+              <span
+                v-for="(_, index) in facts"
+                :key="index"
+                class="dot"
+                :class="{ active: index === currentFactIndex }"
+              />
+            </div>
+          </div>
+
+          <!-- Error State -->
+          <div v-if="error && !isLoading" class="error-state">
+            <p v-if="error.type === 'no-key'" class="error-message">
+              Configure API key in <a href="/admin">Admin Panel</a>
+            </p>
+            <p v-else class="error-message">{{ error.message }}</p>
+          </div>
+
+          <!-- Progress bar -->
+          <div v-if="track" class="progress-container">
+            <ProgressBar
+              :progress="progress"
+              :current-time="currentTime"
+              :duration="duration"
+              :show-time="true"
+            />
+          </div>
+
+          <!-- Zone indicator -->
+          <div class="zone-indicator">
+            <span class="zone-name">{{ zoneName }}</span>
+            <span v-if="isPlaying" class="playing-indicator">
+              <span class="bar"></span>
+              <span class="bar"></span>
+              <span class="bar"></span>
+            </span>
+            <span v-else-if="state === 'paused'" class="paused-indicator">⏸</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </DynamicBackground>
+
+  <div v-else class="facts-columns-layout" :style="backgroundStyle">
     <div class="safe-zone">
       <div class="content">
         <!-- Left column: Artwork -->
