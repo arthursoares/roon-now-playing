@@ -25,7 +25,16 @@ export interface NowPlaying {
 }
 
 // Layout options
-export const LAYOUTS = ['detailed', 'minimal', 'fullscreen', 'ambient', 'cover'] as const;
+export const LAYOUTS = [
+  'detailed',
+  'minimal',
+  'fullscreen',
+  'ambient',
+  'cover',
+  'facts-columns',
+  'facts-overlay',
+  'facts-carousel',
+] as const;
 export type LayoutType = (typeof LAYOUTS)[number];
 
 // Font options
@@ -63,6 +72,77 @@ export const BACKGROUND_CONFIG: Record<BackgroundType, { displayName: string }> 
   'gradient-radial': { displayName: 'Radial Gradient' },
   'gradient-linear': { displayName: 'Linear Gradient' },
 };
+
+// LLM Provider options
+export const LLM_PROVIDERS = ['anthropic', 'openai'] as const;
+export type LLMProvider = (typeof LLM_PROVIDERS)[number];
+
+// Model options per provider
+export const LLM_MODELS = {
+  anthropic: ['claude-sonnet-4-20250514', 'claude-haiku-4-20250514'] as const,
+  openai: ['gpt-4o', 'gpt-4o-mini'] as const,
+} as const;
+
+// Facts configuration (stored on server)
+export interface FactsConfig {
+  provider: LLMProvider;
+  model: string;
+  apiKey: string;
+  factsCount: number;
+  rotationInterval: number;
+  prompt: string;
+}
+
+// Facts API types
+export interface FactsRequest {
+  artist: string;
+  album: string;
+  title: string;
+}
+
+export interface FactsResponse {
+  facts: string[];
+  cached: boolean;
+  generatedAt: number;
+}
+
+export interface FactsTestRequest {
+  artist: string;
+  album: string;
+  title: string;
+}
+
+export interface FactsTestResponse {
+  facts: string[];
+  durationMs: number;
+}
+
+export type FactsErrorType = 'no-key' | 'api-error' | 'empty';
+
+export interface FactsError {
+  type: FactsErrorType;
+  message: string;
+}
+
+// Default prompt template
+export const DEFAULT_FACTS_PROMPT = `Generate {factsCount} interesting, lesser-known facts about this music:
+
+Artist: {artist}
+Album: {album}
+Track: {title}
+
+Focus on:
+- Recording history or interesting production details
+- Historical context or cultural impact
+- Connections to other artists or musical movements
+- Awards, chart positions, or notable achievements
+- Personal stories from the artist about this work
+
+When possible, include attribution (e.g., "In a 1985 interview..." or "According to Songfacts...").
+
+Keep each fact concise (2-3 sentences max). Prioritize surprising or educational information over common knowledge.
+
+Return ONLY a JSON array of strings, no other text.`;
 
 // WebSocket message types
 export interface ClientSubscribeMessage {

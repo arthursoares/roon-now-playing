@@ -12,6 +12,8 @@ import {
   LAYOUTS,
   FONTS,
   FONT_CONFIG,
+  LLM_PROVIDERS,
+  LLM_MODELS,
   type Zone,
   type Track,
   type NowPlaying,
@@ -105,7 +107,7 @@ describe('Shared Types', () => {
     });
 
     it('should have correct number of layouts', () => {
-      expect(LAYOUTS).toHaveLength(5);
+      expect(LAYOUTS).toHaveLength(8);
     });
   });
 
@@ -185,6 +187,31 @@ describe('Shared Types', () => {
         seek_position: 42,
       };
       expect(msg.type).toBe('seek');
+    });
+  });
+
+  describe('Facts Types', () => {
+    it('should include facts layouts in LAYOUTS', () => {
+      expect(LAYOUTS).toContain('facts-columns');
+      expect(LAYOUTS).toContain('facts-overlay');
+      expect(LAYOUTS).toContain('facts-carousel');
+    });
+
+    it('should have correct total number of layouts', () => {
+      expect(LAYOUTS).toHaveLength(8); // 5 existing + 3 facts
+    });
+
+    it('should export LLM_PROVIDERS constant', () => {
+      expect(LLM_PROVIDERS).toContain('anthropic');
+      expect(LLM_PROVIDERS).toContain('openai');
+      expect(LLM_PROVIDERS).toHaveLength(2);
+    });
+
+    it('should export LLM_MODELS for each provider', () => {
+      expect(LLM_MODELS.anthropic).toContain('claude-sonnet-4-20250514');
+      expect(LLM_MODELS.anthropic).toContain('claude-haiku-4-20250514');
+      expect(LLM_MODELS.openai).toContain('gpt-4o');
+      expect(LLM_MODELS.openai).toContain('gpt-4o-mini');
     });
   });
 });
