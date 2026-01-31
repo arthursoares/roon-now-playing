@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import type { Track, PlaybackState, BackgroundType } from '@roon-screen-cover/shared';
+import DynamicBackground from '../components/DynamicBackground.vue';
+import { useColorExtraction } from '../composables/useColorExtraction';
 
 const props = defineProps<{
   track: Track | null;
@@ -13,12 +16,54 @@ const props = defineProps<{
   background: BackgroundType;
 }>();
 
-// Note: MinimalLayout ignores background setting because the artwork covers the entire screen
-// with a gradient overlay on top. Text is always white on the dark overlay.
+const artworkUrlRef = computed(() => props.artworkUrl);
+const { palette, vibrantGradient } = useColorExtraction(artworkUrlRef);
+
+// Background types handled by DynamicBackground component
+const dynamicBackgroundTypes: BackgroundType[] = [
+  'gradient-linear-multi',
+  'gradient-radial-corner',
+  'gradient-mesh',
+  'blur-subtle',
+  'blur-heavy',
+  'duotone',
+  'posterized',
+  'gradient-noise',
+  'blur-grain',
+];
+
+const usesDynamicBackground = computed(() =>
+  dynamicBackgroundTypes.includes(props.background)
+);
 </script>
 
 <template>
-  <div class="minimal-layout">
+  <!-- Dynamic background types use DynamicBackground component -->
+  <DynamicBackground
+    v-if="usesDynamicBackground"
+    :type="background"
+    :artwork-url="artworkUrl"
+    :palette="palette"
+    :vibrant-gradient="vibrantGradient"
+    class="minimal-layout"
+  >
+    <div class="overlay">
+      <div v-if="track" class="track-info">
+        <h1 class="title">{{ track.title }}</h1>
+        <p class="artist">{{ track.artist }}</p>
+      </div>
+      <div v-else class="no-playback">
+        <p>No playback</p>
+      </div>
+
+      <div class="progress-line">
+        <div class="progress-fill" :style="{ width: `${progress}%` }"></div>
+      </div>
+    </div>
+  </DynamicBackground>
+
+  <!-- Original layout uses artwork as background with gradient overlay -->
+  <div v-else class="minimal-layout">
     <div class="artwork-background">
       <img
         v-if="artworkUrl"
