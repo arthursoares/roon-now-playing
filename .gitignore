@@ -33,5 +33,8 @@ Thumbs.db
 # Test
 coverage/
 
+# Worktrees
+.worktrees/
+
 # Roon
 config.json
