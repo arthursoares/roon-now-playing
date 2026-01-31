@@ -10,10 +10,11 @@ A Roon extension that displays real-time album artwork and track metadata on any
 
 - Real-time album artwork and track metadata display
 - Multiple simultaneous clients viewing different zones
-- Five display layouts: Detailed, Minimal, Fullscreen, Ambient, and Cover
-- Five background options including color extraction from artwork
+- Eight display layouts including AI-powered Facts layouts
+- Fourteen background options with dynamic color extraction
 - Seven customizable font families
-- Admin panel for managing connected clients remotely
+- AI-generated facts about currently playing music (Anthropic/OpenAI)
+- Admin panel for managing connected clients and AI configuration
 - Automatic zone selection via URL parameters
 - WebSocket-based real-time updates
 - Artwork caching for performance
@@ -71,11 +72,11 @@ pnpm dev
 | Parameter | Values | Description |
 |-----------|--------|-------------|
 | `zone` | Zone name or ID | Auto-select zone (e.g., `?zone=Living%20Room`) |
-| `layout` | `detailed`, `minimal`, `fullscreen`, `ambient`, `cover` | Display layout |
-| `background` | `black`, `white`, `dominant`, `gradient-radial`, `gradient-linear` | Background style |
+| `layout` | `detailed`, `minimal`, `fullscreen`, `ambient`, `cover`, `facts-columns`, `facts-overlay`, `facts-carousel` | Display layout |
+| `background` | See [Backgrounds](#backgrounds) section | Background style |
 | `font` | `system`, `patua-one`, `comfortaa`, `noto-sans-display`, `coda`, `bellota-text`, `big-shoulders` | Font family |
 
-Example: `http://localhost:3000/?zone=Office&layout=detailed&background=gradient-radial&font=comfortaa`
+Example: `http://localhost:3000/?zone=Office&layout=detailed&background=gradient-mesh&font=comfortaa`
 
 ### Interactions
 
@@ -91,6 +92,11 @@ Example: `http://localhost:3000/?zone=Office&layout=detailed&background=gradient
 | `fullscreen` | Album artwork centered on screen, scaled to fit. No text overlays. |
 | `ambient` | Color-extracted background with artwork and full track info. Great for 10-foot UI / TV displays. |
 | `cover` | Clean album cover centered with subtle shadow. Artwork crossfades on track changes. |
+| `facts-columns` | Two-column layout with artwork and AI-generated facts about the music. |
+| `facts-overlay` | Full artwork background with facts overlaid at the bottom. |
+| `facts-carousel` | Blurred artwork background with facts displayed in a centered card. |
+
+**Note:** Facts layouts require an API key (Anthropic or OpenAI) configured in the Admin panel.
 
 ### Screenshots
 
@@ -109,13 +115,35 @@ Example: `http://localhost:3000/?zone=Office&layout=detailed&background=gradient
 
 Customize the background using the `?background=` URL parameter or via Admin UI:
 
+### Basic
 | Background | Description |
 |------------|-------------|
 | `black` | Pure black (#000000) - Default |
 | `white` | Pure white (#ffffff) |
 | `dominant` | Vibrant solid color extracted from album artwork |
+
+### Gradients
+| Background | Description |
+|------------|-------------|
 | `gradient-radial` | Radial gradient emanating from center using artwork colors |
 | `gradient-linear` | Diagonal linear gradient (135°) using artwork colors |
+| `gradient-linear-multi` | Multi-color linear gradient using full color palette |
+| `gradient-radial-corner` | Radial gradient from corner using palette colors |
+| `gradient-mesh` | CSS mesh gradient with colors at corners |
+
+### Artwork-Based
+| Background | Description |
+|------------|-------------|
+| `blur-subtle` | Softly blurred album artwork (20px blur) |
+| `blur-heavy` | Heavily blurred album artwork (50px blur) |
+| `duotone` | Album artwork with two-color duotone effect |
+| `posterized` | Album artwork with reduced color posterization |
+
+### Textured
+| Background | Description |
+|------------|-------------|
+| `gradient-noise` | Gradient with subtle noise texture overlay |
+| `blur-grain` | Blurred artwork with film grain effect |
 
 **Note:** The `minimal` layout ignores background settings since the artwork covers the entire screen.
 
@@ -135,13 +163,22 @@ Customize the display font using the `?font=` URL parameter:
 
 ## Admin Panel
 
-Access the admin panel at `/admin` to manage connected clients.
+Access the admin panel at `/admin` to manage connected clients and configure AI features.
 
-Features:
+### Client Management
 - View all connected clients with their current settings
 - Push layout, font, background, and zone changes to any client remotely
 - Set friendly names for clients for easy identification
 - Real-time updates when clients connect/disconnect
+
+### Facts Configuration
+Configure AI-powered facts generation for the facts layouts:
+- Choose between Anthropic (Claude) or OpenAI providers
+- Select model (e.g., claude-sonnet-4, gpt-4o)
+- Set API key (or use environment variables)
+- Configure facts count per track (1-10)
+- Customize rotation interval
+- Test configuration with sample track data
 
 ## Configuration
 
@@ -153,6 +190,10 @@ Environment variables (or `.env` file):
 | `HOST` | `0.0.0.0` | Server bind address |
 | `ARTWORK_CACHE_DIR` | `./cache` | Artwork cache directory |
 | `LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
+| `ANTHROPIC_API_KEY` | - | Anthropic API key for facts generation |
+| `OPENAI_API_KEY` | - | OpenAI API key for facts generation |
+
+**Note:** API keys can also be configured via the Admin panel. Environment variables take precedence.
 
 ## API
 
@@ -172,6 +213,15 @@ Environment variables (or `.env` file):
 | `GET` | `/api/admin/zones` | List available zones |
 | `POST` | `/api/admin/clients/:id/name` | Set client friendly name |
 | `POST` | `/api/admin/clients/:id/push` | Push settings to client (layout, font, background, zoneId) |
+
+### Facts API
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/facts/config` | Get current facts configuration |
+| `POST` | `/api/facts/config` | Update facts configuration |
+| `GET` | `/api/facts/:artist/:album/:title` | Get cached facts for a track |
+| `POST` | `/api/facts/test` | Test facts generation with sample data |
 
 ### WebSocket
 
@@ -336,12 +386,16 @@ roon-now-playing/
 │           │   ├── MinimalLayout.vue
 │           │   ├── FullscreenLayout.vue
 │           │   ├── AmbientLayout.vue
-│           │   └── CoverLayout.vue
+│           │   ├── CoverLayout.vue
+│           │   ├── FactsColumnsLayout.vue
+│           │   ├── FactsOverlayLayout.vue
+│           │   └── FactsCarouselLayout.vue
 │           └── composables/
 │               ├── useWebSocket.ts
 │               ├── usePreferences.ts
 │               ├── useColorExtraction.ts
 │               ├── useBackgroundStyle.ts
+│               ├── useFacts.ts
 │               └── colorUtils.ts
 ├── .github/workflows/
 │   └── docker-publish.yml
@@ -359,7 +413,7 @@ Pre-built images are available from GitHub Container Registry:
 docker pull ghcr.io/arthursoares/roon-now-playing:latest
 
 # Specific version
-docker pull ghcr.io/arthursoares/roon-now-playing:1.1.0
+docker pull ghcr.io/arthursoares/roon-now-playing:1.3.0
 ```
 
 Supported platforms:
