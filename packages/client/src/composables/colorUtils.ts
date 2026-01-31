@@ -34,6 +34,13 @@ export interface ExtractedColors {
   ready: boolean;
 }
 
+export interface ExtractedPalette {
+  dominant: HSL;
+  palette: HSL[];
+  paletteCSS: string[];
+  isDark: boolean;
+}
+
 // Color extraction parameters
 export const SAMPLE_SIZE = 50; // Canvas size for sampling
 export const HUE_BUCKETS = 12; // Number of hue groups
