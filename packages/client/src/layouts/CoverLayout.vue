@@ -84,30 +84,32 @@ const layoutClass = computed(() => ({
         :vibrant-gradient="vibrantGradient"
         :class="layoutClass"
     >
-        <div class="safe-zone">
-            <div class="artwork-container">
-                <!-- Previous artwork (for crossfade) -->
-                <img
-                    v-if="previousArtwork && artworkTransitioning"
-                    :src="previousArtwork"
-                    alt=""
-                    class="artwork artwork-previous"
-                />
-                <!-- Current artwork -->
-                <img
-                    v-if="displayedArtwork"
-                    :src="displayedArtwork"
-                    :alt="track?.album || 'Album artwork'"
-                    class="artwork"
-                    :class="{ 'artwork-entering': artworkTransitioning }"
-                />
-                <!-- Placeholder for missing artwork -->
-                <div v-else class="artwork-placeholder">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                        <path
-                            d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
-                        />
-                    </svg>
+        <div class="cover-content">
+            <div class="safe-zone">
+                <div class="artwork-container">
+                    <!-- Previous artwork (for crossfade) -->
+                    <img
+                        v-if="previousArtwork && artworkTransitioning"
+                        :src="previousArtwork"
+                        alt=""
+                        class="artwork artwork-previous"
+                    />
+                    <!-- Current artwork -->
+                    <img
+                        v-if="displayedArtwork"
+                        :src="displayedArtwork"
+                        :alt="track?.album || 'Album artwork'"
+                        class="artwork"
+                        :class="{ 'artwork-entering': artworkTransitioning }"
+                    />
+                    <!-- Placeholder for missing artwork -->
+                    <div v-else class="artwork-placeholder">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path
+                                d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
+                            />
+                        </svg>
+                    </div>
                 </div>
             </div>
         </div>
@@ -153,6 +155,15 @@ const layoutClass = computed(() => ({
     justify-content: center;
     overflow: hidden;
     transition: background 0.5s ease-out;
+}
+
+/* Content wrapper for DynamicBackground - provides centering that .cover-layout normally provides */
+.cover-content {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .safe-zone {
