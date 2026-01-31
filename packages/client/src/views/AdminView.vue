@@ -599,11 +599,13 @@ onMounted(() => {
 <style scoped>
 .admin-view {
   min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   background: #1a1a2e;
   color: #eee;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow-y: auto;
 }
 
 .admin-header {
