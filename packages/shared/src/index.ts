@@ -61,16 +61,43 @@ export const FONT_CONFIG: Record<FontType, { displayName: string; googleFont: st
 };
 
 // Background options
-export const BACKGROUNDS = ['black', 'white', 'dominant', 'gradient-radial', 'gradient-linear'] as const;
+export const BACKGROUNDS = [
+  'black',
+  'white',
+  'dominant',
+  'gradient-radial',
+  'gradient-linear',
+  'gradient-linear-multi',
+  'gradient-radial-corner',
+  'gradient-mesh',
+  'blur-subtle',
+  'blur-heavy',
+  'duotone',
+  'posterized',
+  'gradient-noise',
+  'blur-grain',
+] as const;
 export type BackgroundType = (typeof BACKGROUNDS)[number];
 
-// Background display names
-export const BACKGROUND_CONFIG: Record<BackgroundType, { displayName: string }> = {
-  'black': { displayName: 'Black' },
-  'white': { displayName: 'White' },
-  'dominant': { displayName: 'Dominant Color' },
-  'gradient-radial': { displayName: 'Radial Gradient' },
-  'gradient-linear': { displayName: 'Linear Gradient' },
+// Background category type
+export type BackgroundCategory = 'basic' | 'gradient' | 'artwork' | 'textured';
+
+// Background display names and categories
+export const BACKGROUND_CONFIG: Record<BackgroundType, { displayName: string; category: BackgroundCategory }> = {
+  'black': { displayName: 'Black', category: 'basic' },
+  'white': { displayName: 'White', category: 'basic' },
+  'dominant': { displayName: 'Dominant Color', category: 'basic' },
+  'gradient-radial': { displayName: 'Radial Gradient', category: 'gradient' },
+  'gradient-linear': { displayName: 'Linear Gradient', category: 'gradient' },
+  'gradient-linear-multi': { displayName: 'Multi-Color Linear', category: 'gradient' },
+  'gradient-radial-corner': { displayName: 'Corner Radial', category: 'gradient' },
+  'gradient-mesh': { displayName: 'Mesh Gradient', category: 'gradient' },
+  'blur-subtle': { displayName: 'Subtle Blur', category: 'artwork' },
+  'blur-heavy': { displayName: 'Heavy Blur', category: 'artwork' },
+  'duotone': { displayName: 'Duotone', category: 'artwork' },
+  'posterized': { displayName: 'Posterized', category: 'artwork' },
+  'gradient-noise': { displayName: 'Noise Gradient', category: 'textured' },
+  'blur-grain': { displayName: 'Grainy Blur', category: 'textured' },
 };
 
 // LLM Provider options

@@ -29,6 +29,7 @@ import {
   hslToString,
   getLuminance,
   extractDominantColor,
+  extractColorPalette,
   generateColors,
   type HSL,
 } from './colorUtils';
@@ -51,6 +52,12 @@ beforeAll(() => {
     (globalThis as any).ImageData = ImageDataPolyfill;
   }
 });
+
+// Helper to create ImageData for tests
+function createImageData(width: number, height: number): ImageData {
+  const data = new Uint8ClampedArray(width * height * 4);
+  return new ImageData(data, width, height);
+}
 
 describe('Color Utilities', () => {
   describe('rgbToHsl', () => {
@@ -316,6 +323,98 @@ describe('Color Utilities', () => {
 
       // Should lean toward blue due to higher saturation
       expect(dominant.h).toBeGreaterThan(180);
+    });
+  });
+
+  describe('extractColorPalette', () => {
+    it('should return up to 5 colors sorted by prominence', () => {
+      const imageData = createImageData(50, 50);
+      // Fill with blue (dominant), red, green
+      for (let i = 0; i < imageData.data.length; i += 4) {
+        const pixel = i / 4;
+        if (pixel < 1000) {
+          // Blue - most pixels
+          imageData.data[i] = 50;
+          imageData.data[i + 1] = 100;
+          imageData.data[i + 2] = 200;
+        } else if (pixel < 1500) {
+          // Red
+          imageData.data[i] = 200;
+          imageData.data[i + 1] = 50;
+          imageData.data[i + 2] = 50;
+        } else {
+          // Green
+          imageData.data[i] = 50;
+          imageData.data[i + 1] = 180;
+          imageData.data[i + 2] = 50;
+        }
+        imageData.data[i + 3] = 255;
+      }
+
+      const palette = extractColorPalette(imageData);
+
+      expect(palette.length).toBeGreaterThanOrEqual(3);
+      expect(palette.length).toBeLessThanOrEqual(5);
+      // First color should be blue-ish (hue around 210-230)
+      expect(palette[0].h).toBeGreaterThan(180);
+      expect(palette[0].h).toBeLessThan(250);
+    });
+
+    it('should filter out near-duplicate hues within 15 degrees', () => {
+      const imageData = createImageData(50, 50);
+      // Fill with two very similar blues
+      for (let i = 0; i < imageData.data.length; i += 4) {
+        const pixel = i / 4;
+        if (pixel < 1250) {
+          imageData.data[i] = 50;
+          imageData.data[i + 1] = 100;
+          imageData.data[i + 2] = 200;
+        } else {
+          imageData.data[i] = 60;
+          imageData.data[i + 1] = 110;
+          imageData.data[i + 2] = 210;
+        }
+        imageData.data[i + 3] = 255;
+      }
+
+      const palette = extractColorPalette(imageData);
+      expect(palette.length).toBe(1);
+    });
+
+    it('should respect maxColors parameter', () => {
+      const imageData = createImageData(50, 50);
+      // Fill with 4 distinct colors
+      for (let i = 0; i < imageData.data.length; i += 4) {
+        const pixel = i / 4;
+        if (pixel < 625) {
+          imageData.data[i] = 200;
+          imageData.data[i + 1] = 50;
+          imageData.data[i + 2] = 50; // Red
+        } else if (pixel < 1250) {
+          imageData.data[i] = 50;
+          imageData.data[i + 1] = 200;
+          imageData.data[i + 2] = 50; // Green
+        } else if (pixel < 1875) {
+          imageData.data[i] = 50;
+          imageData.data[i + 1] = 50;
+          imageData.data[i + 2] = 200; // Blue
+        } else {
+          imageData.data[i] = 200;
+          imageData.data[i + 1] = 200;
+          imageData.data[i + 2] = 50; // Yellow
+        }
+        imageData.data[i + 3] = 255;
+      }
+
+      const palette = extractColorPalette(imageData, 2);
+      expect(palette.length).toBeLessThanOrEqual(2);
+    });
+
+    it('should return empty array for fully transparent image', () => {
+      const imageData = createImageData(10, 10);
+      // All pixels are transparent (alpha = 0 by default)
+      const palette = extractColorPalette(imageData);
+      expect(palette.length).toBe(0);
     });
   });
 

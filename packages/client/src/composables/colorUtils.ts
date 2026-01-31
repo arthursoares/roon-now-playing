@@ -34,6 +34,13 @@ export interface ExtractedColors {
   ready: boolean;
 }
 
+export interface ExtractedPalette {
+  dominant: HSL;
+  palette: HSL[];
+  paletteCSS: string[];
+  isDark: boolean;
+}
+
 // Color extraction parameters
 export const SAMPLE_SIZE = 50; // Canvas size for sampling
 export const HUE_BUCKETS = 12; // Number of hue groups
@@ -277,6 +284,96 @@ export function extractDominantColor(imageData: ImageData): HSL {
     s: Math.round(weightedS / totalWeight),
     l: Math.round(weightedL / totalWeight),
   };
+}
+
+/** Minimum hue difference to consider colors as distinct */
+export const MIN_HUE_DIFFERENCE = 15;
+
+/**
+ * Extract a palette of prominent colors from image data
+ * Returns HSL colors sorted by prominence (most prominent first)
+ */
+export function extractColorPalette(imageData: ImageData, maxColors: number = 5): HSL[] {
+  const pixels = imageData.data;
+  const hueBuckets: { colors: HSL[]; count: number; saturationSum: number }[] = Array.from(
+    { length: HUE_BUCKETS },
+    () => ({ colors: [], count: 0, saturationSum: 0 })
+  );
+
+  // Sample pixels and group by hue
+  for (let i = 0; i < pixels.length; i += 4) {
+    const r = pixels[i];
+    const g = pixels[i + 1];
+    const b = pixels[i + 2];
+    const a = pixels[i + 3];
+
+    // Skip transparent pixels
+    if (a < 128) continue;
+
+    const hsl = rgbToHsl(r, g, b);
+
+    // Only consider pixels with meaningful saturation for hue analysis
+    if (hsl.s >= 10) {
+      const bucketIndex = Math.floor(hsl.h / (360 / HUE_BUCKETS)) % HUE_BUCKETS;
+      hueBuckets[bucketIndex].colors.push(hsl);
+      hueBuckets[bucketIndex].count++;
+      hueBuckets[bucketIndex].saturationSum += hsl.s;
+    }
+  }
+
+  // Score and sort buckets by prominence (count * average saturation)
+  const scoredBuckets = hueBuckets
+    .map((bucket, index) => {
+      if (bucket.count === 0) return null;
+      const avgSaturation = bucket.saturationSum / bucket.count;
+      const score = bucket.count * (avgSaturation / 100);
+      return { bucket, index, score };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null)
+    .sort((a, b) => b.score - a.score);
+
+  // Extract representative color from each bucket and filter near-duplicates
+  const palette: HSL[] = [];
+
+  for (const { bucket } of scoredBuckets) {
+    if (palette.length >= maxColors) break;
+
+    // Calculate weighted average color for this bucket
+    let weightedH = 0;
+    let weightedS = 0;
+    let weightedL = 0;
+    let totalWeight = 0;
+
+    for (const color of bucket.colors) {
+      const weight = color.s / 100;
+      weightedH += color.h * weight;
+      weightedS += color.s * weight;
+      weightedL += color.l * weight;
+      totalWeight += weight;
+    }
+
+    if (totalWeight === 0) continue;
+
+    const representativeColor: HSL = {
+      h: Math.round(weightedH / totalWeight),
+      s: Math.round(weightedS / totalWeight),
+      l: Math.round(weightedL / totalWeight),
+    };
+
+    // Check if this hue is too similar to existing palette colors
+    const isTooSimilar = palette.some((existing) => {
+      const hueDiff = Math.abs(existing.h - representativeColor.h);
+      // Handle hue wraparound (e.g., 355 and 5 are only 10 apart)
+      const normalizedDiff = Math.min(hueDiff, 360 - hueDiff);
+      return normalizedDiff < MIN_HUE_DIFFERENCE;
+    });
+
+    if (!isTooSimilar) {
+      palette.push(representativeColor);
+    }
+  }
+
+  return palette;
 }
 
 /**

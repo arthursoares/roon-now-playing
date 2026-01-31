@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
 import type { Track, PlaybackState, BackgroundType } from "@roon-screen-cover/shared";
+import DynamicBackground from '../components/DynamicBackground.vue';
 import { useColorExtraction } from '../composables/useColorExtraction';
 import { useBackgroundStyle } from '../composables/useBackgroundStyle';
 
@@ -18,8 +19,25 @@ const props = defineProps<{
 
 const backgroundRef = computed(() => props.background);
 const artworkUrlRef = computed(() => props.artworkUrl);
-const { colors, vibrantGradient } = useColorExtraction(artworkUrlRef);
+const { colors, vibrantGradient, palette } = useColorExtraction(artworkUrlRef);
 const { style: backgroundStyle } = useBackgroundStyle(backgroundRef, colors, vibrantGradient);
+
+// Background types handled by DynamicBackground component
+const dynamicBackgroundTypes: BackgroundType[] = [
+  'gradient-linear-multi',
+  'gradient-radial-corner',
+  'gradient-mesh',
+  'blur-subtle',
+  'blur-heavy',
+  'duotone',
+  'posterized',
+  'gradient-noise',
+  'blur-grain',
+];
+
+const usesDynamicBackground = computed(() =>
+  dynamicBackgroundTypes.includes(props.background)
+);
 
 // Determine if dark mode based on background type
 const isDarkMode = computed(() => {
@@ -58,7 +76,46 @@ const layoutClass = computed(() => ({
 </script>
 
 <template>
-    <div :class="layoutClass" :style="backgroundStyle">
+    <DynamicBackground
+        v-if="usesDynamicBackground"
+        :type="background"
+        :artwork-url="artworkUrl"
+        :palette="palette"
+        :vibrant-gradient="vibrantGradient"
+        :class="layoutClass"
+    >
+        <div class="cover-content">
+            <div class="safe-zone">
+                <div class="artwork-container">
+                    <!-- Previous artwork (for crossfade) -->
+                    <img
+                        v-if="previousArtwork && artworkTransitioning"
+                        :src="previousArtwork"
+                        alt=""
+                        class="artwork artwork-previous"
+                    />
+                    <!-- Current artwork -->
+                    <img
+                        v-if="displayedArtwork"
+                        :src="displayedArtwork"
+                        :alt="track?.album || 'Album artwork'"
+                        class="artwork"
+                        :class="{ 'artwork-entering': artworkTransitioning }"
+                    />
+                    <!-- Placeholder for missing artwork -->
+                    <div v-else class="artwork-placeholder">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path
+                                d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
+                            />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </DynamicBackground>
+
+    <div v-else :class="layoutClass" :style="backgroundStyle">
         <div class="safe-zone">
             <div class="artwork-container">
                 <!-- Previous artwork (for crossfade) -->
@@ -98,6 +155,15 @@ const layoutClass = computed(() => ({
     justify-content: center;
     overflow: hidden;
     transition: background 0.5s ease-out;
+}
+
+/* Content wrapper for DynamicBackground - provides centering that .cover-layout normally provides */
+.cover-content {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .safe-zone {

@@ -14,6 +14,8 @@ import {
   FONT_CONFIG,
   LLM_PROVIDERS,
   LLM_MODELS,
+  BACKGROUNDS,
+  BACKGROUND_CONFIG,
   type Zone,
   type Track,
   type NowPlaying,
@@ -190,7 +192,7 @@ describe('Shared Types', () => {
     });
   });
 
-  describe('Facts Types', () => {
+describe('Facts Types', () => {
     it('should include facts layouts in LAYOUTS', () => {
       expect(LAYOUTS).toContain('facts-columns');
       expect(LAYOUTS).toContain('facts-overlay');
@@ -212,6 +214,40 @@ describe('Shared Types', () => {
       expect(LLM_MODELS.anthropic).toContain('claude-haiku-4-20250514');
       expect(LLM_MODELS.openai).toContain('gpt-4o');
       expect(LLM_MODELS.openai).toContain('gpt-4o-mini');
+    });
+  });
+
+  describe('BACKGROUNDS', () => {
+    it('should include all 14 background types', () => {
+      expect(BACKGROUNDS).toContain('black');
+      expect(BACKGROUNDS).toContain('white');
+      expect(BACKGROUNDS).toContain('dominant');
+      expect(BACKGROUNDS).toContain('gradient-radial');
+      expect(BACKGROUNDS).toContain('gradient-linear');
+      // New types
+      expect(BACKGROUNDS).toContain('gradient-linear-multi');
+      expect(BACKGROUNDS).toContain('gradient-radial-corner');
+      expect(BACKGROUNDS).toContain('gradient-mesh');
+      expect(BACKGROUNDS).toContain('blur-subtle');
+      expect(BACKGROUNDS).toContain('blur-heavy');
+      expect(BACKGROUNDS).toContain('duotone');
+      expect(BACKGROUNDS).toContain('posterized');
+      expect(BACKGROUNDS).toContain('gradient-noise');
+      expect(BACKGROUNDS).toContain('blur-grain');
+      expect(BACKGROUNDS.length).toBe(14);
+    });
+
+    it('should have display names for all background types', () => {
+      for (const bg of BACKGROUNDS) {
+        expect(BACKGROUND_CONFIG[bg]).toBeDefined();
+        expect(BACKGROUND_CONFIG[bg].displayName).toBeTruthy();
+      }
+    });
+
+    it('should have category for all background types', () => {
+      for (const bg of BACKGROUNDS) {
+        expect(BACKGROUND_CONFIG[bg].category).toMatch(/^(basic|gradient|artwork|textured)$/);
+      }
     });
   });
 });

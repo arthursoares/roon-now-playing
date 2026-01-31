@@ -112,4 +112,50 @@ describe('usePreferences', () => {
 
     expect(layout.value).toBe('minimal');
   });
+
+  // New background type tests
+  it('should accept gradient-mesh background from URL', () => {
+    window.history.replaceState({}, '', '/?background=gradient-mesh');
+
+    const { background, loadPreferences } = usePreferences();
+    loadPreferences();
+
+    expect(background.value).toBe('gradient-mesh');
+  });
+
+  it('should accept blur-subtle background from URL', () => {
+    window.history.replaceState({}, '', '/?background=blur-subtle');
+
+    const { background, loadPreferences } = usePreferences();
+    loadPreferences();
+
+    expect(background.value).toBe('blur-subtle');
+  });
+
+  it('should accept duotone background from URL', () => {
+    window.history.replaceState({}, '', '/?background=duotone');
+
+    const { background, loadPreferences } = usePreferences();
+    loadPreferences();
+
+    expect(background.value).toBe('duotone');
+  });
+
+  it('should reject invalid background from URL', () => {
+    window.history.replaceState({}, '', '/?background=invalid-type');
+
+    const { background, loadPreferences } = usePreferences();
+    loadPreferences();
+
+    expect(background.value).toBe('black'); // Default
+  });
+
+  it('should save new background types to localStorage', () => {
+    const { saveBackgroundPreference, background } = usePreferences();
+
+    saveBackgroundPreference('gradient-noise');
+
+    expect(background.value).toBe('gradient-noise');
+    expect(localStorage.getItem('roon-screen-cover:background')).toBe('gradient-noise');
+  });
 });

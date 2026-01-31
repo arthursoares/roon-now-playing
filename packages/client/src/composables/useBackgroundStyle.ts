@@ -20,7 +20,20 @@ export function useBackgroundStyle(
   vibrantGradient?: Ref<VibrantGradient>
 ): BackgroundStyleResult {
   const needsColorExtraction = computed(() => {
-    return ['dominant', 'gradient-radial', 'gradient-linear'].includes(backgroundType.value);
+    return [
+      'dominant',
+      'gradient-radial',
+      'gradient-linear',
+      'gradient-linear-multi',
+      'gradient-radial-corner',
+      'gradient-mesh',
+      'blur-subtle',
+      'blur-heavy',
+      'duotone',
+      'posterized',
+      'gradient-noise',
+      'blur-grain',
+    ].includes(backgroundType.value);
   });
 
   const style = computed(() => {
@@ -105,6 +118,60 @@ export function useBackgroundStyle(
         // Fallback gradient
         return {
           background: 'linear-gradient(135deg, #1a1a1a 0%, #000000 100%)',
+          '--text-color': '#ffffff',
+          '--text-secondary': 'rgba(255, 255, 255, 0.8)',
+          '--text-tertiary': 'rgba(255, 255, 255, 0.6)',
+          '--progress-bar-bg': 'rgba(255, 255, 255, 0.2)',
+          '--progress-bar-fill': 'rgba(255, 255, 255, 0.9)',
+        };
+
+      // Gradient types handled by DynamicBackground component
+      // These provide text color CSS variables based on vibrantGradient mode
+      case 'gradient-linear-multi':
+      case 'gradient-radial-corner':
+      case 'gradient-mesh':
+      case 'gradient-noise':
+        if (vibrantGradient?.value?.ready) {
+          const isDark = vibrantGradient.value.mode === 'dark';
+          return {
+            background: 'transparent', // DynamicBackground handles the actual background
+            '--text-color': vibrantGradient.value.text,
+            '--text-secondary': vibrantGradient.value.textSecondary,
+            '--text-tertiary': vibrantGradient.value.textTertiary,
+            '--progress-bar-bg': isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(26, 26, 26, 0.15)',
+            '--progress-bar-fill': isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(26, 26, 26, 0.7)',
+          };
+        }
+        // Fallback when colors aren't ready
+        return {
+          background: 'transparent',
+          '--text-color': '#ffffff',
+          '--text-secondary': 'rgba(255, 255, 255, 0.8)',
+          '--text-tertiary': 'rgba(255, 255, 255, 0.6)',
+          '--progress-bar-bg': 'rgba(255, 255, 255, 0.2)',
+          '--progress-bar-fill': 'rgba(255, 255, 255, 0.9)',
+        };
+
+      // Artwork-based types that use extracted colors for text
+      case 'blur-subtle':
+      case 'blur-heavy':
+      case 'blur-grain':
+      case 'duotone':
+      case 'posterized':
+        if (colors?.value) {
+          const isDark = colors.value.mode === 'dark';
+          return {
+            background: 'transparent', // DynamicBackground handles the actual background
+            '--text-color': colors.value.text,
+            '--text-secondary': colors.value.textSecondary,
+            '--text-tertiary': colors.value.textTertiary,
+            '--progress-bar-bg': isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(26, 26, 26, 0.15)',
+            '--progress-bar-fill': isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(26, 26, 26, 0.7)',
+          };
+        }
+        // Fallback when colors aren't ready
+        return {
+          background: 'transparent',
           '--text-color': '#ffffff',
           '--text-secondary': 'rgba(255, 255, 255, 0.8)',
           '--text-tertiary': 'rgba(255, 255, 255, 0.6)',

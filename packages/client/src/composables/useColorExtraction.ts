@@ -1,14 +1,18 @@
 import { ref, watch, type Ref } from 'vue';
 import {
   extractDominantColor,
+  extractColorPalette,
   generateColors,
   generateVibrantGradient,
+  hslToString,
   DEFAULT_LIGHT,
   SAMPLE_SIZE,
   type ExtractedColors,
+  type ExtractedPalette,
+  type HSL,
 } from './colorUtils';
 
-export type { ExtractedColors } from './colorUtils';
+export type { ExtractedColors, ExtractedPalette, HSL } from './colorUtils';
 
 export interface VibrantGradient {
   center: string;
@@ -30,15 +34,23 @@ const DEFAULT_VIBRANT: VibrantGradient = {
   ready: false,
 };
 
+const DEFAULT_PALETTE: ExtractedPalette = {
+  dominant: { h: 220, s: 20, l: 50 },
+  palette: [],
+  paletteCSS: [],
+  isDark: true,
+};
+
 export function useColorExtraction(artworkUrl: Ref<string | null>) {
   const colors = ref<ExtractedColors>({ ...DEFAULT_LIGHT });
   const vibrantGradient = ref<VibrantGradient>({ ...DEFAULT_VIBRANT });
+  const palette = ref<ExtractedPalette>({ ...DEFAULT_PALETTE });
   const previousColors = ref<ExtractedColors | null>(null);
   const isTransitioning = ref(false);
 
   let currentImageUrl: string | null = null;
 
-  async function extractColors(url: string): Promise<{ colors: ExtractedColors; vibrant: VibrantGradient }> {
+  async function extractColors(url: string): Promise<{ colors: ExtractedColors; vibrant: VibrantGradient; palette: ExtractedPalette }> {
     return new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
@@ -54,6 +66,7 @@ export function useColorExtraction(artworkUrl: Ref<string | null>) {
             resolve({
               colors: { ...DEFAULT_LIGHT, ready: true },
               vibrant: { ...DEFAULT_VIBRANT, ready: true },
+              palette: { ...DEFAULT_PALETTE },
             });
             return;
           }
@@ -64,15 +77,27 @@ export function useColorExtraction(artworkUrl: Ref<string | null>) {
           const extracted = generateColors(dominant);
           const vibrant = generateVibrantGradient(dominant);
 
+          // Extract color palette
+          const paletteColors = extractColorPalette(imageData);
+          const paletteCSS = paletteColors.map((c) => hslToString(c.h, c.s, c.l));
+          const extractedPalette: ExtractedPalette = {
+            dominant,
+            palette: paletteColors,
+            paletteCSS,
+            isDark: dominant.l <= 50,
+          };
+
           resolve({
             colors: extracted,
             vibrant: { ...vibrant, ready: true },
+            palette: extractedPalette,
           });
         } catch (error) {
           console.warn('Color extraction failed:', error);
           resolve({
             colors: { ...DEFAULT_LIGHT, ready: true },
             vibrant: { ...DEFAULT_VIBRANT, ready: true },
+            palette: { ...DEFAULT_PALETTE },
           });
         }
       };
@@ -82,6 +107,7 @@ export function useColorExtraction(artworkUrl: Ref<string | null>) {
         resolve({
           colors: { ...DEFAULT_LIGHT, ready: true },
           vibrant: { ...DEFAULT_VIBRANT, ready: true },
+          palette: { ...DEFAULT_PALETTE },
         });
       };
 
@@ -101,6 +127,7 @@ export function useColorExtraction(artworkUrl: Ref<string | null>) {
         previousColors.value = colors.value.ready ? { ...colors.value } : null;
         colors.value = { ...DEFAULT_LIGHT };
         vibrantGradient.value = { ...DEFAULT_VIBRANT };
+        palette.value = { ...DEFAULT_PALETTE };
         return;
       }
 
@@ -114,6 +141,7 @@ export function useColorExtraction(artworkUrl: Ref<string | null>) {
       const extracted = await extractColors(newUrl);
       colors.value = extracted.colors;
       vibrantGradient.value = extracted.vibrant;
+      palette.value = extracted.palette;
 
       // Clear transition state after animation duration
       setTimeout(() => {
@@ -127,6 +155,7 @@ export function useColorExtraction(artworkUrl: Ref<string | null>) {
   return {
     colors,
     vibrantGradient,
+    palette,
     previousColors,
     isTransitioning,
   };
