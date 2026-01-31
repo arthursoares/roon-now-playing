@@ -17,6 +17,9 @@ services:
       - PORT=3000
       - HOST=0.0.0.0
       - LOG_LEVEL=info
+      # Optional: API keys for AI-powered facts layouts
+      # - ANTHROPIC_API_KEY=sk-ant-...
+      # - OPENAI_API_KEY=sk-...
     # Use host network for Roon discovery (alternative to port mapping)
     # network_mode: host
 
