@@ -159,10 +159,10 @@ export function useBackgroundStyle(
       case 'duotone':
       case 'posterized':
         if (colors?.value) {
-          const isDark = colors.value.isDark;
+          const isDark = colors.value.mode === 'dark';
           return {
             background: 'transparent', // DynamicBackground handles the actual background
-            '--text-color': colors.value.textColor,
+            '--text-color': colors.value.text,
             '--text-secondary': colors.value.textSecondary,
             '--text-tertiary': colors.value.textTertiary,
             '--progress-bar-bg': isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(26, 26, 26, 0.15)',
