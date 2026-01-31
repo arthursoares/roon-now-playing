@@ -10,12 +10,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.72.1",
     "@roon-screen-cover/shared": "workspace:*",
     "express": "^5.2.1",
     "node-roon-api": "github:RoonLabs/node-roon-api",
     "node-roon-api-image": "github:RoonLabs/node-roon-api-image",
     "node-roon-api-status": "github:RoonLabs/node-roon-api-status",
     "node-roon-api-transport": "github:RoonLabs/node-roon-api-transport",
+    "openai": "^6.17.0",
     "ws": "^8.19.0"
   },
   "devDependencies": {
