@@ -7,6 +7,9 @@ import DetailedLayout from '../layouts/DetailedLayout.vue';
 import FullscreenLayout from '../layouts/FullscreenLayout.vue';
 import AmbientLayout from '../layouts/AmbientLayout.vue';
 import CoverLayout from '../layouts/CoverLayout.vue';
+import FactsColumnsLayout from '../layouts/FactsColumnsLayout.vue';
+import FactsOverlayLayout from '../layouts/FactsOverlayLayout.vue';
+import FactsCarouselLayout from '../layouts/FactsCarouselLayout.vue';
 
 const props = defineProps<{
   nowPlaying: NowPlayingType | null;
@@ -40,6 +43,12 @@ const layoutComponent = computed(() => {
       return AmbientLayout;
     case 'cover':
       return CoverLayout;
+    case 'facts-columns':
+      return FactsColumnsLayout;
+    case 'facts-overlay':
+      return FactsOverlayLayout;
+    case 'facts-carousel':
+      return FactsCarouselLayout;
     default:
       return DetailedLayout;
   }
