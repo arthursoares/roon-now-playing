@@ -68,17 +68,22 @@ watch(
     <!-- Content overlay -->
     <div class="content-overlay">
       <div class="safe-zone">
-        <!-- Track info or fact -->
-        <div class="text-content">
-          <template v-if="!currentFact || isLoading">
-            <h1 v-if="track" class="title">{{ track.title }}</h1>
-            <p v-if="track" class="artist">{{ track.artist }}</p>
-            <p v-if="isLoading" class="loading-hint">Loading facts...</p>
-          </template>
+        <!-- Facts area (main content) -->
+        <div class="facts-area">
+          <div v-if="!track" class="no-playback">
+            <p class="no-playback-text">No playback</p>
+            <p class="zone-hint">{{ zoneName }}</p>
+          </div>
 
           <template v-else>
-            <p class="fact-text">{{ currentFact }}</p>
-            <div class="fact-dots">
+            <p v-if="isLoading" class="loading-hint">Loading facts...</p>
+            <p v-else-if="currentFact" class="fact-text">{{ currentFact }}</p>
+            <p v-else-if="error && error.type === 'no-key'" class="error-hint">
+              Configure API key in <a href="/admin">Admin</a>
+            </p>
+
+            <!-- Dot indicators -->
+            <div v-if="facts.length > 1" class="fact-dots">
               <span
                 v-for="(_, index) in facts"
                 :key="index"
@@ -87,15 +92,12 @@ watch(
               />
             </div>
           </template>
+        </div>
 
-          <p v-if="error && error.type === 'no-key'" class="error-hint">
-            Configure API key in <a href="/admin">Admin</a>
-          </p>
-
-          <div v-if="!track" class="no-playback">
-            <p class="no-playback-text">No playback</p>
-            <p class="zone-hint">{{ zoneName }}</p>
-          </div>
+        <!-- Metadata (always visible) -->
+        <div v-if="track" class="metadata">
+          <p class="title">{{ track.title }}</p>
+          <p class="artist-album">{{ track.artist }} · {{ track.album }}</p>
         </div>
 
         <!-- Progress line -->
@@ -178,49 +180,43 @@ watch(
 
 .safe-zone {
   padding: 5% 7.5%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 100%;
+  box-sizing: border-box;
 }
 
-.text-content {
+/* Facts area - main content */
+.facts-area {
   margin-bottom: 1.5rem;
 }
 
-.title {
-  font-size: clamp(32px, 5vw, 64px);
-  font-weight: 600;
-  line-height: 1.1;
-  margin: 0 0 0.3em 0;
+.fact-text {
+  font-size: clamp(26px, 4vw, 52px);
+  font-weight: 400;
+  line-height: 1.35;
+  margin: 0;
   color: #fff;
   text-shadow: 0 2px 20px rgba(0, 0, 0, 0.5);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-.artist {
-  font-size: clamp(20px, 3vw, 40px);
-  font-weight: 400;
-  margin: 0;
-  color: rgba(255, 255, 255, 0.8);
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  max-width: 85%;
+  animation: fadeIn 0.5s ease-out;
 }
 
 .loading-hint {
-  font-size: clamp(14px, 1.5vw, 20px);
+  font-size: clamp(20px, 2.5vw, 32px);
   color: rgba(255, 255, 255, 0.6);
-  margin: 1rem 0 0 0;
+  margin: 0;
 }
 
-.fact-text {
-  font-size: clamp(20px, 3vw, 36px);
-  font-weight: 400;
-  line-height: 1.4;
+.error-hint {
+  font-size: clamp(16px, 1.5vw, 22px);
+  color: rgba(255, 255, 255, 0.5);
   margin: 0;
-  color: #fff;
-  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.5);
-  max-width: 80%;
-  animation: fadeIn 0.5s ease-out;
+}
+
+.error-hint a {
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .fact-dots {
@@ -242,14 +238,33 @@ watch(
   transform: scale(1.2);
 }
 
-.error-hint {
-  font-size: clamp(12px, 1.2vw, 16px);
-  color: rgba(255, 255, 255, 0.5);
-  margin: 1rem 0 0 0;
+/* Metadata - always visible, secondary */
+.metadata {
+  margin-bottom: 1.5rem;
 }
 
-.error-hint a {
-  color: rgba(255, 255, 255, 0.7);
+.metadata .title {
+  font-size: clamp(18px, 2.2vw, 28px);
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0 0 0.2em 0;
+  color: #fff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metadata .artist-album {
+  font-size: clamp(14px, 1.6vw, 22px);
+  font-weight: 400;
+  line-height: 1.3;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.75);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .no-playback {

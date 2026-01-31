@@ -164,8 +164,6 @@ export function useFacts(
         facts: factsResponse.facts,
         generatedAt: factsResponse.generatedAt,
       });
-
-      scheduleNextRotation();
     } catch (err) {
       error.value = {
         type: 'api-error',
@@ -174,6 +172,10 @@ export function useFacts(
       facts.value = [];
     } finally {
       isLoading.value = false;
+      // Schedule rotation AFTER loading is complete, so first fact gets full display time
+      if (facts.value.length > 1 && playbackState.value === 'playing') {
+        scheduleNextRotation();
+      }
     }
   }
 
@@ -219,15 +221,9 @@ export function useFacts(
     }
   );
 
-  // Watch facts for rotation
-  watch(
-    facts,
-    (newFacts) => {
-      if (newFacts.length > 0 && playbackState.value === 'playing') {
-        scheduleNextRotation();
-      }
-    }
-  );
+  // Note: We don't watch `facts` directly for rotation scheduling.
+  // Rotation is scheduled explicitly after facts load (in fetchFacts)
+  // to ensure the first fact gets its full display time.
 
   onUnmounted(() => {
     clearDebounceTimer();

@@ -102,62 +102,63 @@ watch(
           </div>
         </div>
 
-        <!-- Right column: Facts -->
+        <!-- Right column: Facts + Metadata -->
         <div class="facts-column">
-          <!-- Loading / Track Info State -->
-          <div v-if="!currentFact || isLoading" class="track-info">
-            <h1 v-if="track" class="title">{{ track.title }}</h1>
-            <p v-if="track" class="artist">{{ track.artist }}</p>
-            <p v-if="track" class="album">{{ track.album }}</p>
-            <p v-if="isLoading" class="loading-hint">Loading facts...</p>
+          <!-- Facts Area (fixed height) -->
+          <div class="facts-area">
             <div v-if="!track" class="no-playback">
               <p class="no-playback-text">No playback</p>
               <p class="zone-hint">{{ zoneName }}</p>
             </div>
+
+            <template v-else>
+              <p v-if="isLoading" class="loading-hint">Loading facts...</p>
+              <p v-else-if="currentFact" class="fact-text">{{ currentFact }}</p>
+              <p v-else-if="error && error.type === 'no-key'" class="error-message">
+                Configure API key in <a href="/admin">Admin Panel</a>
+              </p>
+              <p v-else-if="error" class="error-message">{{ error.message }}</p>
+
+              <!-- Dot indicators -->
+              <div v-if="facts.length > 1" class="fact-dots">
+                <span
+                  v-for="(_, index) in facts"
+                  :key="index"
+                  class="dot"
+                  :class="{ active: index === currentFactIndex }"
+                />
+              </div>
+            </template>
           </div>
 
-          <!-- Facts Display -->
-          <div v-else class="facts-display">
-            <p class="fact-text">{{ currentFact }}</p>
+          <!-- Metadata (always visible) -->
+          <div v-if="track" class="metadata">
+            <p class="title">{{ track.title }}</p>
+            <p class="artist-album">{{ track.artist }} · {{ track.album }}</p>
+          </div>
 
-            <!-- Dot indicators -->
-            <div class="fact-dots">
-              <span
-                v-for="(_, index) in facts"
-                :key="index"
-                class="dot"
-                :class="{ active: index === currentFactIndex }"
+          <!-- Bottom section (fixed position) -->
+          <div class="bottom-section">
+            <!-- Progress bar -->
+            <div v-if="track" class="progress-container">
+              <ProgressBar
+                :progress="progress"
+                :current-time="currentTime"
+                :duration="duration"
+                :show-time="true"
               />
             </div>
-          </div>
 
-          <!-- Error State -->
-          <div v-if="error && !isLoading" class="error-state">
-            <p v-if="error.type === 'no-key'" class="error-message">
-              Configure API key in <a href="/admin">Admin Panel</a>
-            </p>
-            <p v-else class="error-message">{{ error.message }}</p>
-          </div>
-
-          <!-- Progress bar -->
-          <div v-if="track" class="progress-container">
-            <ProgressBar
-              :progress="progress"
-              :current-time="currentTime"
-              :duration="duration"
-              :show-time="true"
-            />
-          </div>
-
-          <!-- Zone indicator -->
-          <div class="zone-indicator">
-            <span class="zone-name">{{ zoneName }}</span>
-            <span v-if="isPlaying" class="playing-indicator">
-              <span class="bar"></span>
-              <span class="bar"></span>
-              <span class="bar"></span>
-            </span>
-            <span v-else-if="state === 'paused'" class="paused-indicator">⏸</span>
+            <!-- Zone indicator -->
+            <div class="zone-indicator">
+              <span class="zone-name">{{ zoneName }}</span>
+              <span v-if="isPlaying" class="playing-indicator">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+              </span>
+              <span v-else-if="state === 'paused'" class="paused-indicator">⏸</span>
+            </div>
           </div>
         </div>
       </div>
@@ -191,62 +192,63 @@ watch(
           </div>
         </div>
 
-        <!-- Right column: Facts -->
+        <!-- Right column: Facts + Metadata -->
         <div class="facts-column">
-          <!-- Loading / Track Info State -->
-          <div v-if="!currentFact || isLoading" class="track-info">
-            <h1 v-if="track" class="title">{{ track.title }}</h1>
-            <p v-if="track" class="artist">{{ track.artist }}</p>
-            <p v-if="track" class="album">{{ track.album }}</p>
-            <p v-if="isLoading" class="loading-hint">Loading facts...</p>
+          <!-- Facts Area (fixed height) -->
+          <div class="facts-area">
             <div v-if="!track" class="no-playback">
               <p class="no-playback-text">No playback</p>
               <p class="zone-hint">{{ zoneName }}</p>
             </div>
+
+            <template v-else>
+              <p v-if="isLoading" class="loading-hint">Loading facts...</p>
+              <p v-else-if="currentFact" class="fact-text">{{ currentFact }}</p>
+              <p v-else-if="error && error.type === 'no-key'" class="error-message">
+                Configure API key in <a href="/admin">Admin Panel</a>
+              </p>
+              <p v-else-if="error" class="error-message">{{ error.message }}</p>
+
+              <!-- Dot indicators -->
+              <div v-if="facts.length > 1" class="fact-dots">
+                <span
+                  v-for="(_, index) in facts"
+                  :key="index"
+                  class="dot"
+                  :class="{ active: index === currentFactIndex }"
+                />
+              </div>
+            </template>
           </div>
 
-          <!-- Facts Display -->
-          <div v-else class="facts-display">
-            <p class="fact-text">{{ currentFact }}</p>
+          <!-- Metadata (always visible) -->
+          <div v-if="track" class="metadata">
+            <p class="title">{{ track.title }}</p>
+            <p class="artist-album">{{ track.artist }} · {{ track.album }}</p>
+          </div>
 
-            <!-- Dot indicators -->
-            <div class="fact-dots">
-              <span
-                v-for="(_, index) in facts"
-                :key="index"
-                class="dot"
-                :class="{ active: index === currentFactIndex }"
+          <!-- Bottom section (fixed position) -->
+          <div class="bottom-section">
+            <!-- Progress bar -->
+            <div v-if="track" class="progress-container">
+              <ProgressBar
+                :progress="progress"
+                :current-time="currentTime"
+                :duration="duration"
+                :show-time="true"
               />
             </div>
-          </div>
 
-          <!-- Error State -->
-          <div v-if="error && !isLoading" class="error-state">
-            <p v-if="error.type === 'no-key'" class="error-message">
-              Configure API key in <a href="/admin">Admin Panel</a>
-            </p>
-            <p v-else class="error-message">{{ error.message }}</p>
-          </div>
-
-          <!-- Progress bar -->
-          <div v-if="track" class="progress-container">
-            <ProgressBar
-              :progress="progress"
-              :current-time="currentTime"
-              :duration="duration"
-              :show-time="true"
-            />
-          </div>
-
-          <!-- Zone indicator -->
-          <div class="zone-indicator">
-            <span class="zone-name">{{ zoneName }}</span>
-            <span v-if="isPlaying" class="playing-indicator">
-              <span class="bar"></span>
-              <span class="bar"></span>
-              <span class="bar"></span>
-            </span>
-            <span v-else-if="state === 'paused'" class="paused-indicator">⏸</span>
+            <!-- Zone indicator -->
+            <div class="zone-indicator">
+              <span class="zone-name">{{ zoneName }}</span>
+              <span v-if="isPlaying" class="playing-indicator">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+              </span>
+              <span v-else-if="state === 'paused'" class="paused-indicator">⏸</span>
+            </div>
           </div>
         </div>
       </div>
@@ -362,9 +364,10 @@ watch(
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: space-between;
   min-width: 0;
   padding-right: 2.5%;
+  height: 100%;
 }
 
 @media (min-width: 900px) {
@@ -373,59 +376,39 @@ watch(
   }
 }
 
-.track-info,
-.facts-display {
-  margin-bottom: 2rem;
-}
-
-.title {
-  font-size: clamp(28px, 4.5vw, 56px);
-  font-weight: 600;
-  line-height: 1.15;
-  margin: 0 0 0.4em 0;
-  color: var(--text-color);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-.artist {
-  font-size: clamp(20px, 3vw, 40px);
-  font-weight: 400;
-  line-height: 1.2;
-  margin: 0 0 0.2em 0;
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.album {
-  font-size: clamp(16px, 2vw, 28px);
-  font-weight: 400;
-  line-height: 1.3;
-  margin: 0;
-  color: var(--text-tertiary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.loading-hint {
-  font-size: clamp(14px, 1.5vw, 20px);
-  color: var(--text-tertiary);
-  margin-top: 1rem;
+/* Facts area - fixed height, main content */
+.facts-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 40%;
 }
 
 .fact-text {
-  font-size: clamp(18px, 2.5vw, 32px);
+  font-size: clamp(24px, 3.5vw, 48px);
   font-weight: 400;
-  line-height: 1.5;
+  line-height: 1.4;
   margin: 0;
   color: var(--text-color);
   animation: fadeIn 0.5s ease-out;
+}
+
+.loading-hint {
+  font-size: clamp(18px, 2vw, 28px);
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+.error-message {
+  font-size: clamp(16px, 1.8vw, 24px);
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+.error-message a {
+  color: var(--text-secondary);
+  text-decoration: underline;
 }
 
 .fact-dots {
@@ -447,23 +430,40 @@ watch(
   transform: scale(1.2);
 }
 
-.error-state {
-  margin-bottom: 2rem;
+/* Metadata - always visible, secondary */
+.metadata {
+  margin-bottom: 1.5rem;
 }
 
-.error-message {
-  font-size: clamp(14px, 1.5vw, 18px);
-  color: var(--text-tertiary);
+.metadata .title {
+  font-size: clamp(18px, 2.2vw, 28px);
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0 0 0.2em 0;
+  color: var(--text-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metadata .artist-album {
+  font-size: clamp(14px, 1.6vw, 22px);
+  font-weight: 400;
+  line-height: 1.3;
   margin: 0;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.error-message a {
-  color: var(--text-secondary);
-  text-decoration: underline;
+/* Bottom section - fixed position */
+.bottom-section {
+  flex-shrink: 0;
 }
 
 .progress-container {
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
 }
 
 .zone-indicator {
