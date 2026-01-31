@@ -85,6 +85,11 @@ export function createFactsRouter(): Router {
   router.post('/facts/config', (req, res) => {
     const updates = req.body as Partial<FactsConfig>;
 
+    // Don't save masked API key (contains bullet points from UI display)
+    if (updates.apiKey && updates.apiKey.includes('••••')) {
+      delete updates.apiKey;
+    }
+
     configStore.update(updates);
     logger.info('Facts config updated');
     res.json({ success: true });
