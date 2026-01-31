@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { createHash } from 'crypto';
 import { RoonClient } from './roon.js';
 import { logger } from './logger.js';
 
@@ -72,7 +73,7 @@ function getCachePath(key: string): string {
   return path.join(CACHE_DIR, `${sanitizedKey}.jpg`);
 }
 
-async function cacheArtwork(key: string, data: Buffer): Promise<void> {
+export async function cacheArtwork(key: string, data: Buffer): Promise<void> {
   try {
     await ensureCacheDir();
     const cachePath = getCachePath(key);
@@ -80,5 +81,65 @@ async function cacheArtwork(key: string, data: Buffer): Promise<void> {
     logger.debug(`Cached artwork: ${key}`);
   } catch (error) {
     logger.warn(`Failed to cache artwork: ${error}`);
+  }
+}
+
+export async function cacheExternalArtwork(url: string): Promise<string | null> {
+  try {
+    // Generate a key from the URL
+    const key = createHash('md5').update(url).digest('hex');
+    const cachePath = getCachePath(key);
+
+    // Check if already cached
+    try {
+      await fs.access(cachePath);
+      logger.debug(`External artwork already cached: ${key}`);
+      return key;
+    } catch {
+      // Not cached, continue to fetch
+    }
+
+    // Fetch the image
+    logger.debug(`Fetching external artwork: ${url}`);
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      logger.warn(`Failed to fetch external artwork: ${response.status}`);
+      return null;
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+
+    // Cache it
+    await cacheArtwork(key, buffer);
+    return key;
+  } catch (error) {
+    logger.error(`Error caching external artwork: ${error}`);
+    return null;
+  }
+}
+
+export async function cacheBase64Artwork(base64: string): Promise<string | null> {
+  try {
+    // Generate a key from the content
+    const key = createHash('md5').update(base64).digest('hex');
+    const cachePath = getCachePath(key);
+
+    // Check if already cached
+    try {
+      await fs.access(cachePath);
+      logger.debug(`Base64 artwork already cached: ${key}`);
+      return key;
+    } catch {
+      // Not cached, continue
+    }
+
+    // Decode and cache
+    const buffer = Buffer.from(base64, 'base64');
+    await cacheArtwork(key, buffer);
+    return key;
+  } catch (error) {
+    logger.error(`Error caching base64 artwork: ${error}`);
+    return null;
   }
 }
