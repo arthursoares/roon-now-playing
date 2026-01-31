@@ -9,6 +9,7 @@ declare module 'node-roon-api' {
     publisher: string;
     email: string;
     website?: string;
+    log_level?: 'none' | 'all';
     core_paired?: (core: RoonCore) => void;
     core_unpaired?: (core: RoonCore) => void;
     core_found?: (core: RoonCore) => void;
