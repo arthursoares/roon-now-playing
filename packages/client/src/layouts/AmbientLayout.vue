@@ -4,6 +4,7 @@ import type { Track, PlaybackState, BackgroundType } from '@roon-screen-cover/sh
 import { useColorExtraction } from '../composables/useColorExtraction';
 import { useBackgroundStyle } from '../composables/useBackgroundStyle';
 import ProgressBar from '../components/ProgressBar.vue';
+import DynamicBackground from '../components/DynamicBackground.vue';
 
 const props = defineProps<{
   track: Track | null;
@@ -19,8 +20,25 @@ const props = defineProps<{
 
 const backgroundRef = computed(() => props.background);
 const artworkUrlRef = computed(() => props.artworkUrl);
-const { colors, vibrantGradient, isTransitioning } = useColorExtraction(artworkUrlRef);
+const { colors, vibrantGradient, palette, isTransitioning } = useColorExtraction(artworkUrlRef);
 const { style: backgroundStyle } = useBackgroundStyle(backgroundRef, colors, vibrantGradient);
+
+// Background types handled by DynamicBackground component
+const dynamicBackgroundTypes: BackgroundType[] = [
+  'gradient-linear-multi',
+  'gradient-radial-corner',
+  'gradient-mesh',
+  'blur-subtle',
+  'blur-heavy',
+  'duotone',
+  'posterized',
+  'gradient-noise',
+  'blur-grain',
+];
+
+const usesDynamicBackground = computed(() =>
+  dynamicBackgroundTypes.includes(props.background)
+);
 
 // Track previous artwork for crossfade
 const displayedArtwork = ref<string | null>(null);
@@ -52,17 +70,8 @@ const effectiveColorMode = computed(() => {
 });
 
 const ambientStyle = computed(() => {
-  // Start with base background style
-  const baseStyle = { ...backgroundStyle.value };
-
-  // For ambient layout, use radial gradient when gradient-radial or dominant is selected
-  if (props.background === 'gradient-radial' || props.background === 'dominant') {
-    baseStyle.background = `radial-gradient(ellipse 120% 100% at 30% 50%, ${colors.value.background} 0%, ${colors.value.backgroundEdge} 100%)`;
-  }
-
-  // Add CSS variables for ambient-specific styling
-  return {
-    ...baseStyle,
+  // CSS variables for ambient-specific styling (used by all background types)
+  const cssVariables = {
     '--bg-color': colors.value.background,
     '--bg-edge': colors.value.backgroundEdge,
     '--shadow-color': colors.value.shadow,
@@ -76,11 +85,106 @@ const ambientStyle = computed(() => {
       ? 'rgba(255, 255, 255, 0.8)'
       : 'rgba(0, 0, 0, 0.6)',
   };
+
+  // For new background types, DynamicBackground handles the background
+  // We only provide CSS variables
+  if (usesDynamicBackground.value) {
+    return cssVariables;
+  }
+
+  // For original types, include the background styling
+  const baseStyle = { ...backgroundStyle.value };
+
+  // For ambient layout, use radial gradient when gradient-radial or dominant is selected
+  if (props.background === 'gradient-radial' || props.background === 'dominant') {
+    baseStyle.background = `radial-gradient(ellipse 120% 100% at 30% 50%, ${colors.value.background} 0%, ${colors.value.backgroundEdge} 100%)`;
+  }
+
+  return {
+    ...baseStyle,
+    ...cssVariables,
+  };
 });
 </script>
 
 <template>
+  <DynamicBackground
+    v-if="usesDynamicBackground"
+    :type="background"
+    :artwork-url="artworkUrl"
+    :palette="palette"
+    :vibrant-gradient="vibrantGradient"
+    class="ambient-layout"
+    :class="{ transitioning: isTransitioning }"
+    :style="ambientStyle"
+  >
+    <div class="safe-zone">
+      <div class="content">
+        <!-- Left column: Artwork -->
+        <div class="artwork-column">
+          <div class="artwork-wrapper">
+            <!-- Previous artwork (for crossfade) -->
+            <img
+              v-if="previousArtwork && artworkTransitioning"
+              :src="previousArtwork"
+              alt=""
+              class="artwork artwork-previous"
+            />
+            <!-- Current artwork -->
+            <img
+              v-if="displayedArtwork"
+              :src="displayedArtwork"
+              :alt="track?.album || 'Album artwork'"
+              class="artwork"
+              :class="{ 'artwork-entering': artworkTransitioning }"
+            />
+            <div v-else class="artwork-placeholder">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right column: Metadata -->
+        <div class="metadata-column">
+          <div v-if="track" class="track-info">
+            <h1 class="title">{{ track.title }}</h1>
+            <p class="artist">{{ track.artist }}</p>
+            <p class="album">{{ track.album }}</p>
+          </div>
+          <div v-else class="no-playback">
+            <p class="no-playback-text">No playback</p>
+            <p class="zone-hint">{{ zoneName }}</p>
+          </div>
+
+          <!-- Progress bar -->
+          <div v-if="track" class="progress-container">
+            <ProgressBar
+              :progress="progress"
+              :current-time="currentTime"
+              :duration="duration"
+              :show-time="true"
+            />
+          </div>
+
+          <!-- Zone indicator -->
+          <div class="zone-indicator">
+            <span class="zone-name">{{ zoneName }}</span>
+            <span v-if="isPlaying" class="playing-indicator">
+              <span class="bar"></span>
+              <span class="bar"></span>
+              <span class="bar"></span>
+            </span>
+            <span v-else-if="state === 'paused'" class="paused-indicator">⏸</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </DynamicBackground>
+
   <div
+    v-else
     class="ambient-layout"
     :class="{ transitioning: isTransitioning }"
     :style="ambientStyle"
