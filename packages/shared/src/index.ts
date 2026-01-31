@@ -267,6 +267,47 @@ export interface ServerRemoteSettingsMessage {
   zoneName?: string;
 }
 
+// External source types
+export type SourceType = 'roon' | 'external';
+export type SourceStatus = 'connected' | 'disconnected';
+
+export interface ExternalZone {
+  zone_id: string;
+  zone_name: string;
+  state: PlaybackState;
+  track: Track | null;
+  seek_position: number;
+  source_status: SourceStatus;
+  last_seen: string; // ISO date string
+}
+
+export interface ExternalUpdatePayload {
+  zone_name: string;
+  state: PlaybackState;
+  title?: string;
+  artist?: string;
+  album?: string;
+  duration_seconds?: number;
+  seek_position?: number;
+  artwork_url?: string;
+  artwork_base64?: string;
+}
+
+export interface ExternalUpdateResponse {
+  success: boolean;
+  zone_id: string;
+  artwork_key?: string;
+}
+
+export interface SourcesConfig {
+  requireApiKey: boolean;
+  apiKey: string;
+}
+
+export interface ZoneWithSource extends Zone {
+  source: SourceType;
+}
+
 export type ClientMessage =
   | ClientSubscribeMessage
   | ClientUnsubscribeMessage
