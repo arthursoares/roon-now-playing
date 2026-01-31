@@ -183,14 +183,23 @@ export function useFacts(
   watch(
     track,
     (newTrack, oldTrack) => {
-      // Clear existing timers
+      // Check if track actually changed (not just object reference)
+      const trackActuallyChanged =
+        newTrack?.title !== oldTrack?.title ||
+        newTrack?.artist !== oldTrack?.artist ||
+        newTrack?.album !== oldTrack?.album;
+
+      // If track data is the same (just a ref update from zone events), ignore
+      if (!trackActuallyChanged && newTrack && oldTrack) {
+        return;
+      }
+
+      // Clear existing timers only when track actually changes
       clearDebounceTimer();
       clearRotationTimer();
 
       // Reset state when track changes
-      if (newTrack?.title !== oldTrack?.title ||
-          newTrack?.artist !== oldTrack?.artist ||
-          newTrack?.album !== oldTrack?.album) {
+      if (trackActuallyChanged) {
         facts.value = [];
         currentFactIndex.value = 0;
         cached.value = false;
