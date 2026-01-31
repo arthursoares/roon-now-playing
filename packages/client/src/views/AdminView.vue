@@ -14,11 +14,13 @@ import {
   type FontType,
   type BackgroundType,
   type ClientMetadata,
-  type LLMProvider,
   type FactsConfig,
 } from '@roon-screen-cover/shared';
 
 const { state: wsState } = useWebSocket({ isAdmin: true });
+
+// Navigation
+const activeSection = ref<'clients' | 'facts' | 'test'>('clients');
 
 const editingName = ref<string | null>(null);
 const editNameValue = ref('');
@@ -55,6 +57,12 @@ const connectionStatus = computed(() => {
   return 'connected';
 });
 
+const connectionLabel = computed(() => {
+  if (connectionStatus.value === 'connecting') return 'Connecting';
+  if (connectionStatus.value === 'waiting-roon') return 'Waiting for Roon';
+  return 'Connected';
+});
+
 // Filter out admin clients from the list
 const displayClients = computed(() =>
   wsState.value.clients.filter((c) => !c.isAdmin)
@@ -66,7 +74,6 @@ function formatTime(timestamp: number): string {
 
 function formatUserAgent(ua: string | null): string {
   if (!ua) return 'Unknown';
-  // Extract browser name from user agent
   if (ua.includes('Firefox')) return 'Firefox';
   if (ua.includes('Safari') && !ua.includes('Chrome')) return 'Safari';
   if (ua.includes('Chrome')) return 'Chrome';
@@ -188,7 +195,6 @@ function resetFactsConfig(): void {
 }
 
 function onProviderChange(): void {
-  // Reset to first model of the new provider
   const models = LLM_MODELS[factsConfig.value.provider];
   if (models && models.length > 0) {
     factsConfig.value.model = models[0];
@@ -239,134 +245,218 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="admin-view">
-    <header class="admin-header">
-      <div class="brand">
-        <h1>Roon Now Playing</h1>
-        <span class="subtitle">Admin Panel</span>
-      </div>
-      <div class="header-right">
-        <a href="/" class="back-link" title="Back to Now Playing">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+  <div class="admin-shell">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <svg viewBox="0 0 24 24" fill="currentColor" class="logo-icon">
             <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+          </svg>
+          <div class="logo-text">
+            <span class="logo-title">Roon</span>
+            <span class="logo-subtitle">Control</span>
+          </div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button
+          class="nav-item"
+          :class="{ active: activeSection === 'clients' }"
+          @click="activeSection = 'clients'"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+            <line x1="8" y1="21" x2="16" y2="21"/>
+            <line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+          <span>Displays</span>
+          <span v-if="displayClients.length > 0" class="nav-badge">{{ displayClients.length }}</span>
+        </button>
+
+        <button
+          class="nav-item"
+          :class="{ active: activeSection === 'facts' }"
+          @click="activeSection = 'facts'"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <span>AI Facts</span>
+        </button>
+
+        <button
+          class="nav-item"
+          :class="{ active: activeSection === 'test' }"
+          @click="activeSection = 'test'"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="4 17 10 11 4 5"/>
+            <line x1="12" y1="19" x2="20" y2="19"/>
+          </svg>
+          <span>Test</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <a href="/" class="back-link">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
           </svg>
           <span>Now Playing</span>
         </a>
-        <div class="connection-indicator" :class="connectionStatus">
-          <span class="dot"></span>
-          <span v-if="connectionStatus === 'connecting'">Connecting...</span>
-          <span v-else-if="connectionStatus === 'waiting-roon'">Waiting for Roon</span>
-          <span v-else>Connected</span>
+
+        <div class="status-indicator" :class="connectionStatus">
+          <span class="status-dot"></span>
+          <span class="status-text">{{ connectionLabel }}</span>
         </div>
       </div>
-    </header>
+    </aside>
 
-    <main class="admin-content">
-      <section class="clients-section">
-        <h2>Connected Clients ({{ displayClients.length }})</h2>
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Clients Section -->
+      <section v-if="activeSection === 'clients'" class="content-section">
+        <header class="section-header">
+          <div class="section-title">
+            <h1>Connected Displays</h1>
+            <p class="section-desc">Manage layout, fonts, and zones for each connected display.</p>
+          </div>
+          <div class="section-stats">
+            <div class="stat">
+              <span class="stat-value">{{ displayClients.length }}</span>
+              <span class="stat-label">Active</span>
+            </div>
+            <div class="stat">
+              <span class="stat-value">{{ wsState.zones.length }}</span>
+              <span class="stat-label">Zones</span>
+            </div>
+          </div>
+        </header>
 
         <div v-if="displayClients.length === 0" class="empty-state">
-          <p>No clients connected</p>
-          <p class="hint">Open the main view in another tab or device to see clients here.</p>
+          <div class="empty-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+          </div>
+          <h3>No displays connected</h3>
+          <p>Open the main view in another tab or device to see displays here.</p>
         </div>
 
-        <table v-else class="clients-table">
-          <thead>
-            <tr>
-              <th>Name / ID</th>
-              <th>Zone</th>
-              <th>Layout</th>
-              <th>Font</th>
-              <th>Background</th>
-              <th>Connected</th>
-              <th>Device</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="client in displayClients" :key="client.clientId">
-              <td class="name-cell">
+        <div v-else class="clients-grid">
+          <article v-for="client in displayClients" :key="client.clientId" class="client-card">
+            <header class="card-header">
+              <div class="client-identity">
                 <template v-if="editingName === client.clientId">
                   <input
                     v-model="editNameValue"
                     type="text"
-                    placeholder="Friendly name"
+                    placeholder="Display name"
                     class="name-input"
                     @keyup.enter="saveName(client.clientId)"
                     @keyup.escape="cancelEditName"
+                    autofocus
                   />
-                  <button class="btn-save" @click="saveName(client.clientId)">Save</button>
-                  <button class="btn-cancel" @click="cancelEditName">Cancel</button>
+                  <div class="name-actions">
+                    <button class="btn-icon btn-confirm" @click="saveName(client.clientId)" title="Save">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    </button>
+                    <button class="btn-icon btn-cancel" @click="cancelEditName" title="Cancel">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                    </button>
+                  </div>
                 </template>
                 <template v-else>
-                  <span
-                    class="client-name"
-                    :class="{ unnamed: !client.friendlyName }"
-                    @click="startEditName(client)"
-                  >
-                    {{ client.friendlyName || client.clientId.slice(0, 8) + '...' }}
-                  </span>
-                  <button class="btn-edit" @click="startEditName(client)">Edit</button>
+                  <h3 class="client-name" :class="{ unnamed: !client.friendlyName }">
+                    {{ client.friendlyName || 'Unnamed Display' }}
+                  </h3>
+                  <button class="btn-icon btn-edit" @click="startEditName(client)" title="Edit name">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                    </svg>
+                  </button>
                 </template>
-              </td>
-              <td>
+              </div>
+              <div class="client-meta">
+                <span class="meta-item">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                  </svg>
+                  {{ formatTime(client.connectedAt) }}
+                </span>
+                <span class="meta-item">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+                    <line x1="12" y1="18" x2="12.01" y2="18"/>
+                  </svg>
+                  {{ formatUserAgent(client.userAgent) }}
+                </span>
+              </div>
+            </header>
+
+            <div class="card-body">
+              <div class="setting-group">
+                <label class="setting-label">Zone</label>
                 <select
                   :value="client.zoneId || ''"
                   :disabled="pushing[client.clientId]"
-                  @change="
-                    (e) =>
-                      pushSetting(client.clientId, {
-                        zoneId: (e.target as HTMLSelectElement).value,
-                      })
-                  "
+                  class="setting-select"
+                  @change="(e) => pushSetting(client.clientId, { zoneId: (e.target as HTMLSelectElement).value })"
                 >
-                  <option value="" disabled>Select zone</option>
+                  <option value="" disabled>Select zone...</option>
                   <option v-for="zone in wsState.zones" :key="zone.id" :value="zone.id">
                     {{ zone.display_name }}
                   </option>
                 </select>
-              </td>
-              <td>
+              </div>
+
+              <div class="setting-group">
+                <label class="setting-label">Layout</label>
                 <select
                   :value="client.layout"
                   :disabled="pushing[client.clientId]"
-                  @change="
-                    (e) =>
-                      pushSetting(client.clientId, {
-                        layout: (e.target as HTMLSelectElement).value as LayoutType,
-                      })
-                  "
+                  class="setting-select"
+                  @change="(e) => pushSetting(client.clientId, { layout: (e.target as HTMLSelectElement).value as LayoutType })"
                 >
                   <option v-for="l in LAYOUTS" :key="l" :value="l">
                     {{ getLayoutDisplayName(l) }}
                   </option>
                 </select>
-              </td>
-              <td>
+              </div>
+
+              <div class="setting-group">
+                <label class="setting-label">Font</label>
                 <select
                   :value="client.font"
                   :disabled="pushing[client.clientId]"
-                  @change="
-                    (e) =>
-                      pushSetting(client.clientId, {
-                        font: (e.target as HTMLSelectElement).value as FontType,
-                      })
-                  "
+                  class="setting-select"
+                  @change="(e) => pushSetting(client.clientId, { font: (e.target as HTMLSelectElement).value as FontType })"
                 >
                   <option v-for="f in FONTS" :key="f" :value="f">
                     {{ getFontDisplayName(f) }}
                   </option>
                 </select>
-              </td>
-              <td>
+              </div>
+
+              <div class="setting-group">
+                <label class="setting-label">Background</label>
                 <select
                   :value="client.background"
                   :disabled="pushing[client.clientId]"
-                  @change="
-                    (e) =>
-                      pushSetting(client.clientId, {
-                        background: (e.target as HTMLSelectElement).value as BackgroundType,
-                      })
-                  "
+                  class="setting-select"
+                  @change="(e) => pushSetting(client.clientId, { background: (e.target as HTMLSelectElement).value as BackgroundType })"
                 >
                   <optgroup label="Basic">
                     <option v-for="b in BACKGROUNDS.filter(bg => BACKGROUND_CONFIG[bg].category === 'basic')" :key="b" :value="b">
@@ -389,676 +479,1006 @@ onMounted(() => {
                     </option>
                   </optgroup>
                 </select>
-              </td>
-              <td class="time-cell">{{ formatTime(client.connectedAt) }}</td>
-              <td class="device-cell">{{ formatUserAgent(client.userAgent) }}</td>
-            </tr>
-          </tbody>
-        </table>
+              </div>
+            </div>
+
+            <div v-if="pushing[client.clientId]" class="card-loading">
+              <div class="loading-bar"></div>
+            </div>
+          </article>
+        </div>
       </section>
 
       <!-- Facts Configuration Section -->
-      <section class="facts-section">
-        <h2>Facts Configuration</h2>
-        <p class="section-hint">
-          Configure AI-powered facts generation for the facts layouts.
-        </p>
+      <section v-if="activeSection === 'facts'" class="content-section">
+        <header class="section-header">
+          <div class="section-title">
+            <h1>AI Facts Configuration</h1>
+            <p class="section-desc">Configure AI-powered facts generation for the facts display layouts.</p>
+          </div>
+        </header>
 
         <div v-if="factsConfigLoading" class="loading-state">
-          Loading configuration...
+          <div class="loading-spinner"></div>
+          <span>Loading configuration...</span>
         </div>
 
-        <div v-else class="facts-config-form">
-          <!-- Provider & Model Row -->
-          <div class="form-row">
-            <div class="form-group">
-              <label for="provider">Provider</label>
-              <select
-                id="provider"
-                v-model="factsConfig.provider"
-                @change="onProviderChange"
-              >
-                <option v-for="p in LLM_PROVIDERS" :key="p" :value="p">
-                  {{ p === 'anthropic' ? 'Anthropic' : 'OpenAI' }}
-                </option>
-              </select>
+        <div v-else class="config-layout">
+          <div class="config-main">
+            <!-- Provider Card -->
+            <div class="config-card">
+              <h2 class="card-title">AI Provider</h2>
+
+              <div class="form-grid">
+                <div class="form-field">
+                  <label for="provider">Provider</label>
+                  <select id="provider" v-model="factsConfig.provider" @change="onProviderChange">
+                    <option v-for="p in LLM_PROVIDERS" :key="p" :value="p">
+                      {{ p === 'anthropic' ? 'Anthropic' : 'OpenAI' }}
+                    </option>
+                  </select>
+                </div>
+
+                <div class="form-field">
+                  <label for="model">Model</label>
+                  <select id="model" v-model="factsConfig.model">
+                    <option v-for="m in availableModels" :key="m" :value="m">
+                      {{ m }}
+                    </option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-field full-width">
+                <label for="apiKey">
+                  API Key
+                  <span class="label-hint">Leave empty to use environment variable</span>
+                </label>
+                <div class="input-with-action">
+                  <input
+                    id="apiKey"
+                    :type="showApiKey ? 'text' : 'password'"
+                    v-model="factsConfig.apiKey"
+                    placeholder="sk-..."
+                    class="mono-input"
+                  />
+                  <button type="button" class="input-action" @click="showApiKey = !showApiKey">
+                    <svg v-if="!showApiKey" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                      <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                    <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                      <line x1="1" y1="1" x2="23" y2="23"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <div class="form-group">
-              <label for="model">Model</label>
-              <select id="model" v-model="factsConfig.model">
-                <option v-for="m in availableModels" :key="m" :value="m">
-                  {{ m }}
-                </option>
-              </select>
-            </div>
-          </div>
+            <!-- Display Settings Card -->
+            <div class="config-card">
+              <h2 class="card-title">Display Settings</h2>
 
-          <!-- API Key -->
-          <div class="form-group">
-            <label for="apiKey">
-              API Key
-              <span class="hint">(or set via environment variable)</span>
-            </label>
-            <div class="api-key-input">
-              <input
-                id="apiKey"
-                :type="showApiKey ? 'text' : 'password'"
-                v-model="factsConfig.apiKey"
-                placeholder="sk-..."
-              />
-              <button
-                type="button"
-                class="btn-toggle-key"
-                @click="showApiKey = !showApiKey"
-              >
-                {{ showApiKey ? 'Hide' : 'Show' }}
+              <div class="form-grid">
+                <div class="form-field">
+                  <label for="factsCount">Facts per Track</label>
+                  <div class="number-input">
+                    <input
+                      id="factsCount"
+                      type="number"
+                      v-model.number="factsConfig.factsCount"
+                      min="1"
+                      max="10"
+                    />
+                    <span class="number-hint">1-10</span>
+                  </div>
+                </div>
+
+                <div class="form-field">
+                  <label for="rotationInterval">Rotation Interval</label>
+                  <div class="number-input">
+                    <input
+                      id="rotationInterval"
+                      type="number"
+                      v-model.number="factsConfig.rotationInterval"
+                      min="5"
+                      max="60"
+                    />
+                    <span class="number-hint">seconds</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Advanced Card -->
+            <div class="config-card collapsible" :class="{ expanded: showAdvanced }">
+              <button class="card-title-button" @click="showAdvanced = !showAdvanced">
+                <h2 class="card-title">Advanced Settings</h2>
+                <svg class="collapse-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
               </button>
-            </div>
-          </div>
 
-          <!-- Facts Count & Rotation Row -->
-          <div class="form-row">
-            <div class="form-group">
-              <label for="factsCount">Facts per Track</label>
-              <input
-                id="factsCount"
-                type="number"
-                v-model.number="factsConfig.factsCount"
-                min="1"
-                max="10"
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="rotationInterval">Default Rotation (sec)</label>
-              <input
-                id="rotationInterval"
-                type="number"
-                v-model.number="factsConfig.rotationInterval"
-                min="5"
-                max="60"
-              />
-            </div>
-          </div>
-
-          <!-- Advanced Section -->
-          <div class="advanced-section">
-            <button
-              type="button"
-              class="btn-advanced"
-              @click="showAdvanced = !showAdvanced"
-            >
-              {{ showAdvanced ? '▼' : '▶' }} Advanced Settings
-            </button>
-
-            <div v-if="showAdvanced" class="advanced-content">
-              <div class="form-group">
-                <label for="prompt">Custom Prompt Template</label>
-                <textarea
-                  id="prompt"
-                  v-model="factsConfig.prompt"
-                  rows="8"
-                  placeholder="Custom prompt template..."
-                ></textarea>
-                <p class="field-hint">
-                  Use {artist}, {album}, {title}, {factsCount} as placeholders.
-                </p>
+              <div v-if="showAdvanced" class="card-content">
+                <div class="form-field full-width">
+                  <label for="prompt">Custom Prompt Template</label>
+                  <textarea
+                    id="prompt"
+                    v-model="factsConfig.prompt"
+                    rows="8"
+                    class="mono-input"
+                    placeholder="Custom prompt template..."
+                  ></textarea>
+                  <p class="field-hint">
+                    Available placeholders: <code>{artist}</code>, <code>{album}</code>, <code>{title}</code>, <code>{factsCount}</code>
+                  </p>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Save/Reset Buttons -->
-          <div class="form-actions">
-            <button
-              type="button"
-              class="btn-primary"
-              :disabled="factsConfigSaving"
-              @click="saveFactsConfig"
-            >
-              {{ factsConfigSaving ? 'Saving...' : 'Save Configuration' }}
-            </button>
-            <button
-              type="button"
-              class="btn-secondary"
-              @click="resetFactsConfig"
-            >
-              Reset to Defaults
-            </button>
-          </div>
+          <div class="config-sidebar">
+            <div class="action-card">
+              <button
+                type="button"
+                class="btn-primary"
+                :disabled="factsConfigSaving"
+                @click="saveFactsConfig"
+              >
+                <svg v-if="!factsConfigSaving" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                  <polyline points="17 21 17 13 7 13 7 21"/>
+                  <polyline points="7 3 7 8 15 8"/>
+                </svg>
+                <span v-if="factsConfigSaving" class="loading-dots">Saving</span>
+                <span v-else>Save Configuration</span>
+              </button>
 
-          <div v-if="factsConfigError" class="message error">
-            {{ factsConfigError }}
-          </div>
-          <div v-if="factsConfigSuccess" class="message success">
-            Configuration saved successfully!
+              <button type="button" class="btn-secondary" @click="resetFactsConfig">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                  <path d="M21 3v5h-5"/>
+                  <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                  <path d="M3 21v-5h5"/>
+                </svg>
+                Reset to Defaults
+              </button>
+            </div>
+
+            <Transition name="message">
+              <div v-if="factsConfigError" class="message-card error">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="15" y1="9" x2="9" y2="15"/>
+                  <line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+                <span>{{ factsConfigError }}</span>
+              </div>
+            </Transition>
+
+            <Transition name="message">
+              <div v-if="factsConfigSuccess" class="message-card success">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                  <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+                <span>Configuration saved!</span>
+              </div>
+            </Transition>
           </div>
         </div>
+      </section>
 
-        <!-- Test Section -->
-        <div class="test-section">
-          <h3>Test Configuration</h3>
+      <!-- Test Section -->
+      <section v-if="activeSection === 'test'" class="content-section">
+        <header class="section-header">
+          <div class="section-title">
+            <h1>Test Facts Generation</h1>
+            <p class="section-desc">Enter track information to test your AI facts configuration.</p>
+          </div>
+        </header>
 
-          <p class="test-hint">
-            Enter track information to test facts generation.
-          </p>
+        <div class="test-layout">
+          <div class="test-form-card">
+            <h2 class="card-title">Track Information</h2>
 
-          <div class="form-row">
-            <div class="form-group">
+            <div class="form-field">
               <label for="testArtist">Artist</label>
-              <input id="testArtist" type="text" v-model="testArtist" />
+              <input id="testArtist" type="text" v-model="testArtist" placeholder="e.g. The Beatles" />
             </div>
-            <div class="form-group">
+
+            <div class="form-field">
               <label for="testAlbum">Album</label>
-              <input id="testAlbum" type="text" v-model="testAlbum" />
+              <input id="testAlbum" type="text" v-model="testAlbum" placeholder="e.g. Abbey Road" />
             </div>
-            <div class="form-group">
-              <label for="testTitle">Title</label>
-              <input id="testTitle" type="text" v-model="testTitle" />
+
+            <div class="form-field">
+              <label for="testTitle">Track Title</label>
+              <input id="testTitle" type="text" v-model="testTitle" placeholder="e.g. Come Together" />
             </div>
+
+            <button
+              type="button"
+              class="btn-primary btn-test"
+              :disabled="testRunning || !testArtist || !testAlbum || !testTitle"
+              @click="runFactsTest"
+            >
+              <svg v-if="!testRunning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="5 3 19 12 5 21 5 3"/>
+              </svg>
+              <span v-if="testRunning" class="loading-dots">Generating</span>
+              <span v-else>Generate Facts</span>
+            </button>
           </div>
 
-          <button
-            type="button"
-            class="btn-test"
-            :disabled="testRunning || !testArtist || !testAlbum || !testTitle"
-            @click="runFactsTest"
-          >
-            {{ testRunning ? 'Generating...' : 'Generate Test Facts' }}
-          </button>
-
-          <div v-if="testError" class="message error">
-            {{ testError }}
-          </div>
-
-          <div v-if="testResult" class="test-result">
-            <div class="result-header">
-              <span>Generated {{ testResult.length }} facts</span>
-              <span v-if="testDuration" class="duration">
-                ({{ (testDuration / 1000).toFixed(1) }}s)
-              </span>
+          <div class="test-results">
+            <div v-if="testError" class="message-card error">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="15" y1="9" x2="9" y2="15"/>
+                <line x1="9" y1="9" x2="15" y2="15"/>
+              </svg>
+              <span>{{ testError }}</span>
             </div>
-            <ul class="facts-list">
-              <li v-for="(fact, index) in testResult" :key="index">
-                {{ fact }}
-              </li>
-            </ul>
+
+            <div v-if="testResult" class="results-card">
+              <header class="results-header">
+                <h3>Generated Facts</h3>
+                <div class="results-meta">
+                  <span class="result-count">{{ testResult.length }} facts</span>
+                  <span v-if="testDuration" class="result-time">{{ (testDuration / 1000).toFixed(1) }}s</span>
+                </div>
+              </header>
+
+              <ul class="facts-list">
+                <li v-for="(fact, index) in testResult" :key="index">
+                  <span class="fact-number">{{ index + 1 }}</span>
+                  <span class="fact-text">{{ fact }}</span>
+                </li>
+              </ul>
+            </div>
+
+            <div v-if="!testResult && !testError" class="results-placeholder">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              <p>Results will appear here</p>
+            </div>
           </div>
         </div>
       </section>
     </main>
-
-    <footer class="admin-footer">
-      <span>Roon Now Playing</span>
-      <span class="separator">·</span>
-      <a href="https://github.com/arthursoares/roon-now-playing" target="_blank" rel="noopener">GitHub</a>
-    </footer>
   </div>
 </template>
 
 <style scoped>
-.admin-view {
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* === Base Variables === */
+.admin-shell {
+  --bg-base: #0a0a0b;
+  --bg-elevated: #111113;
+  --bg-surface: #18181b;
+  --bg-hover: #27272a;
+  --border-subtle: #27272a;
+  --border-default: #3f3f46;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --accent-primary: #f59e0b;
+  --accent-primary-hover: #d97706;
+  --accent-success: #10b981;
+  --accent-error: #ef4444;
+  --accent-info: #3b82f6;
+  --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --transition: 150ms ease;
+}
+
+/* === Shell Layout === */
+.admin-shell {
+  display: flex;
   min-height: 100vh;
-  height: 100vh;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* === Sidebar === */
+.sidebar {
+  width: 240px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  background: #1a1a2e;
-  color: #eee;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  overflow-y: auto;
+  background: var(--bg-elevated);
+  border-right: 1px solid var(--border-subtle);
 }
 
-.admin-header {
+.sidebar-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.logo {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 1rem 2rem;
-  background: #16213e;
-  border-bottom: 1px solid #0f3460;
+  gap: 12px;
 }
 
-.brand {
+.logo-icon {
+  width: 32px;
+  height: 32px;
+  color: var(--accent-primary);
+}
+
+.logo-text {
   display: flex;
-  align-items: baseline;
-  gap: 0.75rem;
+  flex-direction: column;
+  line-height: 1.2;
 }
 
-.admin-header h1 {
-  margin: 0;
-  font-size: 1.5rem;
+.logo-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.logo-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+  text-align: left;
+}
+
+.nav-item svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.nav-item.active {
+  background: var(--accent-primary);
+  color: #000;
+}
+
+.nav-item.active svg {
+  stroke: #000;
+}
+
+.nav-badge {
+  margin-left: auto;
+  padding: 2px 8px;
+  background: var(--bg-hover);
+  border-radius: 10px;
+  font-size: 12px;
   font-weight: 600;
 }
 
-.brand .subtitle {
-  font-size: 0.875rem;
-  color: #888;
-  font-weight: 400;
+.nav-item.active .nav-badge {
+  background: rgba(0, 0, 0, 0.2);
 }
 
-.header-right {
+.sidebar-footer {
+  padding: 12px;
+  border-top: 1px solid var(--border-subtle);
   display: flex;
-  align-items: center;
-  gap: 1.5rem;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .back-link {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  color: #888;
+  gap: 8px;
+  padding: 8px 12px;
+  color: var(--text-muted);
   text-decoration: none;
-  font-size: 0.875rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
-  transition: all 0.2s;
-}
-
-.back-link:hover {
-  color: #fff;
-  background: #0f3460;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  transition: all var(--transition);
 }
 
 .back-link svg {
-  opacity: 0.8;
+  width: 16px;
+  height: 16px;
 }
 
-.connection-indicator {
+.back-link:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.status-indicator {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+  font-size: 12px;
 }
 
-.connection-indicator .dot {
+.status-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #666;
+  background: var(--text-muted);
 }
 
-.connection-indicator.connected .dot {
-  background: #4ade80;
+.status-indicator.connected .status-dot {
+  background: var(--accent-success);
+  box-shadow: 0 0 8px var(--accent-success);
 }
 
-.connection-indicator.waiting-roon .dot {
-  background: #fbbf24;
+.status-indicator.waiting-roon .status-dot {
+  background: var(--accent-primary);
+  animation: pulse 1.5s ease-in-out infinite;
 }
 
-.connection-indicator.connecting .dot {
-  background: #666;
-  animation: pulse 1s infinite;
+.status-indicator.connecting .status-dot {
+  background: var(--text-muted);
+  animation: pulse 1s ease-in-out infinite;
 }
 
 @keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
-.admin-content {
+.status-text {
+  color: var(--text-secondary);
+}
+
+/* === Main Content === */
+.main-content {
   flex: 1;
-  padding: 2rem;
-  max-width: 1400px;
+  overflow-y: auto;
+  padding: 32px;
+}
+
+.content-section {
+  max-width: 1200px;
   margin: 0 auto;
-  width: 100%;
-  box-sizing: border-box;
 }
 
-.clients-section h2 {
-  margin: 0 0 1rem 0;
-  font-size: 1.25rem;
-  font-weight: 500;
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
-.empty-state {
-  text-align: center;
-  padding: 3rem;
-  background: #16213e;
-  border-radius: 8px;
+.section-title h1 {
+  margin: 0 0 8px 0;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
-.empty-state p {
-  margin: 0.5rem 0;
-  color: #888;
+.section-desc {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 15px;
 }
 
-.empty-state .hint {
-  font-size: 0.875rem;
+.section-stats {
+  display: flex;
+  gap: 24px;
 }
 
-.clients-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: #16213e;
-  border-radius: 8px;
-  overflow: hidden;
+.stat {
+  text-align: right;
 }
 
-.clients-table th,
-.clients-table td {
-  padding: 0.75rem 1rem;
-  text-align: left;
-  border-bottom: 1px solid #0f3460;
+.stat-value {
+  display: block;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--accent-primary);
+  line-height: 1;
+  font-family: var(--font-mono);
 }
 
-.clients-table th {
-  background: #0f3460;
-  font-weight: 500;
-  font-size: 0.875rem;
-  color: #aaa;
+.stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-.clients-table tr:last-child td {
-  border-bottom: none;
+/* === Empty State === */
+.empty-state {
+  text-align: center;
+  padding: 64px 32px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--border-default);
 }
 
-.clients-table tr:hover {
-  background: #1f2c50;
+.empty-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  color: var(--text-muted);
 }
 
-.name-cell {
+.empty-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.empty-state h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.empty-state p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* === Client Cards Grid === */
+.clients-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
+}
+
+.client-card {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  position: relative;
+}
+
+.client-card:hover {
+  border-color: var(--border-default);
+}
+
+.card-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.client-identity {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
 .client-name {
-  cursor: pointer;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  transition: background 0.2s;
-}
-
-.client-name:hover {
-  background: #0f3460;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  flex: 1;
 }
 
 .client-name.unnamed {
-  color: #666;
-  font-family: monospace;
-  font-size: 0.875rem;
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .name-input {
-  padding: 0.25rem 0.5rem;
-  background: #0f3460;
-  border: 1px solid #1a3a6e;
-  border-radius: 4px;
-  color: #fff;
-  font-size: 0.875rem;
-  width: 140px;
+  flex: 1;
+  padding: 8px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--accent-primary);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
 }
 
 .name-input:focus {
   outline: none;
-  border-color: #4ade80;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
 }
 
-.btn-edit,
-.btn-save,
-.btn-cancel {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background 0.2s;
+.name-actions {
+  display: flex;
+  gap: 4px;
 }
 
-.btn-edit {
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
-  color: #666;
-}
-
-.btn-edit:hover {
-  background: #0f3460;
-  color: #fff;
-}
-
-.btn-save {
-  background: #4ade80;
-  color: #000;
-}
-
-.btn-save:hover {
-  background: #22c55e;
-}
-
-.btn-cancel {
-  background: #666;
-  color: #fff;
-}
-
-.btn-cancel:hover {
-  background: #888;
-}
-
-select {
-  padding: 0.375rem 0.5rem;
-  background: #0f3460;
-  border: 1px solid #1a3a6e;
-  border-radius: 4px;
-  color: #fff;
-  font-size: 0.875rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
   cursor: pointer;
-  min-width: 120px;
+  transition: all var(--transition);
 }
 
-select:hover:not(:disabled) {
-  border-color: #4ade80;
+.btn-icon svg {
+  width: 16px;
+  height: 16px;
 }
 
-select:disabled {
+.btn-icon:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.btn-icon.btn-confirm:hover {
+  background: var(--accent-success);
+  color: #fff;
+}
+
+.btn-icon.btn-cancel:hover {
+  background: var(--accent-error);
+  color: #fff;
+}
+
+.client-meta {
+  display: flex;
+  gap: 16px;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.meta-item svg {
+  width: 14px;
+  height: 14px;
+}
+
+.card-body {
+  padding: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.setting-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.setting-select {
+  padding: 10px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color var(--transition);
+}
+
+.setting-select:hover:not(:disabled) {
+  border-color: var(--border-default);
+}
+
+.setting-select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.setting-select:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-select:focus {
+.card-loading {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+
+.loading-bar {
+  height: 100%;
+  width: 30%;
+  background: var(--accent-primary);
+  animation: loading 1s ease-in-out infinite;
+}
+
+@keyframes loading {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
+/* === Configuration Layout === */
+.config-layout {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 24px;
+  align-items: start;
+}
+
+.config-main {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.config-card {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  padding: 24px;
+}
+
+.card-title {
+  margin: 0 0 20px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-field.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-field label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.label-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-left: 8px;
+}
+
+.form-field input,
+.form-field select,
+.form-field textarea {
+  padding: 10px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color var(--transition);
+}
+
+.form-field input:hover,
+.form-field select:hover,
+.form-field textarea:hover {
+  border-color: var(--border-default);
+}
+
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
   outline: none;
-  border-color: #4ade80;
+  border-color: var(--accent-primary);
 }
 
-.time-cell {
-  font-family: monospace;
-  font-size: 0.875rem;
-  color: #888;
+.mono-input {
+  font-family: var(--font-mono) !important;
+  font-size: 13px !important;
 }
 
-.device-cell {
-  color: #888;
-  font-size: 0.875rem;
+.input-with-action {
+  display: flex;
+  gap: 8px;
 }
 
-.admin-footer {
+.input-with-action input {
+  flex: 1;
+}
+
+.input-action {
+  width: 42px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 1.5rem;
-  color: #555;
-  font-size: 0.8rem;
-  border-top: 1px solid #0f3460;
-  margin-top: auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition);
 }
 
-.admin-footer a {
-  color: #888;
-  text-decoration: none;
-  transition: color 0.2s;
+.input-action svg {
+  width: 18px;
+  height: 18px;
 }
 
-.admin-footer a:hover {
-  color: #4ade80;
+.input-action:hover {
+  border-color: var(--border-default);
+  color: var(--text-primary);
 }
 
-.admin-footer .separator {
-  color: #333;
+.number-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-/* Facts Configuration Section */
-.facts-section {
-  margin-top: 2rem;
-  background: #16213e;
-  border-radius: 8px;
-  padding: 1.5rem;
-}
-
-.facts-section h2 {
-  margin: 0 0 0.5rem 0;
-  font-size: 1.25rem;
-  font-weight: 500;
-}
-
-.section-hint {
-  margin: 0 0 1.5rem 0;
-  color: #888;
-  font-size: 0.875rem;
-}
-
-.loading-state {
+.number-input input {
+  width: 80px;
   text-align: center;
-  padding: 2rem;
-  color: #888;
 }
 
-.facts-config-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.form-row {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.form-row .form-group {
-  flex: 1;
-  min-width: 200px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.form-group label {
-  font-size: 0.875rem;
-  color: #aaa;
-}
-
-.form-group label .hint {
-  font-size: 0.75rem;
-  color: #666;
-}
-
-.form-group input[type="text"],
-.form-group input[type="password"],
-.form-group input[type="number"],
-.form-group textarea {
-  padding: 0.5rem 0.75rem;
-  background: #0f3460;
-  border: 1px solid #1a3a6e;
-  border-radius: 4px;
-  color: #fff;
-  font-size: 0.875rem;
-}
-
-.form-group input:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: #4ade80;
-}
-
-.form-group textarea {
-  font-family: monospace;
-  resize: vertical;
-}
-
-.api-key-input {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.api-key-input input {
-  flex: 1;
-}
-
-.btn-toggle-key {
-  padding: 0.5rem 0.75rem;
-  background: #0f3460;
-  border: 1px solid #1a3a6e;
-  border-radius: 4px;
-  color: #888;
-  cursor: pointer;
-  font-size: 0.75rem;
-}
-
-.btn-toggle-key:hover {
-  background: #1a3a6e;
-  color: #fff;
-}
-
-.advanced-section {
-  border-top: 1px solid #0f3460;
-  padding-top: 1rem;
-}
-
-.btn-advanced {
-  background: transparent;
-  border: none;
-  color: #888;
-  cursor: pointer;
-  font-size: 0.875rem;
-  padding: 0.5rem 0;
-}
-
-.btn-advanced:hover {
-  color: #fff;
-}
-
-.advanced-content {
-  margin-top: 1rem;
+.number-hint {
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .field-hint {
-  font-size: 0.75rem;
-  color: #666;
-  margin: 0.25rem 0 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 4px 0 0;
 }
 
-.form-actions {
+.field-hint code {
+  padding: 2px 6px;
+  background: var(--bg-surface);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+/* Collapsible Card */
+.collapsible .card-title-button {
   display: flex;
-  gap: 1rem;
-  padding-top: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+}
+
+.collapsible .card-title-button .card-title {
+  margin: 0;
+}
+
+.collapse-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--text-muted);
+  transition: transform var(--transition);
+}
+
+.collapsible.expanded .collapse-icon {
+  transform: rotate(180deg);
+}
+
+.collapsible .card-content {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Config Sidebar */
+.config-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: sticky;
+  top: 32px;
+}
+
+.action-card {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .btn-primary,
-.btn-secondary,
-.btn-test {
-  padding: 0.625rem 1.25rem;
-  border-radius: 6px;
-  font-size: 0.875rem;
+.btn-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition);
   border: none;
 }
 
+.btn-primary svg,
+.btn-secondary svg {
+  width: 18px;
+  height: 18px;
+}
+
 .btn-primary {
-  background: #4ade80;
+  background: var(--accent-primary);
   color: #000;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #22c55e;
+  background: var(--accent-primary-hover);
 }
 
 .btn-primary:disabled {
@@ -1067,100 +1487,289 @@ select:focus {
 }
 
 .btn-secondary {
-  background: #0f3460;
-  color: #aaa;
-  border: 1px solid #1a3a6e;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
 }
 
 .btn-secondary:hover {
-  background: #1a3a6e;
-  color: #fff;
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
-.message {
-  padding: 0.75rem;
-  border-radius: 4px;
-  font-size: 0.875rem;
+.loading-dots::after {
+  content: '';
+  animation: dots 1.5s infinite;
 }
 
-.message.error {
-  background: rgba(239, 68, 68, 0.2);
-  color: #f87171;
+@keyframes dots {
+  0%, 20% { content: ''; }
+  40% { content: '.'; }
+  60% { content: '..'; }
+  80%, 100% { content: '...'; }
 }
 
-.message.success {
-  background: rgba(74, 222, 128, 0.2);
-  color: #4ade80;
-}
-
-/* Test Section */
-.test-section {
-  margin-top: 2rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid #0f3460;
-}
-
-.test-section h3 {
-  margin: 0 0 0.5rem 0;
-  font-size: 1rem;
+.message-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
   font-weight: 500;
 }
 
-.test-hint {
-  color: #888;
-  font-size: 0.875rem;
-  margin: 0 0 1rem 0;
+.message-card svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.message-card.error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+.message-card.success {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #6ee7b7;
+}
+
+.message-enter-active,
+.message-leave-active {
+  transition: all 0.3s ease;
+}
+
+.message-enter-from,
+.message-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* === Loading State === */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 64px;
+  color: var(--text-muted);
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border-subtle);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* === Test Layout === */
+.test-layout {
+  display: grid;
+  grid-template-columns: 400px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.test-form-card {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .btn-test {
-  background: #3b82f6;
-  color: #fff;
-  margin-top: 1rem;
+  margin-top: 8px;
 }
 
-.btn-test:hover:not(:disabled) {
-  background: #2563eb;
+.test-results {
+  min-height: 300px;
 }
 
-.btn-test:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.test-result {
-  margin-top: 1rem;
-  padding: 1rem;
-  background: #0f3460;
-  border-radius: 6px;
-}
-
-.result-header {
+.results-placeholder {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-  font-size: 0.875rem;
-  color: #aaa;
+  justify-content: center;
+  gap: 12px;
+  height: 300px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--border-default);
+  color: var(--text-muted);
 }
 
-.result-header .duration {
-  color: #666;
+.results-placeholder svg {
+  width: 48px;
+  height: 48px;
+  opacity: 0.5;
+}
+
+.results-placeholder p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.results-card {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+}
+
+.results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.results-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.results-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+}
+
+.result-count {
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.result-time {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
 }
 
 .facts-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
 }
 
 .facts-list li {
-  padding: 0.75rem;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
-  font-size: 0.875rem;
-  line-height: 1.5;
+  display: flex;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background var(--transition);
+}
+
+.facts-list li:last-child {
+  border-bottom: none;
+}
+
+.facts-list li:hover {
+  background: var(--bg-surface);
+}
+
+.fact-number {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-hover);
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.fact-text {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+/* === Responsive === */
+@media (max-width: 1200px) {
+  .config-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .config-sidebar {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .action-card {
+    flex: 1;
+    min-width: 200px;
+  }
+}
+
+@media (max-width: 900px) {
+  .test-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .card-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-shell {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-right: none;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .sidebar-header {
+    flex: 1;
+    border-bottom: none;
+  }
+
+  .sidebar-nav {
+    flex-direction: row;
+    padding: 8px 12px;
+    overflow-x: auto;
+  }
+
+  .sidebar-footer {
+    flex-direction: row;
+    border-top: none;
+    border-left: 1px solid var(--border-subtle);
+  }
+
+  .main-content {
+    padding: 20px;
+  }
+
+  .clients-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
