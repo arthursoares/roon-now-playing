@@ -59,10 +59,11 @@ interface SourcesConfig {
 }
 
 interface ExternalZone {
-  zoneId: string;
-  name: string;
-  connected: boolean;
-  lastSeen: number;
+  zone_id: string;
+  zone_name: string;
+  source_status: 'connected' | 'disconnected';
+  last_seen: string;
+  state: string;
 }
 
 const sourcesConfig = ref<SourcesConfig>({
@@ -353,7 +354,7 @@ async function deleteExternalZone(zoneId: string): Promise<void> {
       method: 'DELETE',
     });
     if (response.ok) {
-      externalZones.value = externalZones.value.filter((z) => z.zoneId !== zoneId);
+      externalZones.value = externalZones.value.filter((z) => z.zone_id !== zoneId);
     }
   } catch (error) {
     console.error('Failed to delete external zone:', error);
@@ -362,14 +363,15 @@ async function deleteExternalZone(zoneId: string): Promise<void> {
   }
 }
 
-function formatLastSeen(timestamp: number): string {
+function formatLastSeen(timestamp: string | number): string {
   if (!timestamp) return 'Never';
+  const ts = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
   const now = Date.now();
-  const diff = now - timestamp;
+  const diff = now - ts;
   if (diff < 60000) return 'Just now';
   if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
   if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-  return new Date(timestamp).toLocaleDateString();
+  return new Date(ts).toLocaleDateString();
 }
 
 onMounted(() => {
@@ -906,7 +908,7 @@ onMounted(() => {
           </div>
           <div class="section-stats">
             <div class="stat">
-              <span class="stat-value">{{ externalZones.filter(z => z.connected).length }}</span>
+              <span class="stat-value">{{ externalZones.filter(z => z.source_status === 'connected').length }}</span>
               <span class="stat-label">Connected</span>
             </div>
             <div class="stat">
@@ -1001,20 +1003,20 @@ onMounted(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="zone in externalZones" :key="zone.zoneId">
-                  <td class="zone-name">{{ zone.name }}</td>
-                  <td class="zone-id"><code>{{ zone.zoneId }}</code></td>
+                <tr v-for="zone in externalZones" :key="zone.zone_id">
+                  <td class="zone-name">{{ zone.zone_name }}</td>
+                  <td class="zone-id"><code>{{ zone.zone_id }}</code></td>
                   <td>
-                    <span class="status-badge" :class="zone.connected ? 'connected' : 'disconnected'">
-                      {{ zone.connected ? 'Connected' : 'Disconnected' }}
+                    <span class="status-badge" :class="zone.source_status">
+                      {{ zone.source_status === 'connected' ? 'Connected' : 'Disconnected' }}
                     </span>
                   </td>
-                  <td class="zone-last-seen">{{ formatLastSeen(zone.lastSeen) }}</td>
+                  <td class="zone-last-seen">{{ formatLastSeen(zone.last_seen) }}</td>
                   <td class="zone-actions">
                     <button
                       class="btn-icon btn-delete"
-                      :disabled="deletingZone === zone.zoneId"
-                      @click="deleteExternalZone(zone.zoneId)"
+                      :disabled="deletingZone === zone.zone_id"
+                      @click="deleteExternalZone(zone.zone_id)"
                       title="Delete zone"
                     >
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
