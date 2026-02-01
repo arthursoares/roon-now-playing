@@ -8,6 +8,7 @@ export function useNowPlaying(nowPlaying: () => NowPlaying | null) {
   // Track when we last synced with server
   let lastSyncTime = 0;
   let lastSyncPosition = 0;
+  let lastServerSeekPosition: number | undefined = undefined;
 
   const track = computed(() => nowPlaying()?.track ?? null);
   const state = computed(() => nowPlaying()?.state ?? 'stopped');
@@ -43,6 +44,14 @@ export function useNowPlaying(nowPlaying: () => NowPlaying | null) {
   function startInterpolation(): void {
     stopInterpolation();
 
+    // Sync with current server position before starting interpolation
+    // This prevents stale lastSyncTime from causing jumps when resuming from pause
+    const currentPosition = nowPlaying()?.seek_position;
+    if (currentPosition !== undefined) {
+      lastServerSeekPosition = currentPosition;
+      syncWithServer(currentPosition);
+    }
+
     interpolationInterval = window.setInterval(() => {
       if (isPlaying.value && duration.value > 0) {
         // Calculate time since last sync
@@ -61,10 +70,13 @@ export function useNowPlaying(nowPlaying: () => NowPlaying | null) {
   }
 
   // Watch for server seek updates
+  // Only sync if the server position actually changed (not just object reference)
+  // This prevents unnecessary resyncs that interrupt smooth interpolation
   watch(
     () => nowPlaying()?.seek_position,
     (newPosition) => {
-      if (newPosition !== undefined) {
+      if (newPosition !== undefined && newPosition !== lastServerSeekPosition) {
+        lastServerSeekPosition = newPosition;
         syncWithServer(newPosition);
       }
     },

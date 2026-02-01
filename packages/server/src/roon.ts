@@ -184,10 +184,14 @@ export class RoonClient extends EventEmitter {
         // Handle changed zones (may include new zones in some Roon versions)
         if (data.zones_changed) {
           for (const zone of data.zones_changed) {
-            const isNewZone = !this.zones.has(zone.zone_id);
+            const existingZone = this.zones.get(zone.zone_id);
+            const isNewZone = !existingZone;
             if (isNewZone) {
               logger.info(`Zone appeared via change: ${zone.display_name} (${zone.zone_id})`);
               zonesListChanged = true;
+            } else if (zone.seek_position === undefined && existingZone.seek_position !== undefined) {
+              // Preserve seek_position when not provided in zones_changed (e.g., volume changes)
+              zone.seek_position = existingZone.seek_position;
             }
             this.zones.set(zone.zone_id, zone);
             this.emit('now_playing', this.mapZoneToNowPlaying(zone));
