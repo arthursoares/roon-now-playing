@@ -20,7 +20,7 @@ import {
 const { state: wsState } = useWebSocket({ isAdmin: true });
 
 // Navigation
-const activeSection = ref<'clients' | 'facts' | 'test'>('clients');
+const activeSection = ref<'clients' | 'facts' | 'test' | 'sources'>('clients');
 
 const editingName = ref<string | null>(null);
 const editNameValue = ref('');
@@ -50,6 +50,32 @@ const testRunning = ref(false);
 const testResult = ref<string[] | null>(null);
 const testError = ref<string | null>(null);
 const testDuration = ref<number | null>(null);
+
+// External sources state
+interface SourcesConfig {
+  requireApiKey: boolean;
+  hasApiKey: boolean;
+  apiKey: string;
+}
+
+interface ExternalZone {
+  zoneId: string;
+  name: string;
+  connected: boolean;
+  lastSeen: number;
+}
+
+const sourcesConfig = ref<SourcesConfig>({
+  requireApiKey: false,
+  hasApiKey: false,
+  apiKey: '',
+});
+const externalZones = ref<ExternalZone[]>([]);
+const sourcesLoading = ref(true);
+const sourcesConfigSaving = ref(false);
+const generatingApiKey = ref(false);
+const deletingZone = ref<string | null>(null);
+const apiKeyCopied = ref(false);
 
 const connectionStatus = computed(() => {
   if (!wsState.value.connected) return 'connecting';
@@ -239,8 +265,115 @@ async function runFactsTest(): Promise<void> {
   }
 }
 
+// External sources functions
+async function fetchSourcesConfig(): Promise<void> {
+  try {
+    const response = await fetch('/api/sources/config');
+    if (response.ok) {
+      const config = await response.json();
+      sourcesConfig.value = config;
+    }
+  } catch (error) {
+    console.error('Failed to fetch sources config:', error);
+  }
+}
+
+async function fetchExternalZones(): Promise<void> {
+  try {
+    const response = await fetch('/api/sources');
+    if (response.ok) {
+      const data = await response.json();
+      externalZones.value = data.zones || [];
+    }
+  } catch (error) {
+    console.error('Failed to fetch external zones:', error);
+  }
+}
+
+async function loadSourcesData(): Promise<void> {
+  sourcesLoading.value = true;
+  await Promise.all([fetchSourcesConfig(), fetchExternalZones()]);
+  sourcesLoading.value = false;
+}
+
+async function toggleRequireApiKey(): Promise<void> {
+  sourcesConfigSaving.value = true;
+  try {
+    const newValue = !sourcesConfig.value.requireApiKey;
+    const response = await fetch('/api/sources/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requireApiKey: newValue }),
+    });
+    if (response.ok) {
+      sourcesConfig.value.requireApiKey = newValue;
+    }
+  } catch (error) {
+    console.error('Failed to update sources config:', error);
+  } finally {
+    sourcesConfigSaving.value = false;
+  }
+}
+
+async function generateApiKey(): Promise<void> {
+  generatingApiKey.value = true;
+  try {
+    const response = await fetch('/api/sources/config/generate-key', {
+      method: 'POST',
+    });
+    if (response.ok) {
+      const data = await response.json();
+      sourcesConfig.value.apiKey = data.apiKey;
+      sourcesConfig.value.hasApiKey = true;
+    }
+  } catch (error) {
+    console.error('Failed to generate API key:', error);
+  } finally {
+    generatingApiKey.value = false;
+  }
+}
+
+async function copyApiKey(): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(sourcesConfig.value.apiKey);
+    apiKeyCopied.value = true;
+    setTimeout(() => {
+      apiKeyCopied.value = false;
+    }, 2000);
+  } catch (error) {
+    console.error('Failed to copy API key:', error);
+  }
+}
+
+async function deleteExternalZone(zoneId: string): Promise<void> {
+  deletingZone.value = zoneId;
+  try {
+    const response = await fetch(`/api/sources/${encodeURIComponent(zoneId)}`, {
+      method: 'DELETE',
+    });
+    if (response.ok) {
+      externalZones.value = externalZones.value.filter((z) => z.zoneId !== zoneId);
+    }
+  } catch (error) {
+    console.error('Failed to delete external zone:', error);
+  } finally {
+    deletingZone.value = null;
+  }
+}
+
+function formatLastSeen(timestamp: number): string {
+  if (!timestamp) return 'Never';
+  const now = Date.now();
+  const diff = now - timestamp;
+  if (diff < 60000) return 'Just now';
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+  return new Date(timestamp).toLocaleDateString();
+}
+
 onMounted(() => {
   loadFactsConfig();
+  loadSourcesData();
 });
 </script>
 
@@ -298,6 +431,18 @@ onMounted(() => {
             <line x1="12" y1="19" x2="20" y2="19"/>
           </svg>
           <span>Test</span>
+        </button>
+
+        <button
+          class="nav-item"
+          :class="{ active: activeSection === 'sources' }"
+          @click="activeSection = 'sources'"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 0 1 9-9"/>
+          </svg>
+          <span>Sources</span>
+          <span v-if="externalZones.length > 0" class="nav-badge">{{ externalZones.length }}</span>
         </button>
       </nav>
 
@@ -747,6 +892,141 @@ onMounted(() => {
               </svg>
               <p>Results will appear here</p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- External Sources Section -->
+      <section v-if="activeSection === 'sources'" class="content-section">
+        <header class="section-header">
+          <div class="section-title">
+            <h1>External Sources</h1>
+            <p class="section-desc">Manage external audio sources that connect via the API.</p>
+          </div>
+          <div class="section-stats">
+            <div class="stat">
+              <span class="stat-value">{{ externalZones.filter(z => z.connected).length }}</span>
+              <span class="stat-label">Connected</span>
+            </div>
+            <div class="stat">
+              <span class="stat-value">{{ externalZones.length }}</span>
+              <span class="stat-label">Total</span>
+            </div>
+          </div>
+        </header>
+
+        <div v-if="sourcesLoading" class="loading-state">
+          <div class="loading-spinner"></div>
+          <span>Loading sources...</span>
+        </div>
+
+        <div v-else class="sources-layout">
+          <!-- API Key Configuration Card -->
+          <div class="config-card">
+            <h2 class="card-title">API Configuration</h2>
+
+            <div class="toggle-setting">
+              <div class="toggle-info">
+                <label class="toggle-label">Require API Key</label>
+                <p class="toggle-desc">When enabled, external sources must provide a valid API key to connect.</p>
+              </div>
+              <button
+                class="toggle-switch"
+                :class="{ active: sourcesConfig.requireApiKey }"
+                :disabled="sourcesConfigSaving"
+                @click="toggleRequireApiKey"
+              >
+                <span class="toggle-knob"></span>
+              </button>
+            </div>
+
+            <div class="api-key-section">
+              <label class="setting-label">API Key</label>
+              <div v-if="sourcesConfig.hasApiKey" class="api-key-display">
+                <code class="api-key-value">{{ sourcesConfig.apiKey }}</code>
+                <div class="api-key-actions">
+                  <button class="btn-small" @click="copyApiKey" :disabled="apiKeyCopied">
+                    <svg v-if="!apiKeyCopied" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>
+                    <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                    {{ apiKeyCopied ? 'Copied' : 'Copy' }}
+                  </button>
+                  <button class="btn-small btn-warning" @click="generateApiKey" :disabled="generatingApiKey">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                      <path d="M21 3v5h-5"/>
+                      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                      <path d="M3 21v-5h5"/>
+                    </svg>
+                    {{ generatingApiKey ? 'Regenerating...' : 'Regenerate' }}
+                  </button>
+                </div>
+              </div>
+              <div v-else class="api-key-generate">
+                <p class="no-key-message">No API key has been generated yet.</p>
+                <button class="btn-primary btn-small" @click="generateApiKey" :disabled="generatingApiKey">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+                  </svg>
+                  {{ generatingApiKey ? 'Generating...' : 'Generate API Key' }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- External Zones Table -->
+          <div class="config-card">
+            <h2 class="card-title">External Zones</h2>
+
+            <div v-if="externalZones.length === 0" class="empty-state-inline">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 0 1 9-9"/>
+              </svg>
+              <p>No external zones registered yet.</p>
+            </div>
+
+            <table v-else class="zones-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Zone ID</th>
+                  <th>Status</th>
+                  <th>Last Seen</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="zone in externalZones" :key="zone.zoneId">
+                  <td class="zone-name">{{ zone.name }}</td>
+                  <td class="zone-id"><code>{{ zone.zoneId }}</code></td>
+                  <td>
+                    <span class="status-badge" :class="zone.connected ? 'connected' : 'disconnected'">
+                      {{ zone.connected ? 'Connected' : 'Disconnected' }}
+                    </span>
+                  </td>
+                  <td class="zone-last-seen">{{ formatLastSeen(zone.lastSeen) }}</td>
+                  <td class="zone-actions">
+                    <button
+                      class="btn-icon btn-delete"
+                      :disabled="deletingZone === zone.zoneId"
+                      @click="deleteExternalZone(zone.zoneId)"
+                      title="Delete zone"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        <line x1="10" y1="11" x2="10" y2="17"/>
+                        <line x1="14" y1="11" x2="14" y2="17"/>
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
@@ -1771,5 +2051,267 @@ onMounted(() => {
   .clients-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* === Sources Section === */
+.sources-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.toggle-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.toggle-info {
+  flex: 1;
+}
+
+.toggle-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.toggle-desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.toggle-switch {
+  position: relative;
+  width: 48px;
+  height: 26px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 13px;
+  cursor: pointer;
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+
+.toggle-switch:hover:not(:disabled) {
+  border-color: var(--text-muted);
+}
+
+.toggle-switch.active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.toggle-switch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: var(--text-secondary);
+  border-radius: 50%;
+  transition: all var(--transition);
+}
+
+.toggle-switch.active .toggle-knob {
+  left: 24px;
+  background: #000;
+}
+
+.api-key-section {
+  padding-top: 20px;
+}
+
+.api-key-display {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 12px 16px;
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+}
+
+.api-key-value {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+.api-key-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.api-key-generate {
+  margin-top: 8px;
+}
+
+.no-key-message {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.btn-small {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.btn-small svg {
+  width: 14px;
+  height: 14px;
+}
+
+.btn-small:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
+.btn-small:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-small.btn-warning:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.btn-primary.btn-small {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #000;
+}
+
+.btn-primary.btn-small:hover:not(:disabled) {
+  background: var(--accent-primary-hover);
+  border-color: var(--accent-primary-hover);
+}
+
+.empty-state-inline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.empty-state-inline svg {
+  width: 48px;
+  height: 48px;
+  opacity: 0.5;
+}
+
+.empty-state-inline p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.zones-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.zones-table th,
+.zones-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.zones-table th {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--bg-surface);
+}
+
+.zones-table tbody tr:hover {
+  background: var(--bg-surface);
+}
+
+.zones-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.zone-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.zone-id code {
+  padding: 4px 8px;
+  background: var(--bg-surface);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.zone-last-seen {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.zone-actions {
+  width: 48px;
+  text-align: right;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-badge.connected {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--accent-success);
+}
+
+.status-badge.disconnected {
+  background: var(--bg-surface);
+  color: var(--text-muted);
+}
+
+.btn-icon.btn-delete:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--accent-error);
 }
 </style>
