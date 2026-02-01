@@ -15,6 +15,7 @@ A Roon extension that displays real-time album artwork and track metadata on any
 - Seven customizable font families
 - AI-generated facts about currently playing music (Anthropic/OpenAI)
 - Admin panel for managing connected clients and AI configuration
+- **External Sources API** for non-Roon music sources (see [External API Documentation](docs/external-api.md))
 - Automatic zone selection via URL parameters
 - WebSocket-based real-time updates
 - Artwork caching for performance
@@ -222,6 +223,20 @@ Environment variables (or `.env` file):
 | `POST` | `/api/facts/config` | Update facts configuration |
 | `GET` | `/api/facts/:artist/:album/:title` | Get cached facts for a track |
 | `POST` | `/api/facts/test` | Test facts generation with sample data |
+
+### External Sources API
+
+The External Sources API allows any music source to push now-playing data. External sources appear as zones alongside Roon zones.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/sources/:zoneId/now-playing` | Push now-playing update |
+| `DELETE` | `/api/sources/:zoneId` | Remove external zone |
+| `GET` | `/api/sources` | List external zones |
+| `GET` | `/api/sources/config` | Get API configuration |
+| `POST` | `/api/sources/config` | Update API configuration |
+
+For complete documentation with examples, see [External API Documentation](docs/external-api.md).
 
 ### WebSocket
 
