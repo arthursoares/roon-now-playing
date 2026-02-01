@@ -9,6 +9,10 @@ import { createAdminRouter } from './admin.js';
 import { createFactsRouter } from './facts.js';
 import { ClientNameStore } from './clientNames.js';
 import { logger } from './logger.js';
+import { ExternalSourceManager } from './externalSources.js';
+import { SourcesConfigStore } from './sourcesConfig.js';
+import { createSourcesRouter } from './routes/sources.js';
+import { cacheExternalArtwork } from './artwork.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,6 +30,13 @@ async function main(): Promise<void> {
   // Initialize client name store
   const clientNameStore = new ClientNameStore();
 
+  // Initialize sources config store
+  const sourcesConfigStore = new SourcesConfigStore();
+
+  // Initialize external source manager
+  const externalSourceManager = new ExternalSourceManager();
+  externalSourceManager.setArtworkCallback(cacheExternalArtwork);
+
   // Initialize WebSocket manager
   const wsManager = new WebSocketManager(server, roonClient);
 
@@ -37,16 +48,22 @@ async function main(): Promise<void> {
     clientNameStore.set(clientId, name);
   });
 
+  // Connect external source manager to WebSocket
+  wsManager.setExternalSourceManager(externalSourceManager);
+
   // API routes
   app.use(express.json());
   app.use('/api', createArtworkRouter(roonClient));
   app.use('/api/admin', createAdminRouter(wsManager));
   app.use('/api', createFactsRouter());
+  app.use('/api/sources', createSourcesRouter(externalSourceManager, sourcesConfigStore));
 
   // Zones endpoint
   app.get('/api/zones', (_req, res) => {
+    const roonZones = roonClient.getZones().map(z => ({ ...z, source: 'roon' as const }));
+    const externalZones = externalSourceManager.getZones().map(z => ({ ...z, source: 'external' as const }));
     res.json({
-      zones: roonClient.getZones(),
+      zones: [...roonZones, ...externalZones],
       connected: roonClient.isConnected(),
     });
   });
