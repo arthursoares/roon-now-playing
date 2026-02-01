@@ -1069,7 +1069,8 @@ onMounted(() => {
 /* === Shell Layout === */
 .admin-shell {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: var(--bg-base);
   color: var(--text-primary);
   font-family: var(--font-sans);
@@ -1254,6 +1255,7 @@ onMounted(() => {
 /* === Main Content === */
 .main-content {
   flex: 1;
+  min-height: 0; /* Required for flex children to scroll */
   overflow-y: auto;
   padding: 32px;
 }
@@ -2020,8 +2022,6 @@ onMounted(() => {
 @media (max-width: 768px) {
   .admin-shell {
     flex-direction: column;
-    height: 100vh;
-    overflow: hidden;
   }
 
   .sidebar {
@@ -2053,9 +2053,6 @@ onMounted(() => {
 
   .main-content {
     padding: 20px;
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
 
