@@ -3,7 +3,7 @@
 A Roon extension that displays real-time album artwork and track metadata on any web-connected client. Perfect for "always-on" displays like tablets and wall-mounted screens.
 
 <p align="center">
-  <img src="assets/example03.jpeg" alt="Minimal Layout" width="800">
+  <img width="3108" height="2090" alt="CleanShot 2026-02-01 at 23 09 09@2x" src="https://github.com/user-attachments/assets/11b2f27e-5bbb-415c-a9be-0d5e7431f854" />
 </p>
 
 ## Features
