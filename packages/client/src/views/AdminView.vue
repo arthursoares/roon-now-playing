@@ -2020,12 +2020,15 @@ onMounted(() => {
 @media (max-width: 768px) {
   .admin-shell {
     flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
   }
 
   .sidebar {
     width: 100%;
     flex-direction: row;
     flex-wrap: wrap;
+    flex-shrink: 0;
     border-right: none;
     border-bottom: 1px solid var(--border-subtle);
   }
@@ -2039,6 +2042,7 @@ onMounted(() => {
     flex-direction: row;
     padding: 8px 12px;
     overflow-x: auto;
+    flex: none;
   }
 
   .sidebar-footer {
@@ -2049,6 +2053,10 @@ onMounted(() => {
 
   .main-content {
     padding: 20px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .clients-grid {
