@@ -73,7 +73,8 @@ const selectedZone = computed(() => {
 
 const connectionStatus = computed(() => {
   if (!wsState.value.connected) return 'connecting';
-  if (!wsState.value.roonConnected) return 'waiting-roon';
+  // Only show "waiting for Roon" if no zones available (neither Roon nor external)
+  if (!wsState.value.roonConnected && wsState.value.zones.length === 0) return 'waiting-roon';
   return 'connected';
 });
 

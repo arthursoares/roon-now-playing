@@ -48,9 +48,9 @@ const usesDynamicBackground = computed(() =>
     :artwork-url="artworkUrl"
     :palette="palette"
     :vibrant-gradient="vibrantGradient"
-    class="detailed-layout"
   >
-    <div class="artwork-container">
+    <div class="detailed-layout">
+      <div class="artwork-container">
       <img
         v-if="artworkUrl"
         :src="artworkUrl"
@@ -93,6 +93,7 @@ const usesDynamicBackground = computed(() =>
         </span>
         <span v-else-if="state === 'paused'" class="paused-indicator">⏸</span>
       </div>
+    </div>
     </div>
   </DynamicBackground>
 

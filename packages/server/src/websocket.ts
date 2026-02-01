@@ -21,6 +21,7 @@ import type {
   ServerRemoteSettingsMessage,
 } from '@roon-screen-cover/shared';
 import { RoonClient } from './roon.js';
+import { ExternalSourceManager } from './externalSources.js';
 import { logger } from './logger.js';
 
 interface ClientState {
@@ -49,6 +50,7 @@ export class WebSocketManager {
   private clients: Map<WebSocket, ClientState> = new Map();
   private clientsById: Map<string, ClientState> = new Map();
   private roonClient: RoonClient;
+  private externalSourceManager: ExternalSourceManager | null = null;
   private friendlyNames: Map<string, string> = new Map();
   private onFriendlyNameChange?: (clientId: string, name: string | null) => void;
 
@@ -58,6 +60,11 @@ export class WebSocketManager {
 
     this.setupWebSocketServer();
     this.setupRoonListeners();
+  }
+
+  setExternalSourceManager(manager: ExternalSourceManager): void {
+    this.externalSourceManager = manager;
+    this.setupExternalSourceListeners();
   }
 
   setFriendlyNameChangeCallback(callback: (clientId: string, name: string | null) => void): void {
@@ -102,7 +109,7 @@ export class WebSocketManager {
       // Send current zones list
       this.sendToClient(ws, {
         type: 'zones',
-        zones: this.roonClient.getZones(),
+        zones: this.getCombinedZones(),
       });
 
       // If admin, send current clients list
@@ -161,10 +168,10 @@ export class WebSocketManager {
       });
     });
 
-    this.roonClient.on('zones', (zones: Zone[]) => {
+    this.roonClient.on('zones', () => {
       const message: ServerZonesMessage = {
         type: 'zones',
-        zones,
+        zones: this.getCombinedZones(),
       };
       this.broadcastToAll(message);
     });
@@ -188,6 +195,44 @@ export class WebSocketManager {
       };
       this.broadcastToZoneSubscribers(zoneId, message);
     });
+  }
+
+  private setupExternalSourceListeners(): void {
+    if (!this.externalSourceManager) return;
+
+    this.externalSourceManager.on('zones', () => {
+      // Broadcast combined zones from both Roon and external sources
+      this.broadcastToAll({
+        type: 'zones',
+        zones: this.getCombinedZones(),
+      });
+    });
+
+    this.externalSourceManager.on('now_playing', (nowPlaying: NowPlaying) => {
+      const message: ServerNowPlayingMessage = {
+        type: 'now_playing',
+        zone_id: nowPlaying.zone_id,
+        state: nowPlaying.state,
+        track: nowPlaying.track,
+        seek_position: nowPlaying.seek_position,
+      };
+      this.broadcastToZoneSubscribers(nowPlaying.zone_id, message);
+    });
+
+    this.externalSourceManager.on('seek', (zoneId: string, position: number) => {
+      const message: ServerSeekMessage = {
+        type: 'seek',
+        zone_id: zoneId,
+        seek_position: position,
+      };
+      this.broadcastToZoneSubscribers(zoneId, message);
+    });
+  }
+
+  private getCombinedZones(): Zone[] {
+    const roonZones = this.roonClient.getZones();
+    const externalZones = this.externalSourceManager?.getZones() || [];
+    return [...roonZones, ...externalZones];
   }
 
   private handleClientMessage(ws: WebSocket, data: Buffer): void {
@@ -288,14 +333,20 @@ export class WebSocketManager {
   private handleSubscribe(clientState: ClientState, zoneId: string): void {
     clientState.subscribedZoneId = zoneId;
 
-    // Find zone name
-    const zone = this.roonClient.getZones().find((z) => z.id === zoneId);
+    // Find zone name from either Roon or external sources
+    let zone = this.roonClient.getZones().find((z) => z.id === zoneId);
+    if (!zone && this.externalSourceManager) {
+      zone = this.externalSourceManager.getZones().find((z) => z.id === zoneId);
+    }
     clientState.subscribedZoneName = zone?.display_name || null;
 
     logger.info(`Client subscribed to zone: ${zoneId}`);
 
     // Send current now_playing state for the zone
-    const nowPlaying = this.roonClient.getNowPlaying(zoneId);
+    let nowPlaying = this.roonClient.getNowPlaying(zoneId);
+    if (!nowPlaying && this.externalSourceManager) {
+      nowPlaying = this.externalSourceManager.getNowPlaying(zoneId);
+    }
     if (nowPlaying) {
       this.sendToClient(clientState.ws, {
         type: 'now_playing',
@@ -413,7 +464,10 @@ export class WebSocketManager {
     // Find zone name if zoneId provided
     let zoneName: string | undefined;
     if (settings.zoneId) {
-      const zone = this.roonClient.getZones().find((z) => z.id === settings.zoneId);
+      let zone = this.roonClient.getZones().find((z) => z.id === settings.zoneId);
+      if (!zone && this.externalSourceManager) {
+        zone = this.externalSourceManager.getZones().find((z) => z.id === settings.zoneId);
+      }
       zoneName = zone?.display_name;
     }
 
@@ -490,6 +544,6 @@ export class WebSocketManager {
   }
 
   getZones(): Zone[] {
-    return this.roonClient.getZones();
+    return this.getCombinedZones();
   }
 }

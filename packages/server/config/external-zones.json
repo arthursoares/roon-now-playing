@@ -1,0 +1,12 @@
+{
+  "test-spotify": {
+    "zone_name": "Test Spotify Player",
+    "created_at": "2026-02-01T01:01:27.443Z",
+    "last_seen": "2026-02-01T01:01:27.443Z"
+  },
+  "plex-office": {
+    "zone_name": "Office Plex",
+    "created_at": "2026-02-01T01:00:58.330Z",
+    "last_seen": "2026-02-01T01:00:58.330Z"
+  }
+}
