@@ -34,6 +34,7 @@ const factsConfig = ref<FactsConfig>({
   factsCount: 5,
   rotationInterval: 25,
   prompt: DEFAULT_FACTS_PROMPT,
+  localBaseUrl: 'http://localhost:11434/v1',
 });
 const factsConfigLoading = ref(true);
 const factsConfigSaving = ref(false);
@@ -235,6 +236,7 @@ function resetFactsConfig(): void {
     factsCount: 5,
     rotationInterval: 25,
     prompt: DEFAULT_FACTS_PROMPT,
+    localBaseUrl: 'http://localhost:11434/v1',
   };
 }
 
@@ -744,7 +746,11 @@ onMounted(() => {
               <div class="form-field full-width">
                 <label for="apiKey">
                   API Key
-                  <span class="label-hint">Leave empty to use environment variable</span>
+                  <span class="label-hint">
+                    {{ factsConfig.provider === 'local'
+                      ? 'Optional - only if your local server requires auth'
+                      : 'Leave empty to use environment variable' }}
+                  </span>
                 </label>
                 <div class="input-with-action">
                   <input
@@ -765,6 +771,21 @@ onMounted(() => {
                     </svg>
                   </button>
                 </div>
+              </div>
+
+              <!-- Local LLM Base URL -->
+              <div v-if="factsConfig.provider === 'local'" class="form-field full-width">
+                <label for="localBaseUrl">
+                  Base URL
+                  <span class="label-hint">Default: Ollama on localhost:11434</span>
+                </label>
+                <input
+                  id="localBaseUrl"
+                  type="text"
+                  v-model="factsConfig.localBaseUrl"
+                  placeholder="http://localhost:11434/v1"
+                  class="mono-input"
+                />
               </div>
             </div>
 
