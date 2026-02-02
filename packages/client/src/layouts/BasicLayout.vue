@@ -25,7 +25,7 @@ const backgroundColor = computed(() => {
     case 'white':
       return '#ffffff';
     case 'dominant':
-      return colors.value.dominant || '#000000';
+      return colors.value.background || '#000000';
     case 'black':
     default:
       return '#000000';
@@ -88,7 +88,7 @@ const secondaryTextColor = computed(() => {
 
         <!-- Progress Bar -->
         <div v-if="track" class="progress-section">
-          <ProgressBar :progress="progress" />
+          <ProgressBar :progress="progress" :current-time="currentTime" :duration="duration" />
           <div class="time-display">
             <span>{{ currentTime }}</span>
             <span>{{ duration }}</span>
