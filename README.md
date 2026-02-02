@@ -13,7 +13,7 @@ A Roon extension that displays real-time album artwork and track metadata on any
 - Eight display layouts including AI-powered Facts layouts
 - Fourteen background options with dynamic color extraction
 - Seven customizable font families
-- AI-generated facts about currently playing music (Anthropic/OpenAI)
+- AI-generated facts about currently playing music (Anthropic/OpenAI/OpenRouter/Local LLM)
 - Admin panel for managing connected clients and AI configuration
 - **External Sources API** for non-Roon music sources (see [External API Documentation](docs/external-api.md))
 - Automatic zone selection via URL parameters
@@ -97,7 +97,7 @@ Example: `http://localhost:3000/?zone=Office&layout=detailed&background=gradient
 | `facts-overlay` | Full artwork background with facts overlaid at the bottom. |
 | `facts-carousel` | Blurred artwork background with facts displayed in a centered card. |
 
-**Note:** Facts layouts require an API key (Anthropic or OpenAI) configured in the Admin panel.
+**Note:** Facts layouts require an LLM provider configured in the Admin panel. Supported providers: Anthropic, OpenAI, OpenRouter, or Local LLM (Ollama/LM Studio).
 
 ### Screenshots
 
@@ -174,9 +174,10 @@ Access the admin panel at `/admin` to manage connected clients and configure AI 
 
 ### Facts Configuration
 Configure AI-powered facts generation for the facts layouts:
-- Choose between Anthropic (Claude) or OpenAI providers
-- Select model (e.g., claude-sonnet-4, gpt-4o)
+- Choose from four providers: Anthropic, OpenAI, OpenRouter, or Local LLM
+- Select model from curated list or enter custom model name
 - Set API key (or use environment variables)
+- Configure local LLM base URL for Ollama/LM Studio
 - Configure facts count per track (1-10)
 - Customize rotation interval
 - Test configuration with sample track data
@@ -193,8 +194,57 @@ Environment variables (or `.env` file):
 | `LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
 | `ANTHROPIC_API_KEY` | - | Anthropic API key for facts generation |
 | `OPENAI_API_KEY` | - | OpenAI API key for facts generation |
+| `OPENROUTER_API_KEY` | - | OpenRouter API key for facts generation |
+| `LOCAL_LLM_URL` | `http://localhost:11434/v1` | Base URL for local LLM (Ollama/LM Studio) |
 
 **Note:** API keys can also be configured via the Admin panel. Environment variables take precedence.
+
+## LLM Providers
+
+The facts feature supports multiple LLM providers for generating music facts:
+
+### Anthropic (Default)
+- Models: Claude Sonnet 4, Claude Haiku 4
+- Requires: `ANTHROPIC_API_KEY` or API key in Admin panel
+- Best for: High-quality, nuanced facts
+
+### OpenAI
+- Models: GPT-4o, GPT-4o-mini
+- Requires: `OPENAI_API_KEY` or API key in Admin panel
+- Best for: Fast, reliable generation
+
+### OpenRouter
+- Access 200+ models through a unified API
+- Curated models: Llama 3.1, Mistral, Gemini, DeepSeek
+- Custom model support: Enter any OpenRouter model ID
+- Requires: `OPENROUTER_API_KEY` or API key in Admin panel
+- Best for: Model variety, cost optimization
+- Get an API key at [openrouter.ai](https://openrouter.ai)
+
+### Local LLM (Ollama/LM Studio)
+- Run models locally with no API costs
+- Works with any OpenAI-compatible local server
+- Requires: Local server running (e.g., Ollama, LM Studio)
+- Configure base URL in Admin panel or via `LOCAL_LLM_URL`
+- API key optional (only if your local server requires it)
+- Best for: Privacy, offline use, cost savings
+
+**Ollama Quick Start:**
+```bash
+# Install Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Pull a model
+ollama pull llama3.1
+
+# Ollama runs on http://localhost:11434/v1 by default
+```
+
+**LM Studio Quick Start:**
+1. Download LM Studio from [lmstudio.ai](https://lmstudio.ai)
+2. Download a model (e.g., Llama 3.1, Mistral)
+3. Start local server (default: `http://localhost:1234/v1`)
+4. Configure the URL in Admin panel
 
 ## API
 

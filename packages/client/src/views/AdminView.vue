@@ -243,7 +243,9 @@ function resetFactsConfig(): void {
 function onProviderChange(): void {
   const models = LLM_MODELS[factsConfig.value.provider];
   if (models && models.length > 0) {
-    factsConfig.value.model = models[0];
+    factsConfig.value.model = models[0] as string;
+  } else {
+    factsConfig.value.model = '';
   }
 }
 
