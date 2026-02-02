@@ -138,4 +138,43 @@ describe('FactsConfigStore', () => {
     const config = store2.get();
     expect(config.apiKey).toBe(''); // Should be cleared
   });
+
+  describe('OpenRouter and Local LLM Providers', () => {
+    it('should return OpenRouter API key from environment', () => {
+      process.env.OPENROUTER_API_KEY = 'or-test-key';
+      const store = new FactsConfigStore(TEST_CONFIG_PATH);
+      store.update({ provider: 'openrouter' });
+
+      const config = store.get();
+      expect(config.apiKey).toBe('or-test-key');
+
+      delete process.env.OPENROUTER_API_KEY;
+    });
+
+    it('should return localBaseUrl from environment for local provider', () => {
+      process.env.LOCAL_LLM_URL = 'http://localhost:1234/v1';
+      const store = new FactsConfigStore(TEST_CONFIG_PATH);
+      store.update({ provider: 'local' });
+
+      const config = store.get();
+      expect(config.localBaseUrl).toBe('http://localhost:1234/v1');
+
+      delete process.env.LOCAL_LLM_URL;
+    });
+
+    it('should use default localBaseUrl when not configured', () => {
+      const store = new FactsConfigStore(TEST_CONFIG_PATH);
+      store.update({ provider: 'local' });
+
+      const config = store.get();
+      expect(config.localBaseUrl).toBe('http://localhost:11434/v1');
+    });
+
+    it('should not require API key for local provider', () => {
+      const store = new FactsConfigStore(TEST_CONFIG_PATH);
+      store.update({ provider: 'local', model: 'llama3.1', apiKey: '' });
+
+      expect(store.get().provider).toBe('local');
+    });
+  });
 });
