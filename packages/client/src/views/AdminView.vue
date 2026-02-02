@@ -229,6 +229,16 @@ function onProviderChange(): void {
   }
 }
 
+function getProviderDisplayName(provider: string): string {
+  switch (provider) {
+    case 'anthropic': return 'Anthropic (Claude)';
+    case 'openai': return 'OpenAI (GPT)';
+    case 'openrouter': return 'OpenRouter';
+    case 'local': return 'Local LLM (Ollama/LM Studio)';
+    default: return provider;
+  }
+}
+
 async function runFactsTest(): Promise<void> {
   testRunning.value = true;
   testResult.value = null;
@@ -662,7 +672,7 @@ onMounted(() => {
                   <label for="provider">Provider</label>
                   <select id="provider" v-model="factsConfig.provider" @change="onProviderChange">
                     <option v-for="p in LLM_PROVIDERS" :key="p" :value="p">
-                      {{ p === 'anthropic' ? 'Anthropic' : 'OpenAI' }}
+                      {{ getProviderDisplayName(p) }}
                     </option>
                   </select>
                 </div>
