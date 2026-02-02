@@ -34,6 +34,7 @@ export const LAYOUTS = [
   'facts-columns',
   'facts-overlay',
   'facts-carousel',
+  'basic',
 ] as const;
 export type LayoutType = (typeof LAYOUTS)[number];
 
@@ -46,6 +47,17 @@ export const FONTS = [
   'coda',
   'bellota-text',
   'big-shoulders',
+  // Popular UI fonts
+  'inter',
+  'roboto',
+  'open-sans',
+  'lato',
+  'montserrat',
+  'poppins',
+  'source-sans-3',
+  'nunito',
+  'raleway',
+  'work-sans',
 ] as const;
 export type FontType = (typeof FONTS)[number];
 
@@ -58,6 +70,17 @@ export const FONT_CONFIG: Record<FontType, { displayName: string; googleFont: st
   'coda': { displayName: 'Coda', googleFont: 'Coda:wght@400;800' },
   'bellota-text': { displayName: 'Bellota Text', googleFont: 'Bellota+Text:wght@300;400;700' },
   'big-shoulders': { displayName: 'Big Shoulders Display', googleFont: 'Big+Shoulders+Display:wght@400;500;600;700' },
+  // Popular UI fonts
+  'inter': { displayName: 'Inter', googleFont: 'Inter:wght@300;400;500;600;700' },
+  'roboto': { displayName: 'Roboto', googleFont: 'Roboto:wght@300;400;500;700' },
+  'open-sans': { displayName: 'Open Sans', googleFont: 'Open+Sans:wght@300;400;500;600;700' },
+  'lato': { displayName: 'Lato', googleFont: 'Lato:wght@300;400;700' },
+  'montserrat': { displayName: 'Montserrat', googleFont: 'Montserrat:wght@300;400;500;600;700' },
+  'poppins': { displayName: 'Poppins', googleFont: 'Poppins:wght@300;400;500;600;700' },
+  'source-sans-3': { displayName: 'Source Sans 3', googleFont: 'Source+Sans+3:wght@300;400;500;600;700' },
+  'nunito': { displayName: 'Nunito', googleFont: 'Nunito:wght@300;400;500;600;700' },
+  'raleway': { displayName: 'Raleway', googleFont: 'Raleway:wght@300;400;500;600;700' },
+  'work-sans': { displayName: 'Work Sans', googleFont: 'Work+Sans:wght@300;400;500;600;700' },
 };
 
 // Background options

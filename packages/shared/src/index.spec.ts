@@ -109,7 +109,7 @@ describe('Shared Types', () => {
     });
 
     it('should have correct number of layouts', () => {
-      expect(LAYOUTS).toHaveLength(8);
+      expect(LAYOUTS).toHaveLength(9);
     });
   });
 
@@ -122,10 +122,21 @@ describe('Shared Types', () => {
       expect(FONTS).toContain('coda');
       expect(FONTS).toContain('bellota-text');
       expect(FONTS).toContain('big-shoulders');
+      // Popular UI fonts
+      expect(FONTS).toContain('inter');
+      expect(FONTS).toContain('roboto');
+      expect(FONTS).toContain('open-sans');
+      expect(FONTS).toContain('lato');
+      expect(FONTS).toContain('montserrat');
+      expect(FONTS).toContain('poppins');
+      expect(FONTS).toContain('source-sans-3');
+      expect(FONTS).toContain('nunito');
+      expect(FONTS).toContain('raleway');
+      expect(FONTS).toContain('work-sans');
     });
 
     it('should have correct number of fonts', () => {
-      expect(FONTS).toHaveLength(7);
+      expect(FONTS).toHaveLength(17);
     });
 
     it('should have FONT_CONFIG for each font', () => {
@@ -200,7 +211,7 @@ describe('Facts Types', () => {
     });
 
     it('should have correct total number of layouts', () => {
-      expect(LAYOUTS).toHaveLength(8); // 5 existing + 3 facts
+      expect(LAYOUTS).toHaveLength(9); // 5 existing + 3 facts + 1 basic
     });
 
     it('should export LLM_PROVIDERS constant', () => {
