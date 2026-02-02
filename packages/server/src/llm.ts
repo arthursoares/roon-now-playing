@@ -155,12 +155,71 @@ export class OpenRouterProvider implements LLMProvider {
   }
 }
 
+export class LocalLLMProvider implements LLMProvider {
+  private config: FactsConfig;
+
+  constructor(config: FactsConfig) {
+    this.config = config;
+  }
+
+  async generateFacts(artist: string, album: string, title: string): Promise<string[]> {
+    const prompt = buildPrompt(this.config.prompt, {
+      artist,
+      album,
+      title,
+      factsCount: this.config.factsCount,
+    });
+
+    const baseUrl = this.config.localBaseUrl || 'http://localhost:11434/v1';
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (this.config.apiKey) {
+      headers['Authorization'] = `Bearer ${this.config.apiKey}`;
+    }
+
+    try {
+      const response = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model: this.config.model,
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 1024,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Local LLM API error (${response.status}): ${errorText}`);
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (content) {
+        return parseFactsResponse(content);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('ECONNREFUSED')) {
+        throw new Error(`Cannot connect to local LLM at ${baseUrl}. Is Ollama/LM Studio running?`);
+      }
+      logger.error(`Local LLM API error: ${error}`);
+      throw error;
+    }
+
+    return [];
+  }
+}
+
 export function createLLMProvider(config: FactsConfig): LLMProvider {
   switch (config.provider) {
     case 'openai':
       return new OpenAIProvider(config);
     case 'openrouter':
       return new OpenRouterProvider(config);
+    case 'local':
+      return new LocalLLMProvider(config);
     case 'anthropic':
     default:
       return new AnthropicProvider(config);

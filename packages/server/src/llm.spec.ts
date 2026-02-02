@@ -23,7 +23,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createLLMProvider, AnthropicProvider, OpenAIProvider, OpenRouterProvider } from './llm.js';
+import { createLLMProvider, AnthropicProvider, OpenAIProvider, OpenRouterProvider, LocalLLMProvider } from './llm.js';
 import type { FactsConfig } from '@roon-screen-cover/shared';
 
 // Add mock for global fetch at the top level
@@ -137,6 +137,115 @@ describe('LLM Providers', () => {
         })
       );
       expect(facts).toEqual(['Fact from OpenRouter']);
+    });
+  });
+
+  describe('LocalLLMProvider', () => {
+    beforeEach(() => {
+      mockFetch.mockReset();
+    });
+
+    it('should be created by factory for local provider', () => {
+      const config = { ...baseConfig, provider: 'local' as const, localBaseUrl: 'http://localhost:11434/v1' };
+      const provider = createLLMProvider(config);
+      expect(provider).toBeInstanceOf(LocalLLMProvider);
+    });
+
+    it('should generate facts via Local LLM API', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: '["Local fact"]' } }],
+        }),
+      });
+
+      const config = {
+        ...baseConfig,
+        provider: 'local' as const,
+        model: 'llama3.1',
+        localBaseUrl: 'http://localhost:11434/v1',
+        apiKey: '',
+      };
+      const provider = new LocalLLMProvider(config);
+      const facts = await provider.generateFacts('Artist', 'Album', 'Title');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:11434/v1/chat/completions',
+        expect.objectContaining({
+          method: 'POST',
+        })
+      );
+      expect(facts).toEqual(['Local fact']);
+    });
+
+    it('should work without API key', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: '["Fact"]' } }],
+        }),
+      });
+
+      const config = {
+        ...baseConfig,
+        provider: 'local' as const,
+        model: 'llama3.1',
+        localBaseUrl: 'http://localhost:11434/v1',
+        apiKey: '',
+      };
+      const provider = new LocalLLMProvider(config);
+      await provider.generateFacts('Artist', 'Album', 'Title');
+
+      const callArgs = mockFetch.mock.calls[0][1] as RequestInit;
+      const headers = callArgs.headers as Record<string, string>;
+      expect(headers['Authorization']).toBeUndefined();
+    });
+
+    it('should include Authorization header when API key provided', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: '["Fact"]' } }],
+        }),
+      });
+
+      const config = {
+        ...baseConfig,
+        provider: 'local' as const,
+        model: 'llama3.1',
+        localBaseUrl: 'http://localhost:11434/v1',
+        apiKey: 'local-secret',
+      };
+      const provider = new LocalLLMProvider(config);
+      await provider.generateFacts('Artist', 'Album', 'Title');
+
+      const callArgs = mockFetch.mock.calls[0][1] as RequestInit;
+      const headers = callArgs.headers as Record<string, string>;
+      expect(headers['Authorization']).toBe('Bearer local-secret');
+    });
+
+    it('should use custom base URL', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: '["Fact"]' } }],
+        }),
+      });
+
+      const config = {
+        ...baseConfig,
+        provider: 'local' as const,
+        model: 'mistral',
+        localBaseUrl: 'http://localhost:1234/v1',
+        apiKey: '',
+      };
+      const provider = new LocalLLMProvider(config);
+      await provider.generateFacts('Artist', 'Album', 'Title');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:1234/v1/chat/completions',
+        expect.anything()
+      );
     });
   });
 });
