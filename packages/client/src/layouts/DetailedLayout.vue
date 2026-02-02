@@ -146,7 +146,21 @@ const usesDynamicBackground = computed(() =>
 </template>
 
 <style scoped>
+/*
+ * ============================================
+ * TYPOGRAPHY CONFIGURATION
+ * Adjust these values to tweak font sizes and line heights.
+ * Format: clamp(min, preferred, max)
+ * ============================================
+ */
 .detailed-layout {
+  /* Track metadata */
+  --font-title: clamp(1.5rem, 4vw, 3rem);
+  --line-height-title: 1.2;
+  --font-artist: clamp(1rem, 2.5vw, 1.5rem);
+  --font-album: clamp(0.875rem, 2vw, 1.25rem);
+
+  /* Base styles */
   width: 100%;
   height: 100%;
   display: flex;
@@ -216,9 +230,9 @@ const usesDynamicBackground = computed(() =>
 }
 
 .title {
-  font-size: clamp(1.5rem, 4vw, 3rem);
+  font-size: var(--font-title);
   font-weight: 600;
-  line-height: 1.2;
+  line-height: var(--line-height-title);
   margin-bottom: 0.5rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -228,7 +242,7 @@ const usesDynamicBackground = computed(() =>
 }
 
 .artist {
-  font-size: clamp(1rem, 2.5vw, 1.5rem);
+  font-size: var(--font-artist);
   color: var(--text-secondary, rgba(255, 255, 255, 0.8));
   margin-bottom: 0.25rem;
   overflow: hidden;
@@ -237,7 +251,7 @@ const usesDynamicBackground = computed(() =>
 }
 
 .album {
-  font-size: clamp(0.875rem, 2vw, 1.25rem);
+  font-size: var(--font-album);
   color: var(--text-tertiary, rgba(255, 255, 255, 0.5));
   overflow: hidden;
   text-overflow: ellipsis;

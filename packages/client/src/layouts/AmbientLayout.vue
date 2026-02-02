@@ -256,7 +256,30 @@ const ambientStyle = computed(() => {
 </template>
 
 <style scoped>
+/*
+ * ============================================
+ * TYPOGRAPHY CONFIGURATION
+ * Adjust these values to tweak font sizes and line heights.
+ * Format: clamp(min, preferred, max)
+ * ============================================
+ */
 .ambient-layout {
+  /* Track metadata */
+  --font-title: clamp(28px, 4.5vw, 56px);
+  --line-height-title: 1.15;
+  --font-artist: clamp(20px, 3vw, 40px);
+  --line-height-artist: 1.2;
+  --font-album: clamp(16px, 2vw, 28px);
+  --line-height-album: 1.3;
+
+  /* Secondary text */
+  --font-zone: clamp(14px, 1.5vw, 20px);
+
+  /* No playback state */
+  --font-no-playback: clamp(24px, 3vw, 48px);
+  --font-zone-hint: clamp(16px, 2vw, 28px);
+
+  /* Base styles */
   width: 100%;
   height: 100%;
   color: var(--text-color);
@@ -389,9 +412,9 @@ const ambientStyle = computed(() => {
 
 /* Typography - 10ft UI Scale, Title-first like Detailed */
 .title {
-  font-size: clamp(28px, 4.5vw, 56px);
+  font-size: var(--font-title);
   font-weight: 600;
-  line-height: 1.15;
+  line-height: var(--line-height-title);
   margin: 0;
   margin-bottom: 0.4em;
   color: var(--text-color);
@@ -405,9 +428,9 @@ const ambientStyle = computed(() => {
 }
 
 .artist {
-  font-size: clamp(20px, 3vw, 40px);
+  font-size: var(--font-artist);
   font-weight: 400;
-  line-height: 1.2;
+  line-height: var(--line-height-artist);
   margin: 0;
   margin-bottom: 0.2em;
   color: var(--text-secondary);
@@ -419,9 +442,9 @@ const ambientStyle = computed(() => {
 }
 
 .album {
-  font-size: clamp(16px, 2vw, 28px);
+  font-size: var(--font-album);
   font-weight: 400;
-  line-height: 1.3;
+  line-height: var(--line-height-album);
   margin: 0;
   color: var(--text-tertiary);
 
@@ -442,7 +465,7 @@ const ambientStyle = computed(() => {
   align-items: center;
   gap: 0.75rem;
   color: var(--text-tertiary);
-  font-size: clamp(14px, 1.5vw, 20px);
+  font-size: var(--font-zone);
 }
 
 .zone-name {
@@ -501,13 +524,13 @@ const ambientStyle = computed(() => {
 }
 
 .no-playback-text {
-  font-size: clamp(24px, 3vw, 48px);
+  font-size: var(--font-no-playback);
   color: var(--text-tertiary);
   margin: 0;
 }
 
 .zone-hint {
-  font-size: clamp(16px, 2vw, 28px);
+  font-size: var(--font-zone-hint);
   color: var(--text-tertiary);
   margin: 0;
   margin-top: 0.5em;

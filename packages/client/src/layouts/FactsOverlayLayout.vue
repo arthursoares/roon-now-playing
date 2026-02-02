@@ -110,7 +110,33 @@ watch(
 </template>
 
 <style scoped>
+/*
+ * ============================================
+ * TYPOGRAPHY CONFIGURATION
+ * Adjust these values to tweak font sizes and line heights.
+ * Format: clamp(min, preferred, max)
+ * ============================================
+ */
 .facts-overlay-layout {
+  /* Fact text (main content) */
+  --font-fact: clamp(26px, 4vw, 52px);
+  --line-height-fact: 1.35;
+
+  /* Track metadata */
+  --font-title: clamp(18px, 2.2vw, 28px);
+  --line-height-title: 1.2;
+  --font-artist-album: clamp(14px, 1.6vw, 22px);
+  --line-height-artist-album: 1.3;
+
+  /* Secondary text */
+  --font-loading: clamp(20px, 2.5vw, 32px);
+  --font-error: clamp(16px, 1.5vw, 22px);
+
+  /* No playback state */
+  --font-no-playback: clamp(24px, 3vw, 48px);
+  --font-zone-hint: clamp(16px, 2vw, 28px);
+
+  /* Base styles */
   position: relative;
   width: 100%;
   height: 100%;
@@ -193,9 +219,9 @@ watch(
 }
 
 .fact-text {
-  font-size: clamp(26px, 4vw, 52px);
+  font-size: var(--font-fact);
   font-weight: 400;
-  line-height: 1.35;
+  line-height: var(--line-height-fact);
   margin: 0;
   color: #fff;
   text-shadow: 0 2px 20px rgba(0, 0, 0, 0.5);
@@ -204,13 +230,13 @@ watch(
 }
 
 .loading-hint {
-  font-size: clamp(20px, 2.5vw, 32px);
+  font-size: var(--font-loading);
   color: rgba(255, 255, 255, 0.6);
   margin: 0;
 }
 
 .error-hint {
-  font-size: clamp(16px, 1.5vw, 22px);
+  font-size: var(--font-error);
   color: rgba(255, 255, 255, 0.5);
   margin: 0;
 }
@@ -244,9 +270,9 @@ watch(
 }
 
 .metadata .title {
-  font-size: clamp(18px, 2.2vw, 28px);
+  font-size: var(--font-title);
   font-weight: 600;
-  line-height: 1.2;
+  line-height: var(--line-height-title);
   margin: 0 0 0.2em 0;
   color: #fff;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
@@ -256,9 +282,9 @@ watch(
 }
 
 .metadata .artist-album {
-  font-size: clamp(14px, 1.6vw, 22px);
+  font-size: var(--font-artist-album);
   font-weight: 400;
-  line-height: 1.3;
+  line-height: var(--line-height-artist-album);
   margin: 0;
   color: rgba(255, 255, 255, 0.75);
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
@@ -272,12 +298,12 @@ watch(
 }
 
 .no-playback-text {
-  font-size: clamp(24px, 3vw, 48px);
+  font-size: var(--font-no-playback);
   margin: 0;
 }
 
 .zone-hint {
-  font-size: clamp(16px, 2vw, 28px);
+  font-size: var(--font-zone-hint);
   margin: 0.5em 0 0 0;
   opacity: 0.7;
 }

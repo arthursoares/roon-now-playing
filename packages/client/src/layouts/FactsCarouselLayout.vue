@@ -123,7 +123,34 @@ watch(
 </template>
 
 <style scoped>
+/*
+ * ============================================
+ * TYPOGRAPHY CONFIGURATION
+ * Adjust these values to tweak font sizes and line heights.
+ * Format: clamp(min, preferred, max)
+ * ============================================
+ */
 .facts-carousel-layout {
+  /* Fact text (main content) */
+  --font-fact: clamp(22px, 3.2vw, 42px);
+  --line-height-fact: 1.45;
+
+  /* Track metadata */
+  --font-title: clamp(16px, 2vw, 24px);
+  --line-height-title: 1.2;
+  --font-artist-album: clamp(13px, 1.5vw, 18px);
+  --line-height-artist-album: 1.3;
+
+  /* Secondary text */
+  --font-loading: clamp(16px, 1.8vw, 24px);
+  --font-error: clamp(14px, 1.4vw, 20px);
+  --font-bottom-info: clamp(12px, 1.2vw, 16px);
+
+  /* No playback state */
+  --font-no-playback: clamp(20px, 2.5vw, 36px);
+  --font-zone-hint: clamp(14px, 1.5vw, 22px);
+
+  /* Base styles */
   position: relative;
   width: 100%;
   height: 100%;
@@ -224,22 +251,22 @@ watch(
 }
 
 .fact-text {
-  font-size: clamp(22px, 3.2vw, 42px);
+  font-size: var(--font-fact);
   font-weight: 400;
-  line-height: 1.45;
+  line-height: var(--line-height-fact);
   margin: 0;
   color: #fff;
   animation: fadeIn 0.5s ease-out;
 }
 
 .loading-hint {
-  font-size: clamp(16px, 1.8vw, 24px);
+  font-size: var(--font-loading);
   color: rgba(255, 255, 255, 0.5);
   margin: 0;
 }
 
 .error-hint {
-  font-size: clamp(14px, 1.4vw, 20px);
+  font-size: var(--font-error);
   color: rgba(255, 255, 255, 0.5);
   margin: 0;
 }
@@ -276,9 +303,9 @@ watch(
 }
 
 .metadata .title {
-  font-size: clamp(16px, 2vw, 24px);
+  font-size: var(--font-title);
   font-weight: 600;
-  line-height: 1.2;
+  line-height: var(--line-height-title);
   margin: 0 0 0.2em 0;
   color: #fff;
   overflow: hidden;
@@ -287,9 +314,9 @@ watch(
 }
 
 .metadata .artist-album {
-  font-size: clamp(13px, 1.5vw, 18px);
+  font-size: var(--font-artist-album);
   font-weight: 400;
-  line-height: 1.3;
+  line-height: var(--line-height-artist-album);
   margin: 0;
   color: rgba(255, 255, 255, 0.7);
   overflow: hidden;
@@ -302,12 +329,12 @@ watch(
 }
 
 .no-playback-text {
-  font-size: clamp(20px, 2.5vw, 36px);
+  font-size: var(--font-no-playback);
   margin: 0;
 }
 
 .zone-hint {
-  font-size: clamp(14px, 1.5vw, 22px);
+  font-size: var(--font-zone-hint);
   margin: 0.5em 0 0 0;
   opacity: 0.7;
 }
@@ -319,7 +346,7 @@ watch(
   left: 5%;
   right: 5%;
   color: rgba(255, 255, 255, 0.6);
-  font-size: clamp(12px, 1.2vw, 16px);
+  font-size: var(--font-bottom-info);
 }
 
 .progress-line {

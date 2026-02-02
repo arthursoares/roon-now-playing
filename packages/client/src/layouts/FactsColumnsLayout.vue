@@ -76,14 +76,41 @@ watch(() => props.artworkUrl, () => {
   factsColumnMaxHeight.value = null;
 });
 
+// ResizeObserver for reliable height tracking
+let resizeObserver: ResizeObserver | null = null;
+
+function setupResizeObserver() {
+  if (resizeObserver) {
+    resizeObserver.disconnect();
+  }
+  if (typeof ResizeObserver !== 'undefined' && artworkWrapperRef.value) {
+    resizeObserver = new ResizeObserver(() => {
+      updateLayout();
+    });
+    resizeObserver.observe(artworkWrapperRef.value);
+  }
+}
+
 onMounted(() => {
   // Initial layout with delay to ensure DOM is ready
   setTimeout(updateLayout, 100);
+  // Additional delayed update for slower renders
+  setTimeout(updateLayout, 300);
+
   window.addEventListener('resize', updateLayout);
+
+  // Set up ResizeObserver after next tick to ensure ref is available
+  nextTick(() => {
+    setupResizeObserver();
+  });
 });
 
 onUnmounted(() => {
   window.removeEventListener('resize', updateLayout);
+  if (resizeObserver) {
+    resizeObserver.disconnect();
+    resizeObserver = null;
+  }
 });
 
 // Background types handled by DynamicBackground component
@@ -329,7 +356,34 @@ watch(
 </template>
 
 <style scoped>
+/*
+ * ============================================
+ * TYPOGRAPHY CONFIGURATION
+ * Adjust these values to tweak font sizes and line heights.
+ * Format: clamp(min, preferred, max)
+ * ============================================
+ */
 .facts-columns-layout {
+  /* Fact text (main content) */
+  --font-fact: clamp(22px, 3vw, 72px);
+  --line-height-fact: 1.2;
+
+  /* Track metadata */
+  --font-title: clamp(18px, 2.2vw, 52px);
+  --line-height-title: 1.1;
+  --font-artist-album: clamp(14px, 1.6vw, 38px);
+  --line-height-artist-album: 1.15;
+
+  /* Secondary text */
+  --font-zone: clamp(14px, 1.5vw, 36px);
+  --font-loading: clamp(18px, 2vw, 48px);
+  --font-error: clamp(16px, 1.8vw, 42px);
+
+  /* No playback state */
+  --font-no-playback: clamp(24px, 3vw, 72px);
+  --font-zone-hint: clamp(16px, 2vw, 48px);
+
+  /* Base styles */
   width: 100%;
   height: 100%;
   color: var(--text-color, #fff);
@@ -357,7 +411,7 @@ watch(
 @media (min-width: 900px) {
   .content {
     flex-direction: row;
-    align-items: center; /* Center vertically - artwork defines its own height */
+    align-items: center; /* Center both columns vertically */
     gap: 5%;
   }
 }
@@ -375,6 +429,7 @@ watch(
   .artwork-column {
     width: 55%;
     max-width: none;
+    max-height: 100%; /* Don't exceed container height */
     flex: 0 0 55%;
   }
 }
@@ -382,6 +437,8 @@ watch(
 .artwork-wrapper {
   position: relative;
   width: 100%;
+  max-width: 100%; /* Don't exceed column width */
+  max-height: 100%; /* Don't exceed available height */
   aspect-ratio: 1;
   border-radius: 8px;
   overflow: hidden;
@@ -447,7 +504,7 @@ watch(
 @media (min-width: 900px) {
   .facts-column {
     flex: 0 0 40%;
-    align-self: flex-start; /* Don't stretch, use maxHeight from JS */
+    /* Height is set by JS to match artwork height */
   }
 }
 
@@ -464,9 +521,9 @@ watch(
 }
 
 .fact-text {
-  font-size: clamp(22px, 3vw, 42px);
+  font-size: var(--font-fact);
   font-weight: 400;
-  line-height: 1.35;
+  line-height: var(--line-height-fact);
   margin: 0;
   color: var(--text-color);
   animation: fadeIn 0.5s ease-out;
@@ -500,13 +557,13 @@ watch(
 }
 
 .loading-hint {
-  font-size: clamp(18px, 2vw, 28px);
+  font-size: var(--font-loading);
   color: var(--text-tertiary);
   margin: 0;
 }
 
 .error-message {
-  font-size: clamp(16px, 1.8vw, 24px);
+  font-size: var(--font-error);
   color: var(--text-tertiary);
   margin: 0;
 }
@@ -541,9 +598,9 @@ watch(
 }
 
 .metadata .title {
-  font-size: clamp(18px, 2.2vw, 28px);
+  font-size: var(--font-title);
   font-weight: 600;
-  line-height: 1.2;
+  line-height: var(--line-height-title);
   margin: 0 0 0.2em 0;
   color: var(--text-color);
   overflow: hidden;
@@ -552,9 +609,9 @@ watch(
 }
 
 .metadata .artist-album {
-  font-size: clamp(14px, 1.6vw, 22px);
+  font-size: var(--font-artist-album);
   font-weight: 400;
-  line-height: 1.3;
+  line-height: var(--line-height-artist-album);
   margin: 0;
   color: var(--text-secondary);
   overflow: hidden;
@@ -576,7 +633,7 @@ watch(
   align-items: center;
   gap: 0.75rem;
   color: var(--text-tertiary);
-  font-size: clamp(14px, 1.5vw, 20px);
+  font-size: var(--font-zone);
 }
 
 .zone-name {
@@ -630,13 +687,13 @@ watch(
 }
 
 .no-playback-text {
-  font-size: clamp(24px, 3vw, 48px);
+  font-size: var(--font-no-playback);
   color: var(--text-tertiary);
   margin: 0;
 }
 
 .zone-hint {
-  font-size: clamp(16px, 2vw, 28px);
+  font-size: var(--font-zone-hint);
   color: var(--text-tertiary);
   margin: 0.5em 0 0 0;
   opacity: 0.7;
