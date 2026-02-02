@@ -109,7 +109,7 @@ describe('Shared Types', () => {
     });
 
     it('should have correct number of layouts', () => {
-      expect(LAYOUTS).toHaveLength(8);
+      expect(LAYOUTS).toHaveLength(9);
     });
   });
 
@@ -200,7 +200,7 @@ describe('Facts Types', () => {
     });
 
     it('should have correct total number of layouts', () => {
-      expect(LAYOUTS).toHaveLength(8); // 5 existing + 3 facts
+      expect(LAYOUTS).toHaveLength(9); // 5 existing + 3 facts + 1 basic
     });
 
     it('should export LLM_PROVIDERS constant', () => {

@@ -34,6 +34,7 @@ export const LAYOUTS = [
   'facts-columns',
   'facts-overlay',
   'facts-carousel',
+  'basic',
 ] as const;
 export type LayoutType = (typeof LAYOUTS)[number];
 
