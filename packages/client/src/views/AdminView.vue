@@ -779,7 +779,7 @@ onMounted(() => {
               <div v-if="factsConfig.provider === 'local'" class="form-field full-width">
                 <label for="localBaseUrl">
                   Base URL
-                  <span class="label-hint">Default: Ollama on localhost:11434</span>
+                  <span class="label-hint">Include /v1 for OpenAI-compatible endpoint</span>
                 </label>
                 <input
                   id="localBaseUrl"

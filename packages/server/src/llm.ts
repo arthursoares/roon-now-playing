@@ -171,6 +171,7 @@ export class LocalLLMProvider implements LLMProvider {
     });
 
     const baseUrl = this.config.localBaseUrl || 'http://localhost:11434/v1';
+    const url = `${baseUrl}/chat/completions`;
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -179,26 +180,40 @@ export class LocalLLMProvider implements LLMProvider {
       headers['Authorization'] = `Bearer ${this.config.apiKey}`;
     }
 
+    const requestBody = {
+      model: this.config.model,
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 1024,
+    };
+
+    logger.info(`[LocalLLM] Request URL: ${url}`);
+    logger.info(`[LocalLLM] Model: ${this.config.model}`);
+    logger.debug(`[LocalLLM] Request body: ${JSON.stringify(requestBody, null, 2)}`);
+
     try {
-      const response = await fetch(`${baseUrl}/chat/completions`, {
+      const response = await fetch(url, {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          model: this.config.model,
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: 1024,
-        }),
+        body: JSON.stringify(requestBody),
       });
+
+      logger.info(`[LocalLLM] Response status: ${response.status}`);
 
       if (!response.ok) {
         const errorText = await response.text();
+        logger.error(`[LocalLLM] Error response: ${errorText}`);
         throw new Error(`Local LLM API error (${response.status}): ${errorText}`);
       }
 
       const data = await response.json();
+      logger.debug(`[LocalLLM] Response data: ${JSON.stringify(data, null, 2)}`);
+
       const content = data.choices?.[0]?.message?.content;
       if (content) {
+        logger.info(`[LocalLLM] Got response content (${content.length} chars)`);
         return parseFactsResponse(content);
+      } else {
+        logger.warn(`[LocalLLM] No content in response`);
       }
     } catch (error) {
       if (error instanceof Error && error.message.includes('ECONNREFUSED')) {
