@@ -168,6 +168,22 @@ const availableModels = computed(() => {
   return LLM_MODELS[factsConfig.value.provider] || [];
 });
 
+const isCustomModel = computed(() =>
+  factsConfig.value.provider === 'openrouter' &&
+  !LLM_MODELS.openrouter.includes(factsConfig.value.model as any) &&
+  factsConfig.value.model !== 'custom' &&
+  factsConfig.value.model !== ''
+);
+
+function onOpenRouterModelChange(event: Event): void {
+  const value = (event.target as HTMLSelectElement).value;
+  if (value === 'custom') {
+    factsConfig.value.model = '';
+  } else {
+    factsConfig.value.model = value;
+  }
+}
+
 async function loadFactsConfig(): Promise<void> {
   try {
     factsConfigLoading.value = true;
@@ -678,12 +694,50 @@ onMounted(() => {
                 </div>
 
                 <div class="form-field">
-                  <label for="model">Model</label>
-                  <select id="model" v-model="factsConfig.model">
-                    <option v-for="m in availableModels" :key="m" :value="m">
-                      {{ m }}
-                    </option>
-                  </select>
+                  <label for="model">
+                    {{ factsConfig.provider === 'local' ? 'Model Name' : 'Model' }}
+                  </label>
+
+                  <!-- Local LLM: Free-form text input -->
+                  <template v-if="factsConfig.provider === 'local'">
+                    <input
+                      id="model"
+                      type="text"
+                      v-model="factsConfig.model"
+                      placeholder="e.g., llama3.1, mistral, codellama"
+                    />
+                  </template>
+
+                  <!-- OpenRouter: Dropdown with custom option -->
+                  <template v-else-if="factsConfig.provider === 'openrouter'">
+                    <select
+                      id="model"
+                      :value="isCustomModel ? 'custom' : factsConfig.model"
+                      @change="onOpenRouterModelChange"
+                    >
+                      <option v-for="m in availableModels" :key="m" :value="m">
+                        {{ m === 'custom' ? 'Custom...' : m }}
+                      </option>
+                    </select>
+
+                    <!-- Custom model input -->
+                    <input
+                      v-if="factsConfig.model === 'custom' || isCustomModel || factsConfig.model === ''"
+                      type="text"
+                      v-model="factsConfig.model"
+                      placeholder="e.g., meta-llama/llama-3.1-70b-instruct"
+                      class="custom-model-input"
+                    />
+                  </template>
+
+                  <!-- Anthropic/OpenAI: Standard dropdown -->
+                  <template v-else>
+                    <select id="model" v-model="factsConfig.model">
+                      <option v-for="m in availableModels" :key="m" :value="m">
+                        {{ m }}
+                      </option>
+                    </select>
+                  </template>
                 </div>
               </div>
 
@@ -2331,5 +2385,9 @@ onMounted(() => {
 .btn-icon.btn-delete:hover {
   background: rgba(239, 68, 68, 0.1);
   color: var(--accent-error);
+}
+
+.custom-model-input {
+  margin-top: 8px;
 }
 </style>
