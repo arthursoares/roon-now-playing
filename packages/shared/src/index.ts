@@ -101,13 +101,24 @@ export const BACKGROUND_CONFIG: Record<BackgroundType, { displayName: string; ca
 };
 
 // LLM Provider options
-export const LLM_PROVIDERS = ['anthropic', 'openai'] as const;
+export const LLM_PROVIDERS = ['anthropic', 'openai', 'openrouter', 'local'] as const;
 export type LLMProvider = (typeof LLM_PROVIDERS)[number];
 
 // Model options per provider
 export const LLM_MODELS = {
   anthropic: ['claude-sonnet-4-20250514', 'claude-haiku-4-20250514'] as const,
   openai: ['gpt-4o', 'gpt-4o-mini'] as const,
+  openrouter: [
+    'meta-llama/llama-3.1-70b-instruct',
+    'meta-llama/llama-3.1-8b-instruct',
+    'mistralai/mistral-large',
+    'mistralai/mistral-small',
+    'google/gemini-pro-1.5',
+    'google/gemini-flash-1.5',
+    'deepseek/deepseek-chat',
+    'custom',
+  ] as const,
+  local: [] as const,
 } as const;
 
 // Facts configuration (stored on server)
@@ -118,6 +129,7 @@ export interface FactsConfig {
   factsCount: number;
   rotationInterval: number;
   prompt: string;
+  localBaseUrl?: string; // Only used for 'local' provider
 }
 
 // Facts API types

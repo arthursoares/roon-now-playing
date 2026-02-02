@@ -6,6 +6,7 @@ import { logger } from './logger.js';
 
 const DATA_DIR = process.env.DATA_DIR || './config';
 const DEFAULT_CONFIG_PATH = path.join(DATA_DIR, 'facts-config.json');
+const DEFAULT_LOCAL_BASE_URL = 'http://localhost:11434/v1';
 
 export const DEFAULT_CONFIG: FactsConfig = {
   provider: 'anthropic' as LLMProvider,
@@ -14,6 +15,7 @@ export const DEFAULT_CONFIG: FactsConfig = {
   factsCount: 5,
   rotationInterval: 25,
   prompt: DEFAULT_FACTS_PROMPT,
+  localBaseUrl: DEFAULT_LOCAL_BASE_URL,
 };
 
 export class FactsConfigStore {
@@ -68,15 +70,31 @@ export class FactsConfigStore {
     }
   }
 
-  get(): FactsConfig {
-    // Environment variables take precedence
-    const envKey = this.config.provider === 'anthropic'
-      ? process.env.ANTHROPIC_API_KEY
-      : process.env.OPENAI_API_KEY;
+  private getEffectiveApiKey(): string {
+    switch (this.config.provider) {
+      case 'anthropic':
+        return process.env.ANTHROPIC_API_KEY || this.config.apiKey;
+      case 'openai':
+        return process.env.OPENAI_API_KEY || this.config.apiKey;
+      case 'openrouter':
+        return process.env.OPENROUTER_API_KEY || this.config.apiKey;
+      case 'local':
+        // Local provider doesn't require an API key
+        return this.config.apiKey;
+      default:
+        return this.config.apiKey;
+    }
+  }
 
+  private getEffectiveLocalBaseUrl(): string {
+    return process.env.LOCAL_LLM_URL || this.config.localBaseUrl || DEFAULT_LOCAL_BASE_URL;
+  }
+
+  get(): FactsConfig {
     return {
       ...this.config,
-      apiKey: envKey || this.config.apiKey,
+      apiKey: this.getEffectiveApiKey(),
+      localBaseUrl: this.getEffectiveLocalBaseUrl(),
     };
   }
 

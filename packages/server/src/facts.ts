@@ -106,7 +106,8 @@ export function createFactsRouter(): Router {
 
     const config = configStore.get();
 
-    if (!config.apiKey) {
+    // API key is required for cloud providers, but optional for local LLM
+    if (!config.apiKey && config.provider !== 'local') {
       res.status(400).json({ error: 'No API key configured' });
       return;
     }

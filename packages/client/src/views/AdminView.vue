@@ -34,6 +34,7 @@ const factsConfig = ref<FactsConfig>({
   factsCount: 5,
   rotationInterval: 25,
   prompt: DEFAULT_FACTS_PROMPT,
+  localBaseUrl: 'http://localhost:11434/v1',
 });
 const factsConfigLoading = ref(true);
 const factsConfigSaving = ref(false);
@@ -168,6 +169,22 @@ const availableModels = computed(() => {
   return LLM_MODELS[factsConfig.value.provider] || [];
 });
 
+const isCustomModel = computed(() =>
+  factsConfig.value.provider === 'openrouter' &&
+  !LLM_MODELS.openrouter.includes(factsConfig.value.model as any) &&
+  factsConfig.value.model !== 'custom' &&
+  factsConfig.value.model !== ''
+);
+
+function onOpenRouterModelChange(event: Event): void {
+  const value = (event.target as HTMLSelectElement).value;
+  if (value === 'custom') {
+    factsConfig.value.model = '';
+  } else {
+    factsConfig.value.model = value;
+  }
+}
+
 async function loadFactsConfig(): Promise<void> {
   try {
     factsConfigLoading.value = true;
@@ -219,13 +236,26 @@ function resetFactsConfig(): void {
     factsCount: 5,
     rotationInterval: 25,
     prompt: DEFAULT_FACTS_PROMPT,
+    localBaseUrl: 'http://localhost:11434/v1',
   };
 }
 
 function onProviderChange(): void {
   const models = LLM_MODELS[factsConfig.value.provider];
   if (models && models.length > 0) {
-    factsConfig.value.model = models[0];
+    factsConfig.value.model = models[0] as string;
+  } else {
+    factsConfig.value.model = '';
+  }
+}
+
+function getProviderDisplayName(provider: string): string {
+  switch (provider) {
+    case 'anthropic': return 'Anthropic (Claude)';
+    case 'openai': return 'OpenAI (GPT)';
+    case 'openrouter': return 'OpenRouter';
+    case 'local': return 'Local LLM (Ollama/LM Studio)';
+    default: return provider;
   }
 }
 
@@ -662,25 +692,67 @@ onMounted(() => {
                   <label for="provider">Provider</label>
                   <select id="provider" v-model="factsConfig.provider" @change="onProviderChange">
                     <option v-for="p in LLM_PROVIDERS" :key="p" :value="p">
-                      {{ p === 'anthropic' ? 'Anthropic' : 'OpenAI' }}
+                      {{ getProviderDisplayName(p) }}
                     </option>
                   </select>
                 </div>
 
                 <div class="form-field">
-                  <label for="model">Model</label>
-                  <select id="model" v-model="factsConfig.model">
-                    <option v-for="m in availableModels" :key="m" :value="m">
-                      {{ m }}
-                    </option>
-                  </select>
+                  <label for="model">
+                    {{ factsConfig.provider === 'local' ? 'Model Name' : 'Model' }}
+                  </label>
+
+                  <!-- Local LLM: Free-form text input -->
+                  <template v-if="factsConfig.provider === 'local'">
+                    <input
+                      id="model"
+                      type="text"
+                      v-model="factsConfig.model"
+                      placeholder="e.g., llama3.1, mistral, codellama"
+                    />
+                  </template>
+
+                  <!-- OpenRouter: Dropdown with custom option -->
+                  <template v-else-if="factsConfig.provider === 'openrouter'">
+                    <select
+                      id="model"
+                      :value="isCustomModel ? 'custom' : factsConfig.model"
+                      @change="onOpenRouterModelChange"
+                    >
+                      <option v-for="m in availableModels" :key="m" :value="m">
+                        {{ m === 'custom' ? 'Custom...' : m }}
+                      </option>
+                    </select>
+
+                    <!-- Custom model input -->
+                    <input
+                      v-if="factsConfig.model === 'custom' || isCustomModel || factsConfig.model === ''"
+                      type="text"
+                      v-model="factsConfig.model"
+                      placeholder="e.g., meta-llama/llama-3.1-70b-instruct"
+                      class="custom-model-input"
+                    />
+                  </template>
+
+                  <!-- Anthropic/OpenAI: Standard dropdown -->
+                  <template v-else>
+                    <select id="model" v-model="factsConfig.model">
+                      <option v-for="m in availableModels" :key="m" :value="m">
+                        {{ m }}
+                      </option>
+                    </select>
+                  </template>
                 </div>
               </div>
 
               <div class="form-field full-width">
                 <label for="apiKey">
                   API Key
-                  <span class="label-hint">Leave empty to use environment variable</span>
+                  <span class="label-hint">
+                    {{ factsConfig.provider === 'local'
+                      ? 'Optional - only if your local server requires auth'
+                      : 'Leave empty to use environment variable' }}
+                  </span>
                 </label>
                 <div class="input-with-action">
                   <input
@@ -701,6 +773,21 @@ onMounted(() => {
                     </svg>
                   </button>
                 </div>
+              </div>
+
+              <!-- Local LLM Base URL -->
+              <div v-if="factsConfig.provider === 'local'" class="form-field full-width">
+                <label for="localBaseUrl">
+                  Base URL
+                  <span class="label-hint">Include /v1 for OpenAI-compatible endpoint</span>
+                </label>
+                <input
+                  id="localBaseUrl"
+                  type="text"
+                  v-model="factsConfig.localBaseUrl"
+                  placeholder="http://localhost:11434/v1"
+                  class="mono-input"
+                />
               </div>
             </div>
 
@@ -2321,5 +2408,9 @@ onMounted(() => {
 .btn-icon.btn-delete:hover {
   background: rgba(239, 68, 68, 0.1);
   color: var(--accent-error);
+}
+
+.custom-model-input {
+  margin-top: 8px;
 }
 </style>
