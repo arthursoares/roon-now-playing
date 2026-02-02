@@ -10,7 +10,7 @@ A Roon extension that displays real-time album artwork and track metadata on any
 
 - Real-time album artwork and track metadata display
 - Multiple simultaneous clients viewing different zones
-- Eight display layouts including AI-powered Facts layouts
+- Nine display layouts including AI-powered Facts layouts
 - Fourteen background options with dynamic color extraction
 - Seven customizable font families
 - AI-generated facts about currently playing music (Anthropic/OpenAI/OpenRouter/Local LLM)
@@ -73,7 +73,7 @@ pnpm dev
 | Parameter | Values | Description |
 |-----------|--------|-------------|
 | `zone` | Zone name or ID | Auto-select zone (e.g., `?zone=Living%20Room`) |
-| `layout` | `detailed`, `minimal`, `fullscreen`, `ambient`, `cover`, `facts-columns`, `facts-overlay`, `facts-carousel` | Display layout |
+| `layout` | `detailed`, `minimal`, `fullscreen`, `ambient`, `cover`, `facts-columns`, `facts-overlay`, `facts-carousel`, `basic` | Display layout |
 | `background` | See [Backgrounds](#backgrounds) section | Background style |
 | `font` | `system`, `patua-one`, `comfortaa`, `noto-sans-display`, `coda`, `bellota-text`, `big-shoulders` | Font family |
 
@@ -96,8 +96,11 @@ Example: `http://localhost:3000/?zone=Office&layout=detailed&background=gradient
 | `facts-columns` | Two-column layout with artwork and AI-generated facts about the music. |
 | `facts-overlay` | Full artwork background with facts overlaid at the bottom. |
 | `facts-carousel` | Blurred artwork background with facts displayed in a centered card. |
+| `basic` | Legacy-compatible layout for older browsers (iOS 12+). Artwork with title, artist, album, and progress bar. Auto-adapts to portrait/landscape. |
 
 **Note:** Facts layouts require an LLM provider configured in the Admin panel. Supported providers: Anthropic, OpenAI, OpenRouter, or Local LLM (Ollama/LM Studio).
+
+**Note:** The `basic` layout is designed for older browsers like iOS 12 Safari. It avoids modern CSS features (gap, aspect-ratio, backdrop-filter) for maximum compatibility on legacy devices used as dedicated displays.
 
 ### Screenshots
 
@@ -454,7 +457,8 @@ roon-now-playing/
 │           │   ├── CoverLayout.vue
 │           │   ├── FactsColumnsLayout.vue
 │           │   ├── FactsOverlayLayout.vue
-│           │   └── FactsCarouselLayout.vue
+│           │   ├── FactsCarouselLayout.vue
+│           │   └── BasicLayout.vue
 │           └── composables/
 │               ├── useWebSocket.ts
 │               ├── usePreferences.ts
