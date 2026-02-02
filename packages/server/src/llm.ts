@@ -105,10 +105,62 @@ export class OpenAIProvider implements LLMProvider {
   }
 }
 
+export class OpenRouterProvider implements LLMProvider {
+  private config: FactsConfig;
+
+  constructor(config: FactsConfig) {
+    this.config = config;
+  }
+
+  async generateFacts(artist: string, album: string, title: string): Promise<string[]> {
+    const prompt = buildPrompt(this.config.prompt, {
+      artist,
+      album,
+      title,
+      factsCount: this.config.factsCount,
+    });
+
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.config.apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://github.com/arthursoares/roon-now-playing',
+          'X-Title': 'Roon Now Playing',
+        },
+        body: JSON.stringify({
+          model: this.config.model,
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 1024,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`OpenRouter API error (${response.status}): ${errorText}`);
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (content) {
+        return parseFactsResponse(content);
+      }
+    } catch (error) {
+      logger.error(`OpenRouter API error: ${error}`);
+      throw error;
+    }
+
+    return [];
+  }
+}
+
 export function createLLMProvider(config: FactsConfig): LLMProvider {
   switch (config.provider) {
     case 'openai':
       return new OpenAIProvider(config);
+    case 'openrouter':
+      return new OpenRouterProvider(config);
     case 'anthropic':
     default:
       return new AnthropicProvider(config);
