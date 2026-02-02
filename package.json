@@ -15,10 +15,14 @@
     "start": "pnpm --filter @roon-screen-cover/server start",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:screenshots": "playwright test --grep 'Screenshot' --project=TV-1080p --project=TV-4K --project=iPad-landscape --project=Monitor-16x10-WQXGA",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint packages --ext .ts,.vue"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.1",
     "@types/node": "^25.0.10",
     "jsdom": "^27.4.0",
     "typescript": "~5.9.3",
