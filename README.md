@@ -12,7 +12,7 @@ A Roon extension that displays real-time album artwork and track metadata on any
 - Multiple simultaneous clients viewing different zones
 - Nine display layouts including AI-powered Facts layouts
 - Fourteen background options with dynamic color extraction
-- Seven customizable font families
+- Seventeen customizable font families
 - AI-generated facts about currently playing music (Anthropic/OpenAI/OpenRouter/Local LLM)
 - Admin panel for managing connected clients and AI configuration
 - **External Sources API** for non-Roon music sources (see [External API Documentation](docs/external-api.md))
@@ -75,7 +75,7 @@ pnpm dev
 | `zone` | Zone name or ID | Auto-select zone (e.g., `?zone=Living%20Room`) |
 | `layout` | `detailed`, `minimal`, `fullscreen`, `ambient`, `cover`, `facts-columns`, `facts-overlay`, `facts-carousel`, `basic` | Display layout |
 | `background` | See [Backgrounds](#backgrounds) section | Background style |
-| `font` | `system`, `patua-one`, `comfortaa`, `noto-sans-display`, `coda`, `bellota-text`, `big-shoulders` | Font family |
+| `font` | See [Fonts](#fonts) section | Font family |
 
 Example: `http://localhost:3000/?zone=Office&layout=detailed&background=gradient-mesh&font=comfortaa`
 
@@ -164,6 +164,16 @@ Customize the display font using the `?font=` URL parameter:
 | `coda` | Coda - Friendly sans-serif |
 | `bellota-text` | Bellota Text - Soft humanist sans |
 | `big-shoulders` | Big Shoulders Display - Condensed display |
+| `inter` | Inter - Modern UI font, highly legible |
+| `roboto` | Roboto - Google's signature font |
+| `open-sans` | Open Sans - Friendly and neutral |
+| `lato` | Lato - Warm and stable |
+| `montserrat` | Montserrat - Geometric elegance |
+| `poppins` | Poppins - Clean geometric sans |
+| `source-sans-3` | Source Sans 3 - Adobe's open source font |
+| `nunito` | Nunito - Rounded and balanced |
+| `raleway` | Raleway - Elegant thin weight |
+| `work-sans` | Work Sans - Optimized for screens |
 
 ## Admin Panel
 
