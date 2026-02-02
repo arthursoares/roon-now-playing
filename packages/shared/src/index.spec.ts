@@ -206,7 +206,6 @@ describe('Facts Types', () => {
     it('should export LLM_PROVIDERS constant', () => {
       expect(LLM_PROVIDERS).toContain('anthropic');
       expect(LLM_PROVIDERS).toContain('openai');
-      expect(LLM_PROVIDERS).toHaveLength(2);
     });
 
     it('should export LLM_MODELS for each provider', () => {
@@ -214,6 +213,29 @@ describe('Facts Types', () => {
       expect(LLM_MODELS.anthropic).toContain('claude-haiku-4-20250514');
       expect(LLM_MODELS.openai).toContain('gpt-4o');
       expect(LLM_MODELS.openai).toContain('gpt-4o-mini');
+    });
+  });
+
+  describe('LLM_PROVIDERS and LLM_MODELS', () => {
+    it('should include openrouter in LLM_PROVIDERS', () => {
+      expect(LLM_PROVIDERS).toContain('openrouter');
+    });
+
+    it('should include local in LLM_PROVIDERS', () => {
+      expect(LLM_PROVIDERS).toContain('local');
+    });
+
+    it('should have correct number of LLM_PROVIDERS', () => {
+      expect(LLM_PROVIDERS).toHaveLength(4);
+    });
+
+    it('should have openrouter models including custom option', () => {
+      expect(LLM_MODELS.openrouter).toContain('meta-llama/llama-3.1-70b-instruct');
+      expect(LLM_MODELS.openrouter).toContain('custom');
+    });
+
+    it('should have empty local models array', () => {
+      expect(LLM_MODELS.local).toEqual([]);
     });
   });
 
