@@ -16,8 +16,8 @@ function buildPrompt(template: string, vars: Record<string, string | number>): s
 }
 
 function parseFactsResponse(text: string): string[] {
+  // Strategy 1: Try to parse as a single JSON array
   try {
-    // Try to extract JSON array from response
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
@@ -25,9 +25,34 @@ function parseFactsResponse(text: string): string[] {
         return parsed;
       }
     }
-  } catch (error) {
-    logger.error(`Failed to parse LLM response: ${error}`);
+  } catch {
+    // Single array parse failed, try alternative strategies
   }
+
+  // Strategy 2: Handle multiple JSON arrays on separate lines (some models do this)
+  // e.g., ["Fact 1"]\n["Fact 2"]\n["Fact 3"]
+  try {
+    const lineArrays = text.match(/\["[^"]*"\]/g);
+    if (lineArrays && lineArrays.length > 0) {
+      const facts: string[] = [];
+      for (const arr of lineArrays) {
+        const parsed = JSON.parse(arr);
+        if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'string') {
+          facts.push(parsed[0]);
+        }
+      }
+      if (facts.length > 0) {
+        logger.info(`[ParseFacts] Parsed ${facts.length} facts from multi-array format`);
+        return facts;
+      }
+    }
+  } catch {
+    // Multi-array parse failed
+  }
+
+  // Log failure for debugging
+  const preview = text.length > 500 ? text.substring(0, 500) + '...' : text;
+  logger.warn(`[ParseFacts] Could not parse facts from response. Preview: ${preview}`);
   return [];
 }
 
@@ -206,14 +231,30 @@ export class LocalLLMProvider implements LLMProvider {
       }
 
       const data = await response.json();
-      logger.debug(`[LocalLLM] Response data: ${JSON.stringify(data, null, 2)}`);
 
-      const content = data.choices?.[0]?.message?.content;
+      // Try content first, then reasoning (for "thinking" models like lfm2.5-thinking)
+      let content = data.choices?.[0]?.message?.content;
+
+      // Some thinking models put output in "reasoning" field instead of "content"
+      if (!content && data.choices?.[0]?.message?.reasoning) {
+        content = data.choices[0].message.reasoning;
+        logger.info(`[LocalLLM] Using 'reasoning' field from thinking model`);
+      }
+
       if (content) {
+        // Strip markdown code blocks if present (```json ... ```)
+        const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (codeBlockMatch) {
+          content = codeBlockMatch[1].trim();
+          logger.info(`[LocalLLM] Extracted content from markdown code block`);
+        }
+
         logger.info(`[LocalLLM] Got response content (${content.length} chars)`);
         return parseFactsResponse(content);
       } else {
-        logger.warn(`[LocalLLM] No content in response`);
+        // Log raw response to help debug why content is missing
+        const rawPreview = JSON.stringify(data, null, 2);
+        logger.warn(`[LocalLLM] No content in response. Raw response:\n${rawPreview}`);
       }
     } catch (error) {
       if (error instanceof Error && error.message.includes('ECONNREFUSED')) {

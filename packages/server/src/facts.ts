@@ -120,6 +120,17 @@ export function createFactsRouter(): Router {
       const durationMs = Date.now() - startTime;
 
       const response: FactsTestResponse = { facts, durationMs };
+
+      // Add warning if no facts were parsed (likely model output format issue)
+      if (facts.length === 0) {
+        logger.warn(`Facts test returned 0 facts - model may not be returning valid JSON array. Check server logs for details.`);
+        res.json({
+          ...response,
+          warning: 'Model returned content but no facts could be parsed. The model may not be following the JSON array format. Check server logs for raw response.'
+        });
+        return;
+      }
+
       res.json(response);
     } catch (error) {
       logger.error(`Facts test failed: ${error}`);

@@ -181,7 +181,10 @@ When possible, include attribution (e.g., "In a 1985 interview..." or "According
 
 Keep each fact concise (2-3 sentences max). Prioritize surprising or educational information over common knowledge.
 
-Return ONLY a JSON array of strings, no other text.`;
+IMPORTANT: Return ONLY a valid JSON array of strings with no additional text, markdown, or explanation.
+
+Example format:
+["Fact one goes here.", "Fact two goes here.", "Fact three goes here."]`;
 
 // WebSocket message types
 export interface ClientSubscribeMessage {
