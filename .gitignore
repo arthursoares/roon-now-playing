@@ -44,3 +44,6 @@ e2e/screenshots/
 
 # Roon
 config.json
+
+# Claude
+.claude/settings.local.json

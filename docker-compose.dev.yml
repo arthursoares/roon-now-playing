@@ -20,6 +20,8 @@ services:
       - PORT=3000
       - HOST=0.0.0.0
       - LOG_LEVEL=debug
+      # Set to 'false' to disable Roon and run in external-sources-only mode
+      # - ROON_ENABLED=false
     # Use host network for Roon discovery (alternative to port mapping)
     # network_mode: host
 

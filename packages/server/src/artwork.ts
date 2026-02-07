@@ -7,7 +7,7 @@ import { logger } from './logger.js';
 
 const CACHE_DIR = process.env.ARTWORK_CACHE_DIR || './cache';
 
-export function createArtworkRouter(roonClient: RoonClient): Router {
+export function createArtworkRouter(roonClient: RoonClient | null): Router {
   const router = Router();
 
   // Ensure cache directory exists
@@ -37,6 +37,12 @@ export function createArtworkRouter(roonClient: RoonClient): Router {
         return;
       } catch {
         // Not in cache, fetch from Roon
+      }
+
+      // When Roon is disabled, we can only serve cached artwork
+      if (!roonClient) {
+        res.status(404).send('Artwork not found');
+        return;
       }
 
       // Fetch from Roon

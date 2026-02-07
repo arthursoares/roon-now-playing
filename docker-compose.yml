@@ -17,6 +17,8 @@ services:
       - PORT=3000
       - HOST=0.0.0.0
       - LOG_LEVEL=info
+      # Set to 'false' to disable Roon and run in external-sources-only mode
+      # - ROON_ENABLED=false
       # Optional: API keys for AI-powered facts layouts
       # - ANTHROPIC_API_KEY=sk-ant-...
       # - OPENAI_API_KEY=sk-...

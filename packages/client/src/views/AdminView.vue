@@ -81,14 +81,15 @@ const apiKeyCopied = ref(false);
 
 const connectionStatus = computed(() => {
   if (!wsState.value.connected) return 'connecting';
-  // Only show "waiting for Roon" if no zones available (neither Roon nor external)
-  if (!wsState.value.roonConnected && wsState.value.zones.length === 0) return 'waiting-roon';
+  // Only show "waiting for Roon" if Roon is enabled but not connected and no zones available
+  if (wsState.value.roonEnabled && !wsState.value.roonConnected && wsState.value.zones.length === 0) return 'waiting-roon';
   return 'connected';
 });
 
 const connectionLabel = computed(() => {
   if (connectionStatus.value === 'connecting') return 'Connecting';
   if (connectionStatus.value === 'waiting-roon') return 'Waiting for Roon';
+  if (!wsState.value.roonEnabled) return 'Connected (External only)';
   return 'Connected';
 });
 
