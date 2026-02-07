@@ -248,6 +248,7 @@ export interface ServerConnectionMessage {
   type: 'connection';
   status: 'connected' | 'disconnected';
   roon_connected: boolean;
+  roon_enabled?: boolean;
 }
 
 // Admin panel types
