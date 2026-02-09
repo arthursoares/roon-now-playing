@@ -2,7 +2,7 @@ import express from 'express';
 import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getRoonClient } from './roon.js';
+import { getRoonClient, isRoonEnabled } from './roon.js';
 import { WebSocketManager } from './websocket.js';
 import { createArtworkRouter } from './artwork.js';
 import { createAdminRouter } from './admin.js';
@@ -60,11 +60,12 @@ async function main(): Promise<void> {
 
   // Zones endpoint
   app.get('/api/zones', (_req, res) => {
-    const roonZones = roonClient.getZones().map(z => ({ ...z, source: 'roon' as const }));
+    const roonZones = roonClient?.getZones().map(z => ({ ...z, source: 'roon' as const })) ?? [];
     const externalZones = externalSourceManager.getZones().map(z => ({ ...z, source: 'external' as const }));
     res.json({
       zones: [...roonZones, ...externalZones],
-      connected: roonClient.isConnected(),
+      connected: roonClient?.isConnected() ?? false,
+      roon_enabled: isRoonEnabled(),
     });
   });
 
@@ -72,7 +73,8 @@ async function main(): Promise<void> {
   app.get('/api/health', (_req, res) => {
     res.json({
       status: 'ok',
-      roon_connected: roonClient.isConnected(),
+      roon_enabled: isRoonEnabled(),
+      roon_connected: roonClient?.isConnected() ?? false,
       clients: wsManager.getConnectedClientCount(),
     });
   });
@@ -106,13 +108,19 @@ async function main(): Promise<void> {
     });
   });
 
-  // Start Roon discovery
-  roonClient.start();
+  // Start Roon discovery (only if enabled)
+  if (roonClient) {
+    roonClient.start();
+  }
 
   // Start HTTP server
   server.listen(PORT, HOST, () => {
     logger.info(`Server running at http://${HOST}:${PORT}`);
-    logger.info('Waiting for Roon Core pairing...');
+    if (roonClient) {
+      logger.info('Waiting for Roon Core pairing...');
+    } else {
+      logger.info('Roon integration disabled (ROON_ENABLED=false)');
+    }
   });
 
   // Graceful shutdown

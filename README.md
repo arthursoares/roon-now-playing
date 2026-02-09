@@ -1,6 +1,6 @@
 # Roon Now Playing
 
-A Roon extension that displays real-time album artwork and track metadata on any web-connected client. Perfect for "always-on" displays like tablets and wall-mounted screens.
+A now-playing display for Roon and other music sources. Shows real-time album artwork and track metadata on any web-connected client. Perfect for "always-on" displays like tablets and wall-mounted screens. Works with Roon, or in external-sources-only mode via API.
 
 <p align="center">
   <img width="3108" height="2090" alt="CleanShot 2026-02-01 at 23 09 09@2x" src="https://github.com/user-attachments/assets/11b2f27e-5bbb-415c-a9be-0d5e7431f854" />
@@ -14,7 +14,9 @@ A Roon extension that displays real-time album artwork and track metadata on any
 - Fourteen background options with dynamic color extraction
 - Seventeen customizable font families
 - AI-generated facts about currently playing music (Anthropic/OpenAI/OpenRouter/Local LLM)
+- **Self-service onboarding** — displays auto-generate friendly names and show QR codes linking to per-screen config
 - Admin panel for managing connected clients and AI configuration
+- **Roon optional** — set `ROON_ENABLED=false` to run in external-sources-only mode, no Roon required
 - **External Sources API** for non-Roon music sources (see [External API Documentation](docs/external-api.md))
 - Automatic zone selection via URL parameters
 - WebSocket-based real-time updates
@@ -63,10 +65,13 @@ pnpm dev
 
 ## Usage
 
-1. **First Launch**: Authorize the extension in Roon Settings → Extensions
-2. **Open Browser**: Navigate to `http://<server-ip>:3000`
-3. **Select Zone**: Choose which zone to display
-4. **Enjoy**: The display will update in real-time
+1. **First Launch**: Open `http://<server-ip>:3000` on your display
+2. **Welcome Screen**: The display auto-generates a friendly name (e.g., `gentle-fox-17`) and shows a QR code
+3. **Configure**: Scan the QR code from your phone to open the screen's config page, or visit `/admin`
+4. **Select Zone**: Choose which zone to display (Roon zones auto-appear; external sources via API)
+5. **Enjoy**: The display will update in real-time
+
+> **Tip:** If using Roon, authorize the extension in Roon Settings → Extensions. To run without Roon, set `ROON_ENABLED=false` in your environment.
 
 ### URL Parameters
 
@@ -179,10 +184,20 @@ Customize the display font using the `?font=` URL parameter:
 
 Access the admin panel at `/admin` to manage connected clients and configure AI features.
 
+### Self-Service Onboarding
+New displays automatically receive a memorable name (e.g., `calm-falcon-7`) and show a QR code linking to `/admin/screen/<name>`. Scanning the QR from a phone opens a focused config page for that specific display — no manual ID lookup needed.
+
+### Per-Screen Config (`/admin/screen/:name`)
+A mobile-friendly page for configuring a single display:
+- Rename the screen
+- Select zone
+- Change layout, background, and font
+- Settings are pushed to the display in real-time
+
 ### Client Management
 - View all connected clients with their current settings
 - Push layout, font, background, and zone changes to any client remotely
-- Set friendly names for clients for easy identification
+- Auto-generated friendly names (admin can rename anytime)
 - Real-time updates when clients connect/disconnect
 
 ### Facts Configuration
@@ -203,6 +218,7 @@ Environment variables (or `.env` file):
 |----------|---------|-------------|
 | `PORT` | `3000` | HTTP server port |
 | `HOST` | `0.0.0.0` | Server bind address |
+| `ROON_ENABLED` | `true` | Set to `false` to disable Roon and run in external-sources-only mode |
 | `ARTWORK_CACHE_DIR` | `./cache` | Artwork cache directory |
 | `LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
 | `ANTHROPIC_API_KEY` | - | Anthropic API key for facts generation |
@@ -277,6 +293,7 @@ ollama pull llama3.1
 | `GET` | `/api/admin/zones` | List available zones |
 | `POST` | `/api/admin/clients/:id/name` | Set client friendly name |
 | `POST` | `/api/admin/clients/:id/push` | Push settings to client (layout, font, background, zoneId) |
+| `GET` | `/api/admin/screens/:name` | Get screen by friendly name |
 
 ### Facts API
 
@@ -447,14 +464,17 @@ roon-now-playing/
 │   │   └── src/
 │   │       ├── index.ts     # Entry point
 │   │       ├── roon.ts      # Roon API client
-│   │       ├── websocket.ts # WebSocket handling
-│   │       ├── artwork.ts   # Artwork cache
-│   │       └── admin.ts     # Admin API routes
+│   │       ├── websocket.ts    # WebSocket handling
+│   │       ├── artwork.ts      # Artwork cache
+│   │       ├── admin.ts        # Admin API routes
+│   │       ├── nameGenerator.ts # Friendly name generator
+│   │       └── clientNames.ts  # Persistent name storage
 │   └── client/              # Vue 3 frontend
 │       └── src/
 │           ├── views/
 │           │   ├── NowPlayingView.vue
-│           │   └── AdminView.vue
+│           │   ├── AdminView.vue
+│           │   └── ScreenConfigView.vue
 │           ├── components/
 │           │   ├── NowPlaying.vue
 │           │   ├── ZonePicker.vue

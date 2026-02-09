@@ -291,7 +291,14 @@ export class RoonClient extends EventEmitter {
 // Singleton instance
 let roonClient: RoonClient | null = null;
 
-export function getRoonClient(): RoonClient {
+export function isRoonEnabled(): boolean {
+  return process.env.ROON_ENABLED?.toLowerCase() !== 'false';
+}
+
+export function getRoonClient(): RoonClient | null {
+  if (!isRoonEnabled()) {
+    return null;
+  }
   if (!roonClient) {
     roonClient = new RoonClient();
   }

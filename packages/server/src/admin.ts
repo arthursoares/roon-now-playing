@@ -29,6 +29,20 @@ export function createAdminRouter(wsManager: WebSocketManager): Router {
       return;
     }
 
+    if (name && name.length > 50) {
+      res.status(400).json({ error: 'Name must be 50 characters or fewer' });
+      return;
+    }
+
+    // Check uniqueness — another screen shouldn't already have this name
+    if (name) {
+      const existing = wsManager.getClientByFriendlyName(name);
+      if (existing && existing.clientId !== clientId) {
+        res.status(409).json({ error: 'Name already in use by another screen' });
+        return;
+      }
+    }
+
     const success = wsManager.setClientFriendlyName(clientId, name || null);
     if (success) {
       logger.info(`Set friendly name for ${clientId}: ${name || '(cleared)'}`);
@@ -80,6 +94,17 @@ export function createAdminRouter(wsManager: WebSocketManager): Router {
       res.json({ success: true });
     } else {
       res.status(404).json({ error: 'Client not found or not connected' });
+    }
+  });
+
+  // Get screen by friendly name
+  router.get('/screens/:friendlyName', (req, res) => {
+    const { friendlyName } = req.params;
+    const client = wsManager.getClientByFriendlyName(friendlyName);
+    if (client) {
+      res.json({ client });
+    } else {
+      res.status(404).json({ error: 'Screen not found' });
     }
   });
 

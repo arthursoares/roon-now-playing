@@ -1,0 +1,10 @@
+{
+  "provider": "local",
+  "model": "lfm2.5-thinking",
+  "apiKey": "",
+  "factsCount": 5,
+  "rotationInterval": 25,
+  "prompt": "Generate {factsCount} interesting, lesser-known facts about this music:\n\nArtist: {artist}\nAlbum: {album}\nTrack: {title}\n\nFocus on:\n- Recording history or interesting production details\n- Historical context or cultural impact\n- Connections to other artists or musical movements\n- Awards, chart positions, or notable achievements\n- Personal stories from the artist about this work\n\nWhen possible, include attribution (e.g., \"In a 1985 interview...\" or \"According to Songfacts...\").\n\nKeep each fact concise (2-3 sentences max). Prioritize surprising or educational information over common knowledge.\n\nReturn ONLY a JSON array of strings, no other text.\nExample: `[\"Fact one goes here.\", \"Fact two goes here.\", \"Fact three goes here.\"]`",
+  "localBaseUrl": "http://localhost:11434/v1",
+  "hasApiKey": false
+}

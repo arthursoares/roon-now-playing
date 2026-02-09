@@ -15,6 +15,8 @@ import { useClientId } from './useClientId';
 export interface WebSocketState {
   connected: boolean;
   roonConnected: boolean;
+  roonEnabled: boolean;
+  friendlyName: string | null;
   zones: Zone[];
   nowPlaying: NowPlaying | null;
   // Admin-only state
@@ -55,6 +57,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const state = ref<WebSocketState>({
     connected: false,
     roonConnected: false,
+    roonEnabled: true,
+    friendlyName: null,
     zones: [],
     nowPlaying: null,
     clients: [],
@@ -151,6 +155,10 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       switch (message.type) {
         case 'connection':
           state.value.roonConnected = message.roon_connected;
+          state.value.roonEnabled = message.roon_enabled ?? true;
+          if (message.friendly_name) {
+            state.value.friendlyName = message.friendly_name;
+          }
           break;
 
         case 'zones':
