@@ -1,6 +1,6 @@
 # Roon Now Playing
 
-A Roon extension that displays real-time album artwork and track metadata on any web-connected client. Perfect for "always-on" displays like tablets and wall-mounted screens.
+A now-playing display for Roon and other music sources. Shows real-time album artwork and track metadata on any web-connected client. Perfect for "always-on" displays like tablets and wall-mounted screens. Works with Roon, or in external-sources-only mode via API.
 
 <p align="center">
   <img width="3108" height="2090" alt="CleanShot 2026-02-01 at 23 09 09@2x" src="https://github.com/user-attachments/assets/11b2f27e-5bbb-415c-a9be-0d5e7431f854" />
@@ -16,6 +16,7 @@ A Roon extension that displays real-time album artwork and track metadata on any
 - AI-generated facts about currently playing music (Anthropic/OpenAI/OpenRouter/Local LLM)
 - **Self-service onboarding** — displays auto-generate friendly names and show QR codes linking to per-screen config
 - Admin panel for managing connected clients and AI configuration
+- **Roon optional** — set `ROON_ENABLED=false` to run in external-sources-only mode, no Roon required
 - **External Sources API** for non-Roon music sources (see [External API Documentation](docs/external-api.md))
 - Automatic zone selection via URL parameters
 - WebSocket-based real-time updates
@@ -70,7 +71,7 @@ pnpm dev
 4. **Select Zone**: Choose which zone to display (Roon zones auto-appear; external sources via API)
 5. **Enjoy**: The display will update in real-time
 
-> **Tip:** If using Roon, authorize the extension in Roon Settings → Extensions.
+> **Tip:** If using Roon, authorize the extension in Roon Settings → Extensions. To run without Roon, set `ROON_ENABLED=false` in your environment.
 
 ### URL Parameters
 
