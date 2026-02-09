@@ -15,6 +15,11 @@ const router = createRouter({
       name: 'admin',
       component: AdminView,
     },
+    {
+      path: '/admin/screen/:friendlyName',
+      name: 'screen-config',
+      component: () => import('./views/ScreenConfigView.vue'),
+    },
   ],
 });
 

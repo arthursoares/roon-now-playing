@@ -22,6 +22,7 @@ import type {
 } from '@roon-screen-cover/shared';
 import { RoonClient } from './roon.js';
 import { ExternalSourceManager } from './externalSources.js';
+import { generateFriendlyName } from './nameGenerator.js';
 import { logger } from './logger.js';
 
 interface ClientState {
@@ -299,10 +300,19 @@ export class WebSocketManager {
       clientState.isAdmin = message.isAdmin;
     }
 
-    // Load friendly name if available (keyed by deviceId for persistence)
+    // Load or auto-generate friendly name (keyed by deviceId for persistence)
     const storedName = this.friendlyNames.get(deviceId);
     if (storedName) {
       clientState.friendlyName = storedName;
+    } else {
+      const existingNames = new Set(this.friendlyNames.values());
+      const generated = generateFriendlyName(existingNames);
+      clientState.friendlyName = generated;
+      this.friendlyNames.set(deviceId, generated);
+      if (this.onFriendlyNameChange) {
+        this.onFriendlyNameChange(deviceId, generated);
+      }
+      logger.info(`Auto-assigned friendly name: ${generated} to device ${deviceId}`);
     }
 
     // Update clientsById map
@@ -315,6 +325,14 @@ export class WebSocketManager {
       `Client metadata: ${message.clientId} (${clientState.friendlyName || 'unnamed'}) - ` +
         `layout: ${message.layout}, zone: ${message.zoneName || 'none'}`
     );
+
+    // Send friendly name to the client
+    this.sendToClient(clientState.ws, {
+      type: 'connection',
+      status: 'connected',
+      roon_connected: this.roonClient.isConnected(),
+      friendly_name: clientState.friendlyName ?? undefined,
+    });
 
     // Notify admins
     if (isNewClient) {
@@ -545,5 +563,14 @@ export class WebSocketManager {
 
   getZones(): Zone[] {
     return this.getCombinedZones();
+  }
+
+  getClientByFriendlyName(name: string): ClientMetadata | null {
+    for (const state of this.clients.values()) {
+      if (state.friendlyName === name) {
+        return this.getClientMetadata(state);
+      }
+    }
+    return null;
   }
 }

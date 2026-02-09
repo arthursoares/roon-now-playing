@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import { LAYOUTS, type Zone, type LayoutType, type FontType, type BackgroundType } from '@roon-screen-cover/shared';
+import QRCode from 'qrcode';
 import { useWebSocket } from '../composables/useWebSocket';
 import { usePreferences } from '../composables/usePreferences';
 import { useFontLoader } from '../composables/useFontLoader';
@@ -73,10 +74,27 @@ const selectedZone = computed(() => {
 
 const connectionStatus = computed(() => {
   if (!wsState.value.connected) return 'connecting';
-  // Only show "waiting for Roon" if no zones available (neither Roon nor external)
-  if (!wsState.value.roonConnected && wsState.value.zones.length === 0) return 'waiting-roon';
+  if (wsState.value.zones.length === 0 && !selectedZoneId.value) return 'welcome';
   return 'connected';
 });
+
+// QR code for welcome screen
+const qrCodeDataUrl = ref<string | null>(null);
+const configUrl = computed(() => {
+  const name = wsState.value.friendlyName;
+  if (!name) return null;
+  return `${window.location.origin}/admin/screen/${encodeURIComponent(name)}`;
+});
+
+watch(configUrl, async (url) => {
+  if (url) {
+    qrCodeDataUrl.value = await QRCode.toDataURL(url, {
+      width: 200,
+      margin: 2,
+      color: { dark: '#ffffff', light: '#00000000' },
+    });
+  }
+}, { immediate: true });
 
 function findZoneByPreference(zones: Zone[], preference: string | null): Zone | null {
   if (!preference || zones.length === 0) return null;
@@ -152,12 +170,20 @@ onMounted(() => {
 
 <template>
   <div class="now-playing-view" :style="{ fontFamily }">
-    <!-- Connection overlay -->
-    <div v-if="connectionStatus !== 'connected'" class="connection-overlay">
+    <!-- Connecting spinner -->
+    <div v-if="connectionStatus === 'connecting'" class="connection-overlay">
       <div class="connection-status">
         <div class="spinner"></div>
-        <p v-if="connectionStatus === 'connecting'">Connecting to server...</p>
-        <p v-else>Waiting for Roon Core...</p>
+        <p>Connecting to server...</p>
+      </div>
+    </div>
+
+    <!-- Welcome screen -->
+    <div v-else-if="connectionStatus === 'welcome'" class="connection-overlay">
+      <div class="welcome-content">
+        <h1 v-if="wsState.friendlyName" class="screen-name">{{ wsState.friendlyName }}</h1>
+        <img v-if="qrCodeDataUrl" :src="qrCodeDataUrl" alt="Config QR Code" class="qr-code" />
+        <p class="welcome-caption">Scan to configure this display</p>
       </div>
     </div>
 
@@ -181,7 +207,7 @@ onMounted(() => {
     />
 
     <!-- No zone selected fallback -->
-    <div v-else-if="connectionStatus === 'connected' && !showZonePicker" class="no-zone">
+    <div v-else-if="connectionStatus === 'connected' && !selectedZone && !showZonePicker" class="no-zone">
       <p>No zone selected</p>
       <button @click="showZonePicker = true">Select Zone</button>
     </div>
@@ -230,6 +256,33 @@ onMounted(() => {
   to {
     transform: rotate(360deg);
   }
+}
+
+.welcome-content {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.screen-name {
+  font-size: 2rem;
+  font-weight: 300;
+  color: #fff;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+.qr-code {
+  width: 200px;
+  height: 200px;
+}
+
+.welcome-caption {
+  font-size: 1rem;
+  color: #666;
+  margin: 0;
 }
 
 .no-zone {
