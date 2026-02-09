@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.7.0] - 2026-02-09
+
+### Added
+
+- **Self-Service Welcome Screen**: New displays show a clean welcome screen with their auto-generated friendly name and a QR code linking to their config page. Replaces the Roon-specific "Waiting for Roon Core..." message.
+
+- **Auto-Generated Friendly Names**: Screens automatically receive a memorable name on first connect (e.g., `gentle-fox-17`, `calm-falcon-3`). Names are persisted across reconnects. Admins can rename anytime.
+
+- **Per-Screen Config Page** (`/admin/screen/:name`): A focused, mobile-friendly page for configuring a single display. Scan the QR code from your phone to land directly on the right screen's settings — zone, layout, font, and background.
+
+- **Roon Optional Mode** (contributed by @leolobato): Set `ROON_ENABLED=false` to run without Roon entirely. The app runs in external-sources-only mode — no Roon discovery, no "Waiting for Roon" screen. Includes:
+  - `RoonClient` is nullable throughout the server
+  - `roon_enabled` flag sent to clients via WebSocket
+  - Admin panel shows "Connected (External only)" status
+  - Docker Compose files updated with commented `ROON_ENABLED` option
+
+- **Screen Lookup API**: New `GET /api/admin/screens/:friendlyName` endpoint to resolve a screen by its friendly name.
+
+- **Name Validation**: Friendly name uniqueness check and 50-character length limit on rename.
+
+### Changed
+
+- Welcome screen now works for all users (Roon, API-only, or no sources yet)
+- Admin panel connection label is Roon-aware ("Connected", "Waiting for Roon", or "Connected (External only)")
+- Updated README with new onboarding flow, Roon-optional docs, and updated project structure
+
 ## [1.6.0] - 2026-02-02
 
 ### Added
