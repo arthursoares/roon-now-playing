@@ -219,6 +219,7 @@ Environment variables (or `.env` file):
 | `PORT` | `3000` | HTTP server port |
 | `HOST` | `0.0.0.0` | Server bind address |
 | `ROON_ENABLED` | `true` | Set to `false` to disable Roon and run in external-sources-only mode |
+| `DATA_DIR` | `./config` | Directory for persistent config (Roon state, client names, etc.) |
 | `ARTWORK_CACHE_DIR` | `./cache` | Artwork cache directory |
 | `LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
 | `ANTHROPIC_API_KEY` | - | Anthropic API key for facts generation |

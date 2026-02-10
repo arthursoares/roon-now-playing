@@ -3,8 +3,12 @@ import RoonApiTransport, { type Zone as RoonZone } from 'node-roon-api-transport
 import RoonApiImage from 'node-roon-api-image';
 import RoonApiStatus from 'node-roon-api-status';
 import { EventEmitter } from 'events';
+import fs from 'fs';
+import path from 'path';
 import type { Zone, NowPlaying, Track, PlaybackState } from '@roon-screen-cover/shared';
 import { logger } from './logger.js';
+
+const DATA_DIR = process.env.DATA_DIR || './config';
 
 // Type definitions for Roon API (not provided by the package)
 interface RoonCore {
@@ -53,14 +57,33 @@ export class RoonClient extends EventEmitter {
   constructor() {
     super();
 
+    const roonStatePath = path.join(DATA_DIR, 'roonstate.json');
+
     this.roon = new RoonApi({
       extension_id: 'com.github.roon-now-playing',
       display_name: 'Roon Now Playing',
-      display_version: '1.5.1',
+      display_version: '1.7.1',
       publisher: 'roon-screen-cover',
       email: 'noreply@example.com',
       website: 'https://github.com/arthursoares/roon-screen-cover',
       log_level: 'none',
+
+      set_persisted_state: (state: Record<string, unknown>) => {
+        try {
+          fs.mkdirSync(path.dirname(roonStatePath), { recursive: true });
+          fs.writeFileSync(roonStatePath, JSON.stringify(state, null, 2));
+        } catch (e) {
+          logger.error(`Failed to save Roon state: ${(e as Error).message}`);
+        }
+      },
+      get_persisted_state: () => {
+        try {
+          const content = fs.readFileSync(roonStatePath, { encoding: 'utf8' });
+          return JSON.parse(content);
+        } catch {
+          return {};
+        }
+      },
 
       core_paired: (core: RoonCore) => {
         logger.info(`Paired with Roon Core: ${core.display_name}`);

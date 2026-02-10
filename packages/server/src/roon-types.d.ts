@@ -14,6 +14,8 @@ declare module 'node-roon-api' {
     core_unpaired?: (core: RoonCore) => void;
     core_found?: (core: RoonCore) => void;
     core_lost?: (core: RoonCore) => void;
+    set_persisted_state?: (state: Record<string, unknown>) => void;
+    get_persisted_state?: () => Record<string, unknown>;
   }
 
   interface RoonCore {
