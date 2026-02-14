@@ -97,16 +97,14 @@ const usesDynamicBackground = computed(() =>
 <style scoped>
 /*
  * ============================================
- * TYPOGRAPHY CONFIGURATION
- * Adjust these values to tweak font sizes and line heights.
- * Format: clamp(min, preferred, max)
+ * TYPOGRAPHY
+ * Uses token-based container queries for responsive scaling.
+ * See: packages/client/src/styles/tokens.css
  * ============================================
  */
 .minimal-layout {
-  /* Track metadata */
-  --font-title: clamp(1.5rem, 5vw, 3rem);
-  --line-height-title: 1.2;
-  --font-artist: clamp(1rem, 3vw, 1.5rem);
+  container-type: inline-size;
+  container-name: layout;
 
   /* Base styles */
   width: 100%;
@@ -164,9 +162,9 @@ const usesDynamicBackground = computed(() =>
 }
 
 .title {
-  font-size: var(--font-title);
-  font-weight: 600;
-  line-height: var(--line-height-title);
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-tight);
   margin-bottom: 0.25rem;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   overflow: hidden;
@@ -175,7 +173,9 @@ const usesDynamicBackground = computed(() =>
 }
 
 .artist {
-  font-size: var(--font-artist);
+  font-size: var(--text-lg);
+  font-weight: var(--font-normal);
+  line-height: var(--leading-snug);
   color: rgba(255, 255, 255, 0.8);
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
   overflow: hidden;
@@ -188,7 +188,9 @@ const usesDynamicBackground = computed(() =>
 }
 
 .no-playback p {
-  font-size: 1.5rem;
+  font-size: var(--text-xl);
+  font-weight: var(--font-normal);
+  line-height: var(--leading-snug);
   color: rgba(255, 255, 255, 0.6);
 }
 
@@ -203,5 +205,48 @@ const usesDynamicBackground = computed(() =>
   height: 100%;
   background: rgba(255, 255, 255, 0.9);
   transition: width 0.1s linear;
+}
+
+/* Container Query Typography Scaling */
+@container layout (min-width: 500px) {
+  .title {
+    font-size: var(--text-2xl);
+  }
+
+  .artist {
+    font-size: var(--text-xl);
+  }
+
+  .no-playback p {
+    font-size: var(--text-2xl);
+  }
+}
+
+@container layout (min-width: 700px) {
+  .title {
+    font-size: var(--text-3xl);
+  }
+
+  .artist {
+    font-size: var(--text-2xl);
+  }
+
+  .no-playback p {
+    font-size: var(--text-3xl);
+  }
+}
+
+@container layout (min-width: 1000px) {
+  .title {
+    font-size: var(--text-4xl);
+  }
+
+  .artist {
+    font-size: var(--text-3xl);
+  }
+
+  .no-playback p {
+    font-size: var(--text-4xl);
+  }
 }
 </style>
