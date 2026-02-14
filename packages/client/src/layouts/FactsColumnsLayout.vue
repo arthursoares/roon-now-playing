@@ -364,6 +364,9 @@ watch(
  * ============================================
  */
 .facts-columns-layout {
+  container-type: inline-size;
+  container-name: layout;
+
   /* Fact text (main content) */
   --font-fact: clamp(22px, 3vw, 72px);
   --line-height-fact: 1.2;
@@ -399,6 +402,9 @@ watch(
 }
 
 .content {
+  container-type: inline-size;
+  container-name: content;
+
   width: 100%;
   height: 100%;
   padding: 2.5%;
