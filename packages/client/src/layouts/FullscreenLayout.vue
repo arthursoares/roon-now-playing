@@ -88,6 +88,7 @@ const usesDynamicBackground = computed(() =>
   justify-content: center;
   color: var(--text-color, #fff);
   transition: background 0.5s ease-out;
+  container-type: inline-size;
 }
 
 .artwork {
@@ -111,7 +112,7 @@ const usesDynamicBackground = computed(() =>
 }
 
 .artwork-placeholder p {
-  font-size: 1.5rem;
+  font-size: var(--text-xl);
   color: var(--text-tertiary, #444);
 }
 </style>

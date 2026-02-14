@@ -155,6 +155,7 @@ const layoutClass = computed(() => ({
     justify-content: center;
     overflow: hidden;
     transition: background 0.5s ease-out;
+    container-type: inline-size;
 }
 
 /* Content wrapper for DynamicBackground - provides centering that .cover-layout normally provides */
