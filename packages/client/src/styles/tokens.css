@@ -1,0 +1,35 @@
+/**
+ * Typography Design Tokens
+ * Scale: 1.25 ratio (major third)
+ * Base: 1rem = 16px
+ */
+
+:root {
+  /* Typography Scale */
+  --text-xs: 0.64rem;      /* 10px - zone hints, timestamps */
+  --text-sm: 0.8rem;       /* 13px - secondary info */
+  --text-base: 1rem;       /* 16px - body text */
+  --text-lg: 1.25rem;      /* 20px - artist/album */
+  --text-xl: 1.563rem;     /* 25px - titles */
+  --text-2xl: 1.953rem;    /* 31px - facts (tablet) */
+  --text-3xl: 2.441rem;    /* 39px - facts (desktop) */
+  --text-4xl: 3.052rem;    /* 49px - facts (TV) */
+  --text-5xl: 3.815rem;    /* 61px - facts (4K) */
+
+  /* Line Heights */
+  --leading-tight: 1.1;
+  --leading-snug: 1.25;
+  --leading-normal: 1.4;
+
+  /* Font Weights */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+
+  /* Container Query Breakpoints (for reference in comments) */
+  /* sm: < 500px */
+  /* md: 500-699px */
+  /* lg: 700-999px */
+  /* xl: 1000-1399px */
+  /* 2xl: >= 1400px */
+}
