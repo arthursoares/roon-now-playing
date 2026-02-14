@@ -148,17 +148,14 @@ const usesDynamicBackground = computed(() =>
 <style scoped>
 /*
  * ============================================
- * TYPOGRAPHY CONFIGURATION
- * Adjust these values to tweak font sizes and line heights.
- * Format: clamp(min, preferred, max)
+ * TYPOGRAPHY
+ * Uses token-based container queries for responsive scaling.
+ * See: packages/client/src/styles/tokens.css
  * ============================================
  */
 .detailed-layout {
-  /* Track metadata */
-  --font-title: clamp(1.5rem, 4vw, 3rem);
-  --line-height-title: 1.2;
-  --font-artist: clamp(1rem, 2.5vw, 1.5rem);
-  --font-album: clamp(0.875rem, 2vw, 1.25rem);
+  container-type: inline-size;
+  container-name: layout;
 
   /* Base styles */
   width: 100%;
@@ -230,9 +227,9 @@ const usesDynamicBackground = computed(() =>
 }
 
 .title {
-  font-size: var(--font-title);
-  font-weight: 600;
-  line-height: var(--line-height-title);
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-tight);
   margin-bottom: 0.5rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -242,7 +239,9 @@ const usesDynamicBackground = computed(() =>
 }
 
 .artist {
-  font-size: var(--font-artist);
+  font-size: var(--text-lg);
+  font-weight: var(--font-normal);
+  line-height: var(--leading-snug);
   color: var(--text-secondary, rgba(255, 255, 255, 0.8));
   margin-bottom: 0.25rem;
   overflow: hidden;
@@ -251,7 +250,9 @@ const usesDynamicBackground = computed(() =>
 }
 
 .album {
-  font-size: var(--font-album);
+  font-size: var(--text-base);
+  font-weight: var(--font-normal);
+  line-height: var(--leading-snug);
   color: var(--text-tertiary, rgba(255, 255, 255, 0.5));
   overflow: hidden;
   text-overflow: ellipsis;
@@ -263,12 +264,12 @@ const usesDynamicBackground = computed(() =>
 }
 
 .no-playback p {
-  font-size: 1.5rem;
-  color: #666;
+  font-size: var(--text-xl);
+  color: var(--text-tertiary);
 }
 
 .no-playback .zone-hint {
-  font-size: 1rem;
+  font-size: var(--text-base);
   margin-top: 0.5rem;
 }
 
@@ -281,7 +282,7 @@ const usesDynamicBackground = computed(() =>
   align-items: center;
   gap: 0.75rem;
   color: var(--text-tertiary, rgba(255, 255, 255, 0.5));
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
 }
 
 .zone-name {
@@ -329,6 +330,53 @@ const usesDynamicBackground = computed(() =>
 }
 
 .paused-indicator {
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
+}
+
+/* Container Query Typography Scaling */
+@container layout (min-width: 500px) {
+  .title {
+    font-size: var(--text-2xl);
+  }
+
+  .artist {
+    font-size: var(--text-xl);
+  }
+
+  .album {
+    font-size: var(--text-lg);
+  }
+
+  .zone-indicator {
+    font-size: var(--text-base);
+  }
+}
+
+@container layout (min-width: 700px) {
+  .title {
+    font-size: var(--text-3xl);
+  }
+
+  .artist {
+    font-size: var(--text-2xl);
+  }
+
+  .album {
+    font-size: var(--text-xl);
+  }
+}
+
+@container layout (min-width: 1000px) {
+  .title {
+    font-size: var(--text-4xl);
+  }
+
+  .artist {
+    font-size: var(--text-3xl);
+  }
+
+  .album {
+    font-size: var(--text-2xl);
+  }
 }
 </style>
