@@ -258,26 +258,14 @@ const ambientStyle = computed(() => {
 <style scoped>
 /*
  * ============================================
- * TYPOGRAPHY CONFIGURATION
- * Adjust these values to tweak font sizes and line heights.
- * Format: clamp(min, preferred, max)
+ * TYPOGRAPHY
+ * Uses token-based container queries for responsive scaling.
+ * See: packages/client/src/styles/tokens.css
  * ============================================
  */
 .ambient-layout {
-  /* Track metadata */
-  --font-title: clamp(28px, 4.5vw, 56px);
-  --line-height-title: 1.15;
-  --font-artist: clamp(20px, 3vw, 40px);
-  --line-height-artist: 1.2;
-  --font-album: clamp(16px, 2vw, 28px);
-  --line-height-album: 1.3;
-
-  /* Secondary text */
-  --font-zone: clamp(14px, 1.5vw, 20px);
-
-  /* No playback state */
-  --font-no-playback: clamp(24px, 3vw, 48px);
-  --font-zone-hint: clamp(16px, 2vw, 28px);
+  container-type: inline-size;
+  container-name: layout;
 
   /* Base styles */
   width: 100%;
@@ -412,9 +400,9 @@ const ambientStyle = computed(() => {
 
 /* Typography - 10ft UI Scale, Title-first like Detailed */
 .title {
-  font-size: var(--font-title);
-  font-weight: 600;
-  line-height: var(--line-height-title);
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-tight);
   margin: 0;
   margin-bottom: 0.4em;
   color: var(--text-color);
@@ -428,9 +416,9 @@ const ambientStyle = computed(() => {
 }
 
 .artist {
-  font-size: var(--font-artist);
-  font-weight: 400;
-  line-height: var(--line-height-artist);
+  font-size: var(--text-lg);
+  font-weight: var(--font-normal);
+  line-height: var(--leading-snug);
   margin: 0;
   margin-bottom: 0.2em;
   color: var(--text-secondary);
@@ -442,9 +430,9 @@ const ambientStyle = computed(() => {
 }
 
 .album {
-  font-size: var(--font-album);
-  font-weight: 400;
-  line-height: var(--line-height-album);
+  font-size: var(--text-base);
+  font-weight: var(--font-normal);
+  line-height: var(--leading-snug);
   margin: 0;
   color: var(--text-tertiary);
 
@@ -465,7 +453,7 @@ const ambientStyle = computed(() => {
   align-items: center;
   gap: 0.75rem;
   color: var(--text-tertiary);
-  font-size: var(--font-zone);
+  font-size: var(--text-sm);
 }
 
 .zone-name {
@@ -524,13 +512,13 @@ const ambientStyle = computed(() => {
 }
 
 .no-playback-text {
-  font-size: var(--font-no-playback);
+  font-size: var(--text-xl);
   color: var(--text-tertiary);
   margin: 0;
 }
 
 .zone-hint {
-  font-size: var(--font-zone-hint);
+  font-size: var(--text-base);
   color: var(--text-tertiary);
   margin: 0;
   margin-top: 0.5em;
@@ -566,6 +554,77 @@ const ambientStyle = computed(() => {
 
   .no-playback {
     text-align: center;
+  }
+}
+
+/* Container Query Typography Scaling */
+@container layout (min-width: 500px) {
+  .title {
+    font-size: var(--text-2xl);
+  }
+
+  .artist {
+    font-size: var(--text-xl);
+  }
+
+  .album {
+    font-size: var(--text-lg);
+  }
+
+  .zone-indicator {
+    font-size: var(--text-base);
+  }
+
+  .no-playback-text {
+    font-size: var(--text-2xl);
+  }
+
+  .zone-hint {
+    font-size: var(--text-lg);
+  }
+}
+
+@container layout (min-width: 700px) {
+  .title {
+    font-size: var(--text-3xl);
+  }
+
+  .artist {
+    font-size: var(--text-2xl);
+  }
+
+  .album {
+    font-size: var(--text-xl);
+  }
+
+  .no-playback-text {
+    font-size: var(--text-3xl);
+  }
+
+  .zone-hint {
+    font-size: var(--text-2xl);
+  }
+}
+
+@container layout (min-width: 1000px) {
+  .title {
+    font-size: var(--text-4xl);
+  }
+
+  .artist {
+    font-size: var(--text-3xl);
+  }
+
+  .album {
+    font-size: var(--text-2xl);
+  }
+
+  .no-playback-text {
+    font-size: var(--text-4xl);
+  }
+
+  .zone-hint {
+    font-size: var(--text-3xl);
   }
 }
 </style>
