@@ -358,33 +358,14 @@ watch(
 <style scoped>
 /*
  * ============================================
- * TYPOGRAPHY CONFIGURATION
- * Adjust these values to tweak font sizes and line heights.
- * Format: clamp(min, preferred, max)
+ * TYPOGRAPHY
+ * Uses token-based container queries for responsive scaling.
+ * See: packages/client/src/styles/typography.css
  * ============================================
  */
 .facts-columns-layout {
   container-type: inline-size;
   container-name: layout;
-
-  /* Fact text (main content) */
-  --font-fact: clamp(22px, 3vw, 72px);
-  --line-height-fact: 1.2;
-
-  /* Track metadata */
-  --font-title: clamp(18px, 2.2vw, 52px);
-  --line-height-title: 1.1;
-  --font-artist-album: clamp(14px, 1.6vw, 38px);
-  --line-height-artist-album: 1.15;
-
-  /* Secondary text */
-  --font-zone: clamp(14px, 1.5vw, 36px);
-  --font-loading: clamp(18px, 2vw, 48px);
-  --font-error: clamp(16px, 1.8vw, 42px);
-
-  /* No playback state */
-  --font-no-playback: clamp(24px, 3vw, 72px);
-  --font-zone-hint: clamp(16px, 2vw, 48px);
 
   /* Base styles */
   width: 100%;
@@ -527,9 +508,9 @@ watch(
 }
 
 .fact-text {
-  font-size: var(--font-fact);
-  font-weight: 400;
-  line-height: var(--line-height-fact);
+  font-size: var(--text-lg);
+  font-weight: var(--font-normal);
+  line-height: var(--leading-snug);
   margin: 0;
   color: var(--text-color);
   animation: fadeIn 0.5s ease-out;
@@ -562,14 +543,38 @@ watch(
   }
 }
 
+@container content (min-width: 500px) {
+  .fact-text {
+    font-size: var(--text-xl);
+  }
+}
+
+@container content (min-width: 700px) {
+  .fact-text {
+    font-size: var(--text-2xl);
+  }
+}
+
+@container content (min-width: 1000px) {
+  .fact-text {
+    font-size: var(--text-3xl);
+  }
+}
+
+@container content (min-width: 1400px) {
+  .fact-text {
+    font-size: var(--text-4xl);
+  }
+}
+
 .loading-hint {
-  font-size: var(--font-loading);
+  font-size: var(--text-base);
   color: var(--text-tertiary);
   margin: 0;
 }
 
 .error-message {
-  font-size: var(--font-error);
+  font-size: var(--text-sm);
   color: var(--text-tertiary);
   margin: 0;
 }
@@ -604,9 +609,9 @@ watch(
 }
 
 .metadata .title {
-  font-size: var(--font-title);
-  font-weight: 600;
-  line-height: var(--line-height-title);
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-tight);
   margin: 0 0 0.2em 0;
   color: var(--text-color);
   overflow: hidden;
@@ -615,14 +620,34 @@ watch(
 }
 
 .metadata .artist-album {
-  font-size: var(--font-artist-album);
-  font-weight: 400;
-  line-height: var(--line-height-artist-album);
+  font-size: var(--text-base);
+  font-weight: var(--font-normal);
+  line-height: var(--leading-snug);
   margin: 0;
   color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@container content (min-width: 700px) {
+  .metadata .title {
+    font-size: var(--text-xl);
+  }
+
+  .metadata .artist-album {
+    font-size: var(--text-lg);
+  }
+}
+
+@container content (min-width: 1000px) {
+  .metadata .title {
+    font-size: var(--text-2xl);
+  }
+
+  .metadata .artist-album {
+    font-size: var(--text-xl);
+  }
 }
 
 /* Bottom section - fixed position */
@@ -639,7 +664,13 @@ watch(
   align-items: center;
   gap: 0.75rem;
   color: var(--text-tertiary);
-  font-size: var(--font-zone);
+  font-size: var(--text-sm);
+}
+
+@container content (min-width: 700px) {
+  .zone-indicator {
+    font-size: var(--text-base);
+  }
 }
 
 .zone-name {
@@ -693,13 +724,19 @@ watch(
 }
 
 .no-playback-text {
-  font-size: var(--font-no-playback);
+  font-size: var(--text-xl);
   color: var(--text-tertiary);
   margin: 0;
 }
 
+@container content (min-width: 700px) {
+  .no-playback-text {
+    font-size: var(--text-2xl);
+  }
+}
+
 .zone-hint {
-  font-size: var(--font-zone-hint);
+  font-size: var(--text-base);
   color: var(--text-tertiary);
   margin: 0.5em 0 0 0;
   opacity: 0.7;
