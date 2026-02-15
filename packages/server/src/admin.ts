@@ -3,6 +3,7 @@ import type { WebSocketManager } from './websocket.js';
 import type { LayoutType, FontType, BackgroundType } from '@roon-screen-cover/shared';
 import { LAYOUTS, FONTS, BACKGROUNDS } from '@roon-screen-cover/shared';
 import { logger } from './logger.js';
+import { loadDisplaySettings, saveDisplaySettings } from './display-settings.js';
 
 export function createAdminRouter(wsManager: WebSocketManager): Router {
   const router = Router();
@@ -106,6 +107,28 @@ export function createAdminRouter(wsManager: WebSocketManager): Router {
     } else {
       res.status(404).json({ error: 'Screen not found' });
     }
+  });
+
+  // Get display settings
+  router.get('/display-settings', (_req, res) => {
+    const settings = loadDisplaySettings();
+    res.json(settings);
+  });
+
+  // Update display settings
+  router.post('/display-settings', (req, res) => {
+    const { fontScale } = req.body;
+    const settings = loadDisplaySettings();
+
+    if (typeof fontScale === 'number' && fontScale >= 0.75 && fontScale <= 1.5) {
+      settings.fontScale = fontScale;
+    }
+
+    saveDisplaySettings(settings);
+
+    // TODO: Broadcast to clients via WebSocket (Task 5)
+
+    res.json(settings);
   });
 
   return router;
