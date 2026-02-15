@@ -244,6 +244,8 @@ watch(
   margin: 0;
   color: #fff;
   animation: fadeIn 0.5s ease-out;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 @container card (min-width: 300px) {
@@ -274,6 +276,7 @@ watch(
   font-size: calc(var(--text-base) * var(--font-scale, 1));
   color: rgba(255, 255, 255, 0.5);
   margin: 0;
+  width: 100%;
 }
 
 @container card (min-width: 400px) {
@@ -286,6 +289,7 @@ watch(
   font-size: calc(var(--text-sm) * var(--font-scale, 1));
   color: rgba(255, 255, 255, 0.5);
   margin: 0;
+  width: 100%;
 }
 
 @container card (min-width: 400px) {
@@ -378,6 +382,7 @@ watch(
 .no-playback-text {
   font-size: calc(var(--text-xl) * var(--font-scale, 1));
   margin: 0;
+  width: 100%;
 }
 
 @container card (min-width: 400px) {
@@ -396,6 +401,7 @@ watch(
   font-size: calc(var(--text-base) * var(--font-scale, 1));
   margin: 0.5em 0 0 0;
   opacity: 0.7;
+  width: 100%;
 }
 
 @container card (min-width: 400px) {
