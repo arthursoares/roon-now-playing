@@ -1791,6 +1791,8 @@ onMounted(() => {
   font-size: 14px;
   font-family: inherit;
   transition: border-color var(--transition);
+  min-width: 0; /* Allow shrinking in flex/grid */
+  box-sizing: border-box;
 }
 
 .form-field input:hover,
@@ -1851,7 +1853,10 @@ onMounted(() => {
 
 .number-input input {
   width: 80px;
+  min-width: 60px;
+  max-width: 100px;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .number-hint {
@@ -2253,6 +2258,17 @@ onMounted(() => {
   }
 }
 
+@media (max-width: 500px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .form-field.full-width {
+    grid-column: 1;
+  }
+}
+
 /* === Sources Section === */
 .sources-layout {
   display: flex;
@@ -2517,6 +2533,7 @@ onMounted(() => {
 
 .custom-model-input {
   margin-top: 8px;
+  width: 100%;
 }
 
 /* === Slider Styles === */
