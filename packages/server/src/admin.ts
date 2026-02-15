@@ -126,7 +126,8 @@ export function createAdminRouter(wsManager: WebSocketManager): Router {
 
     saveDisplaySettings(settings);
 
-    // TODO: Broadcast to clients via WebSocket (Task 5)
+    // Broadcast to all connected display clients
+    wsManager.broadcastDisplaySettings(settings);
 
     res.json(settings);
   });

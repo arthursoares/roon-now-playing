@@ -19,6 +19,7 @@ import type {
   ServerClientDisconnectedMessage,
   ServerClientUpdatedMessage,
   ServerRemoteSettingsMessage,
+  DisplaySettings,
 } from '@roon-screen-cover/shared';
 import { RoonClient } from './roon.js';
 import { ExternalSourceManager } from './externalSources.js';
@@ -578,5 +579,19 @@ export class WebSocketManager {
       }
     }
     return null;
+  }
+
+  broadcastDisplaySettings(settings: DisplaySettings): void {
+    const message = JSON.stringify({
+      type: 'display_settings_update',
+      settings,
+    });
+
+    // Broadcast to all non-admin clients
+    for (const clientState of this.clients.values()) {
+      if (!clientState.isAdmin && clientState.ws.readyState === WebSocket.OPEN) {
+        clientState.ws.send(message);
+      }
+    }
   }
 }
