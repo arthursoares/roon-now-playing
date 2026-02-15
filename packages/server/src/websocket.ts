@@ -25,6 +25,7 @@ import { RoonClient } from './roon.js';
 import { ExternalSourceManager } from './externalSources.js';
 import { generateFriendlyName } from './nameGenerator.js';
 import { logger } from './logger.js';
+import { loadDisplaySettings } from './display-settings.js';
 
 interface ClientState {
   ws: WebSocket;
@@ -123,6 +124,13 @@ export class WebSocketManager {
         this.sendToClient(ws, {
           type: 'clients_list',
           clients: this.getAllClientsMetadata(),
+        });
+      } else {
+        // For non-admin clients, send current display settings
+        const displaySettings = loadDisplaySettings();
+        this.sendToClient(ws, {
+          type: 'display_settings_update',
+          settings: displaySettings,
         });
       }
 
