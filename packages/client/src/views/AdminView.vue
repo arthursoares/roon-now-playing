@@ -1665,6 +1665,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
 .setting-label {
@@ -1685,6 +1686,9 @@ onMounted(() => {
   font-family: inherit;
   cursor: pointer;
   transition: border-color var(--transition);
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .setting-select:hover:not(:disabled) {
