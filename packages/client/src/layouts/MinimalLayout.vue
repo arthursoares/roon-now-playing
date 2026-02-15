@@ -162,7 +162,7 @@ const usesDynamicBackground = computed(() =>
 }
 
 .title {
-  font-size: var(--text-xl);
+  font-size: calc(var(--text-xl) * var(--font-scale, 1));
   font-weight: var(--font-semibold);
   line-height: var(--leading-tight);
   margin-bottom: 0.25rem;
@@ -173,7 +173,7 @@ const usesDynamicBackground = computed(() =>
 }
 
 .artist {
-  font-size: var(--text-lg);
+  font-size: calc(var(--text-lg) * var(--font-scale, 1));
   font-weight: var(--font-normal);
   line-height: var(--leading-snug);
   color: rgba(255, 255, 255, 0.8);
@@ -188,7 +188,7 @@ const usesDynamicBackground = computed(() =>
 }
 
 .no-playback p {
-  font-size: var(--text-xl);
+  font-size: calc(var(--text-xl) * var(--font-scale, 1));
   font-weight: var(--font-normal);
   line-height: var(--leading-snug);
   color: rgba(255, 255, 255, 0.6);
@@ -210,43 +210,43 @@ const usesDynamicBackground = computed(() =>
 /* Container Query Typography Scaling */
 @container layout (min-width: 500px) {
   .title {
-    font-size: var(--text-2xl);
+    font-size: calc(var(--text-2xl) * var(--font-scale, 1));
   }
 
   .artist {
-    font-size: var(--text-xl);
+    font-size: calc(var(--text-xl) * var(--font-scale, 1));
   }
 
   .no-playback p {
-    font-size: var(--text-2xl);
+    font-size: calc(var(--text-2xl) * var(--font-scale, 1));
   }
 }
 
 @container layout (min-width: 700px) {
   .title {
-    font-size: var(--text-3xl);
+    font-size: calc(var(--text-3xl) * var(--font-scale, 1));
   }
 
   .artist {
-    font-size: var(--text-2xl);
+    font-size: calc(var(--text-2xl) * var(--font-scale, 1));
   }
 
   .no-playback p {
-    font-size: var(--text-3xl);
+    font-size: calc(var(--text-3xl) * var(--font-scale, 1));
   }
 }
 
 @container layout (min-width: 1000px) {
   .title {
-    font-size: var(--text-4xl);
+    font-size: calc(var(--text-4xl) * var(--font-scale, 1));
   }
 
   .artist {
-    font-size: var(--text-3xl);
+    font-size: calc(var(--text-3xl) * var(--font-scale, 1));
   }
 
   .no-playback p {
-    font-size: var(--text-4xl);
+    font-size: calc(var(--text-4xl) * var(--font-scale, 1));
   }
 }
 </style>

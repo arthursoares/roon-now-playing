@@ -227,7 +227,7 @@ const usesDynamicBackground = computed(() =>
 }
 
 .title {
-  font-size: var(--text-xl);
+  font-size: calc(var(--text-xl) * var(--font-scale, 1));
   font-weight: var(--font-semibold);
   line-height: var(--leading-tight);
   margin-bottom: 0.5rem;
@@ -239,7 +239,7 @@ const usesDynamicBackground = computed(() =>
 }
 
 .artist {
-  font-size: var(--text-lg);
+  font-size: calc(var(--text-lg) * var(--font-scale, 1));
   font-weight: var(--font-normal);
   line-height: var(--leading-snug);
   color: var(--text-secondary, rgba(255, 255, 255, 0.8));
@@ -250,7 +250,7 @@ const usesDynamicBackground = computed(() =>
 }
 
 .album {
-  font-size: var(--text-base);
+  font-size: calc(var(--text-base) * var(--font-scale, 1));
   font-weight: var(--font-normal);
   line-height: var(--leading-snug);
   color: var(--text-tertiary, rgba(255, 255, 255, 0.5));
@@ -264,12 +264,12 @@ const usesDynamicBackground = computed(() =>
 }
 
 .no-playback p {
-  font-size: var(--text-xl);
+  font-size: calc(var(--text-xl) * var(--font-scale, 1));
   color: var(--text-tertiary);
 }
 
 .no-playback .zone-hint {
-  font-size: var(--text-base);
+  font-size: calc(var(--text-base) * var(--font-scale, 1));
   margin-top: 0.5rem;
 }
 
@@ -282,7 +282,7 @@ const usesDynamicBackground = computed(() =>
   align-items: center;
   gap: 0.75rem;
   color: var(--text-tertiary, rgba(255, 255, 255, 0.5));
-  font-size: var(--text-sm);
+  font-size: calc(var(--text-sm) * var(--font-scale, 1));
 }
 
 .zone-name {
@@ -330,53 +330,53 @@ const usesDynamicBackground = computed(() =>
 }
 
 .paused-indicator {
-  font-size: var(--text-xs);
+  font-size: calc(var(--text-xs) * var(--font-scale, 1));
 }
 
 /* Container Query Typography Scaling */
 @container layout (min-width: 500px) {
   .title {
-    font-size: var(--text-2xl);
+    font-size: calc(var(--text-2xl) * var(--font-scale, 1));
   }
 
   .artist {
-    font-size: var(--text-xl);
+    font-size: calc(var(--text-xl) * var(--font-scale, 1));
   }
 
   .album {
-    font-size: var(--text-lg);
+    font-size: calc(var(--text-lg) * var(--font-scale, 1));
   }
 
   .zone-indicator {
-    font-size: var(--text-base);
+    font-size: calc(var(--text-base) * var(--font-scale, 1));
   }
 }
 
 @container layout (min-width: 700px) {
   .title {
-    font-size: var(--text-3xl);
+    font-size: calc(var(--text-3xl) * var(--font-scale, 1));
   }
 
   .artist {
-    font-size: var(--text-2xl);
+    font-size: calc(var(--text-2xl) * var(--font-scale, 1));
   }
 
   .album {
-    font-size: var(--text-xl);
+    font-size: calc(var(--text-xl) * var(--font-scale, 1));
   }
 }
 
 @container layout (min-width: 1000px) {
   .title {
-    font-size: var(--text-4xl);
+    font-size: calc(var(--text-4xl) * var(--font-scale, 1));
   }
 
   .artist {
-    font-size: var(--text-3xl);
+    font-size: calc(var(--text-3xl) * var(--font-scale, 1));
   }
 
   .album {
-    font-size: var(--text-2xl);
+    font-size: calc(var(--text-2xl) * var(--font-scale, 1));
   }
 }
 </style>

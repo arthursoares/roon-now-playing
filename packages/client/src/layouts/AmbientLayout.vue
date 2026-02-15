@@ -400,7 +400,7 @@ const ambientStyle = computed(() => {
 
 /* Typography - 10ft UI Scale, Title-first like Detailed */
 .title {
-  font-size: var(--text-xl);
+  font-size: calc(var(--text-xl) * var(--font-scale, 1));
   font-weight: var(--font-semibold);
   line-height: var(--leading-tight);
   margin: 0;
@@ -416,7 +416,7 @@ const ambientStyle = computed(() => {
 }
 
 .artist {
-  font-size: var(--text-lg);
+  font-size: calc(var(--text-lg) * var(--font-scale, 1));
   font-weight: var(--font-normal);
   line-height: var(--leading-snug);
   margin: 0;
@@ -430,7 +430,7 @@ const ambientStyle = computed(() => {
 }
 
 .album {
-  font-size: var(--text-base);
+  font-size: calc(var(--text-base) * var(--font-scale, 1));
   font-weight: var(--font-normal);
   line-height: var(--leading-snug);
   margin: 0;
@@ -453,7 +453,7 @@ const ambientStyle = computed(() => {
   align-items: center;
   gap: 0.75rem;
   color: var(--text-tertiary);
-  font-size: var(--text-sm);
+  font-size: calc(var(--text-sm) * var(--font-scale, 1));
 }
 
 .zone-name {
@@ -512,13 +512,13 @@ const ambientStyle = computed(() => {
 }
 
 .no-playback-text {
-  font-size: var(--text-xl);
+  font-size: calc(var(--text-xl) * var(--font-scale, 1));
   color: var(--text-tertiary);
   margin: 0;
 }
 
 .zone-hint {
-  font-size: var(--text-base);
+  font-size: calc(var(--text-base) * var(--font-scale, 1));
   color: var(--text-tertiary);
   margin: 0;
   margin-top: 0.5em;
@@ -560,71 +560,71 @@ const ambientStyle = computed(() => {
 /* Container Query Typography Scaling */
 @container layout (min-width: 500px) {
   .title {
-    font-size: var(--text-2xl);
+    font-size: calc(var(--text-2xl) * var(--font-scale, 1));
   }
 
   .artist {
-    font-size: var(--text-xl);
+    font-size: calc(var(--text-xl) * var(--font-scale, 1));
   }
 
   .album {
-    font-size: var(--text-lg);
+    font-size: calc(var(--text-lg) * var(--font-scale, 1));
   }
 
   .zone-indicator {
-    font-size: var(--text-base);
+    font-size: calc(var(--text-base) * var(--font-scale, 1));
   }
 
   .no-playback-text {
-    font-size: var(--text-2xl);
+    font-size: calc(var(--text-2xl) * var(--font-scale, 1));
   }
 
   .zone-hint {
-    font-size: var(--text-lg);
+    font-size: calc(var(--text-lg) * var(--font-scale, 1));
   }
 }
 
 @container layout (min-width: 700px) {
   .title {
-    font-size: var(--text-3xl);
+    font-size: calc(var(--text-3xl) * var(--font-scale, 1));
   }
 
   .artist {
-    font-size: var(--text-2xl);
+    font-size: calc(var(--text-2xl) * var(--font-scale, 1));
   }
 
   .album {
-    font-size: var(--text-xl);
+    font-size: calc(var(--text-xl) * var(--font-scale, 1));
   }
 
   .no-playback-text {
-    font-size: var(--text-3xl);
+    font-size: calc(var(--text-3xl) * var(--font-scale, 1));
   }
 
   .zone-hint {
-    font-size: var(--text-2xl);
+    font-size: calc(var(--text-2xl) * var(--font-scale, 1));
   }
 }
 
 @container layout (min-width: 1000px) {
   .title {
-    font-size: var(--text-4xl);
+    font-size: calc(var(--text-4xl) * var(--font-scale, 1));
   }
 
   .artist {
-    font-size: var(--text-3xl);
+    font-size: calc(var(--text-3xl) * var(--font-scale, 1));
   }
 
   .album {
-    font-size: var(--text-2xl);
+    font-size: calc(var(--text-2xl) * var(--font-scale, 1));
   }
 
   .no-playback-text {
-    font-size: var(--text-4xl);
+    font-size: calc(var(--text-4xl) * var(--font-scale, 1));
   }
 
   .zone-hint {
-    font-size: var(--text-3xl);
+    font-size: calc(var(--text-3xl) * var(--font-scale, 1));
   }
 }
 </style>
