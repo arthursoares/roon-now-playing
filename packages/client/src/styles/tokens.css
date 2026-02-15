@@ -5,6 +5,9 @@
  */
 
 :root {
+  /* Font Scale Multiplier - adjusted via admin UI */
+  --font-scale: 1;
+
   /* Typography Scale */
   --text-xs: 0.64rem;      /* 10px - zone hints, timestamps */
   --text-sm: 0.8rem;       /* 13px - secondary info */
