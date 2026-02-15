@@ -31,6 +31,7 @@ export interface RemoteSettingsHandler {
     layout?: LayoutType;
     font?: FontType;
     background?: BackgroundType;
+    fontScaleOverride?: number | null;
     zoneId?: string;
     zoneName?: string;
   }) => void;
@@ -49,6 +50,7 @@ export interface UseWebSocketOptions {
     layout?: LayoutType;
     font?: FontType;
     background?: BackgroundType;
+    fontScaleOverride?: number | null;
     zoneId?: string;
     zoneName?: string;
   }) => void;
@@ -215,6 +217,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
               layout: message.layout,
               font: message.font,
               background: message.background,
+              fontScaleOverride: message.fontScaleOverride,
               zoneId: message.zoneId,
               zoneName: message.zoneName,
             });
