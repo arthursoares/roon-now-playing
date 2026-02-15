@@ -500,7 +500,7 @@ watch(
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   min-height: 0; /* Allow flex shrink */
   max-height: 100%;
   overflow: hidden;
