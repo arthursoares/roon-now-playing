@@ -20,7 +20,7 @@ import {
 const { state: wsState } = useWebSocket({ isAdmin: true });
 
 // Navigation
-const activeSection = ref<'clients' | 'facts' | 'test' | 'sources'>('clients');
+const activeSection = ref<'clients' | 'facts' | 'test' | 'sources' | 'display'>('clients');
 
 const editingName = ref<string | null>(null);
 const editNameValue = ref('');
@@ -78,6 +78,51 @@ const sourcesConfigSaving = ref(false);
 const generatingApiKey = ref(false);
 const deletingZone = ref<string | null>(null);
 const apiKeyCopied = ref(false);
+
+// Display settings state
+const displaySettings = ref<{ fontScale: number }>({ fontScale: 1 });
+const displaySettingsLoading = ref(true);
+const displaySettingsSaving = ref(false);
+
+async function loadDisplaySettings(): Promise<void> {
+  try {
+    displaySettingsLoading.value = true;
+    const response = await fetch('/api/admin/display-settings');
+    if (response.ok) {
+      displaySettings.value = await response.json();
+    }
+  } catch (error) {
+    console.error('Failed to load display settings:', error);
+  } finally {
+    displaySettingsLoading.value = false;
+  }
+}
+
+// Debounced save
+let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+
+function onFontScaleChange(event: Event): void {
+  const value = parseFloat((event.target as HTMLInputElement).value);
+  displaySettings.value.fontScale = value;
+
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => saveDisplaySettings(), 300);
+}
+
+async function saveDisplaySettings(): Promise<void> {
+  displaySettingsSaving.value = true;
+  try {
+    await fetch('/api/admin/display-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(displaySettings.value),
+    });
+  } catch (error) {
+    console.error('Failed to save display settings:', error);
+  } finally {
+    displaySettingsSaving.value = false;
+  }
+}
 
 const connectionStatus = computed(() => {
   if (!wsState.value.connected) return 'connecting';
@@ -408,6 +453,7 @@ function formatLastSeen(timestamp: string | number): string {
 onMounted(() => {
   loadFactsConfig();
   loadSourcesData();
+  loadDisplaySettings();
 });
 </script>
 
@@ -477,6 +523,18 @@ onMounted(() => {
           </svg>
           <span>Sources</span>
           <span v-if="externalZones.length > 0" class="nav-badge">{{ externalZones.length }}</span>
+        </button>
+
+        <button
+          class="nav-item"
+          :class="{ active: activeSection === 'display' }"
+          @click="activeSection = 'display'"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          <span>Display</span>
         </button>
       </nav>
 
@@ -1118,6 +1176,52 @@ onMounted(() => {
                 </tr>
               </tbody>
             </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Display Settings Section -->
+      <section v-if="activeSection === 'display'" class="content-section">
+        <header class="section-header">
+          <div class="section-title">
+            <h1>Display Settings</h1>
+            <p class="section-desc">Adjust global display appearance settings.</p>
+          </div>
+        </header>
+
+        <div v-if="displaySettingsLoading" class="loading-state">
+          <div class="loading-spinner"></div>
+          <span>Loading settings...</span>
+        </div>
+
+        <div v-else class="config-card">
+          <h2 class="card-title">Font Scale</h2>
+          <p class="card-desc">Adjust the global font size multiplier. Individual screens can override this setting.</p>
+
+          <div class="slider-field">
+            <div class="slider-header">
+              <label for="fontScale">Scale Factor</label>
+              <span class="slider-value">{{ displaySettings.fontScale.toFixed(2) }}x</span>
+            </div>
+            <input
+              id="fontScale"
+              type="range"
+              min="0.75"
+              max="1.5"
+              step="0.05"
+              :value="displaySettings.fontScale"
+              @input="onFontScaleChange"
+              class="slider-input"
+            />
+            <div class="slider-labels">
+              <span>0.75x</span>
+              <span>1.0x</span>
+              <span>1.5x</span>
+            </div>
+          </div>
+
+          <div v-if="displaySettingsSaving" class="saving-indicator">
+            Saving...
           </div>
         </div>
       </section>
@@ -2413,5 +2517,86 @@ onMounted(() => {
 
 .custom-model-input {
   margin-top: 8px;
+}
+
+/* === Slider Styles === */
+.card-desc {
+  margin: 0 0 24px 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.slider-field {
+  max-width: 400px;
+}
+
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.slider-header label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.slider-value {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  min-width: 48px;
+  text-align: right;
+}
+
+.slider-input {
+  width: 100%;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--bg-surface);
+  border-radius: 3px;
+  outline: none;
+}
+
+.slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: var(--accent-primary);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.slider-input::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+.slider-input::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  background: var(--accent-primary);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.slider-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.saving-indicator {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 </style>
