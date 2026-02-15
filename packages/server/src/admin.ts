@@ -56,11 +56,12 @@ export function createAdminRouter(wsManager: WebSocketManager): Router {
   // Push settings to client
   router.post('/clients/:clientId/push', (req, res) => {
     const { clientId } = req.params;
-    const { layout, font, background, zoneId } = req.body as {
+    const { layout, font, background, zoneId, fontScaleOverride } = req.body as {
       layout?: LayoutType;
       font?: FontType;
       background?: BackgroundType;
       zoneId?: string;
+      fontScaleOverride?: number | null;
     };
 
     // Validate layout
@@ -81,16 +82,24 @@ export function createAdminRouter(wsManager: WebSocketManager): Router {
       return;
     }
 
+    // Validate fontScaleOverride
+    if (fontScaleOverride !== undefined && fontScaleOverride !== null) {
+      if (typeof fontScaleOverride !== 'number' || fontScaleOverride < 0.75 || fontScaleOverride > 1.5) {
+        res.status(400).json({ error: 'fontScaleOverride must be a number between 0.75 and 1.5, or null' });
+        return;
+      }
+    }
+
     // Check if any settings provided
-    if (layout === undefined && font === undefined && background === undefined && zoneId === undefined) {
-      res.status(400).json({ error: 'At least one setting (layout, font, background, or zoneId) is required' });
+    if (layout === undefined && font === undefined && background === undefined && zoneId === undefined && fontScaleOverride === undefined) {
+      res.status(400).json({ error: 'At least one setting (layout, font, background, zoneId, or fontScaleOverride) is required' });
       return;
     }
 
-    const success = wsManager.pushSettingsToClient(clientId, { layout, font, background, zoneId });
+    const success = wsManager.pushSettingsToClient(clientId, { layout, font, background, zoneId, fontScaleOverride });
     if (success) {
       logger.info(
-        `Pushed settings to ${clientId}: layout=${layout}, font=${font}, background=${background}, zoneId=${zoneId}`
+        `Pushed settings to ${clientId}: layout=${layout}, font=${font}, background=${background}, zoneId=${zoneId}, fontScaleOverride=${fontScaleOverride}`
       );
       res.json({ success: true });
     } else {

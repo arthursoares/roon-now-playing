@@ -39,6 +39,7 @@ interface ClientState {
   connectedAt: number;
   userAgent: string | null;
   isAdmin: boolean;
+  fontScaleOverride?: number | null;
 }
 
 function extractDeviceId(clientId: string): string {
@@ -459,6 +460,7 @@ export class WebSocketManager {
       connectedAt: clientState.connectedAt,
       userAgent: clientState.userAgent,
       isAdmin: clientState.isAdmin,
+      fontScaleOverride: clientState.fontScaleOverride,
     };
   }
 
@@ -479,7 +481,7 @@ export class WebSocketManager {
 
   pushSettingsToClient(
     clientId: string,
-    settings: { layout?: LayoutType; font?: FontType; background?: BackgroundType; zoneId?: string }
+    settings: { layout?: LayoutType; font?: FontType; background?: BackgroundType; zoneId?: string; fontScaleOverride?: number | null }
   ): boolean {
     const clientState = this.clientsById.get(clientId);
     if (!clientState || clientState.ws.readyState !== WebSocket.OPEN) {
@@ -503,6 +505,7 @@ export class WebSocketManager {
       background: settings.background,
       zoneId: settings.zoneId,
       zoneName,
+      fontScaleOverride: settings.fontScaleOverride,
     };
 
     this.sendToClient(clientState.ws, message);
@@ -514,6 +517,9 @@ export class WebSocketManager {
     if (settings.zoneId) {
       clientState.subscribedZoneId = settings.zoneId;
       clientState.subscribedZoneName = zoneName || null;
+    }
+    if (settings.fontScaleOverride !== undefined) {
+      clientState.fontScaleOverride = settings.fontScaleOverride;
     }
 
     // Notify admins about the update

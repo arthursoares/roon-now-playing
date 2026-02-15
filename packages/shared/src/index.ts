@@ -264,6 +264,7 @@ export interface ClientMetadata {
   connectedAt: number;
   userAgent: string | null;
   isAdmin: boolean;
+  fontScaleOverride?: number | null; // null = use global, number = custom
 }
 
 export interface ClientMetadataMessage {
@@ -305,6 +306,7 @@ export interface ServerRemoteSettingsMessage {
   background?: BackgroundType;
   zoneId?: string;
   zoneName?: string;
+  fontScaleOverride?: number | null;
 }
 
 // Display settings (stored on server)

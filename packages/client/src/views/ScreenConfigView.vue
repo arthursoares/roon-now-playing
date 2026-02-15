@@ -77,7 +77,7 @@ async function saveName(): Promise<void> {
 }
 
 async function pushSetting(
-  setting: { layout?: LayoutType; font?: FontType; background?: BackgroundType; zoneId?: string }
+  setting: { layout?: LayoutType; font?: FontType; background?: BackgroundType; zoneId?: string; fontScaleOverride?: number | null }
 ): Promise<void> {
   if (!screen.value) return;
   saving.value = true;
@@ -97,6 +97,21 @@ async function pushSetting(
   } finally {
     saving.value = false;
   }
+}
+
+function toggleFontScaleOverride(event: Event): void {
+  const useGlobal = (event.target as HTMLInputElement).checked;
+  pushSetting({ fontScaleOverride: useGlobal ? null : 1.0 });
+}
+
+let fontScaleTimeout: ReturnType<typeof setTimeout> | null = null;
+
+function onFontScaleOverrideChange(event: Event): void {
+  const value = parseFloat((event.target as HTMLInputElement).value);
+  if (fontScaleTimeout) clearTimeout(fontScaleTimeout);
+  fontScaleTimeout = setTimeout(() => {
+    pushSetting({ fontScaleOverride: value });
+  }, 300);
 }
 
 // Auto-clear errors
@@ -226,6 +241,34 @@ onUnmounted(() => {
             >
               {{ getFontDisplayName(f) }}
             </button>
+          </div>
+        </section>
+
+        <!-- Font Scale Override -->
+        <section class="config-section">
+          <label class="config-label">Font Scale</label>
+
+          <div class="override-toggle">
+            <label class="checkbox-label">
+              <input
+                type="checkbox"
+                :checked="screen.fontScaleOverride === null || screen.fontScaleOverride === undefined"
+                @change="toggleFontScaleOverride"
+              />
+              Use global setting
+            </label>
+          </div>
+
+          <div v-if="screen.fontScaleOverride !== null && screen.fontScaleOverride !== undefined" class="slider-compact">
+            <input
+              type="range"
+              min="0.75"
+              max="1.5"
+              step="0.05"
+              :value="screen.fontScaleOverride"
+              @input="onFontScaleOverrideChange"
+            />
+            <span class="slider-value">{{ screen.fontScaleOverride?.toFixed(2) || '1.00' }}x</span>
           </div>
         </section>
       </template>
@@ -421,5 +464,52 @@ onUnmounted(() => {
   padding: 0.75rem 1.5rem;
   border-radius: 8px;
   font-size: 0.9rem;
+}
+
+.override-toggle {
+  margin-bottom: 1rem;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  color: #ccc;
+}
+
+.checkbox-label input {
+  width: 16px;
+  height: 16px;
+}
+
+.slider-compact {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.slider-compact input[type="range"] {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  background: #333;
+  border-radius: 2px;
+}
+
+.slider-compact input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #4a6cf7;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.slider-compact .slider-value {
+  font-family: monospace;
+  font-size: 0.9rem;
+  color: #888;
+  min-width: 48px;
 }
 </style>
