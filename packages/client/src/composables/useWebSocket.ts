@@ -9,6 +9,7 @@ import type {
   FontType,
   BackgroundType,
   ClientMetadata,
+  DisplaySettings,
 } from '@roon-screen-cover/shared';
 import { useClientId } from './useClientId';
 
@@ -21,6 +22,8 @@ export interface WebSocketState {
   nowPlaying: NowPlaying | null;
   // Admin-only state
   clients: ClientMetadata[];
+  // Display settings
+  displaySettings: DisplaySettings;
 }
 
 export interface RemoteSettingsHandler {
@@ -62,6 +65,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     zones: [],
     nowPlaying: null,
     clients: [],
+    displaySettings: { fontScale: 1 },
   });
 
   let ws: WebSocket | null = null;
@@ -215,6 +219,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
               zoneName: message.zoneName,
             });
           }
+          break;
+
+        // Display settings update
+        case 'display_settings_update':
+          state.value.displaySettings = message.settings;
           break;
       }
     } catch (error) {
