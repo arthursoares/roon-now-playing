@@ -307,6 +307,20 @@ export interface ServerRemoteSettingsMessage {
   zoneName?: string;
 }
 
+// Display settings (stored on server)
+export interface DisplaySettings {
+  fontScale: number;
+}
+
+export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
+  fontScale: 1.0,
+};
+
+export interface DisplaySettingsUpdateMessage {
+  type: 'display_settings_update';
+  settings: DisplaySettings;
+}
+
 // External source types
 export type SourceType = 'roon' | 'external';
 export type SourceStatus = 'connected' | 'disconnected';
@@ -363,4 +377,5 @@ export type ServerMessage =
   | ServerClientConnectedMessage
   | ServerClientDisconnectedMessage
   | ServerClientUpdatedMessage
-  | ServerRemoteSettingsMessage;
+  | ServerRemoteSettingsMessage
+  | DisplaySettingsUpdateMessage;
