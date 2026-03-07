@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import { useWebSocket } from './composables/useWebSocket';
+
+// Initialize WebSocket for connection state
+// Note: Font scale is applied per-route (e.g., NowPlayingView handles it)
+const { state } = useWebSocket();
 </script>
 
 <template>

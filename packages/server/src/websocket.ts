@@ -19,11 +19,13 @@ import type {
   ServerClientDisconnectedMessage,
   ServerClientUpdatedMessage,
   ServerRemoteSettingsMessage,
+  DisplaySettings,
 } from '@roon-screen-cover/shared';
 import { RoonClient } from './roon.js';
 import { ExternalSourceManager } from './externalSources.js';
 import { generateFriendlyName } from './nameGenerator.js';
 import { logger } from './logger.js';
+import { loadDisplaySettings } from './display-settings.js';
 
 interface ClientState {
   ws: WebSocket;
@@ -38,6 +40,7 @@ interface ClientState {
   connectedAt: number;
   userAgent: string | null;
   isAdmin: boolean;
+  fontScaleOverride?: number | null;
 }
 
 function extractDeviceId(clientId: string): string {
@@ -121,6 +124,13 @@ export class WebSocketManager {
         this.sendToClient(ws, {
           type: 'clients_list',
           clients: this.getAllClientsMetadata(),
+        });
+      } else {
+        // For non-admin clients, send current display settings
+        const displaySettings = loadDisplaySettings();
+        this.sendToClient(ws, {
+          type: 'display_settings_update',
+          settings: displaySettings,
         });
       }
 
@@ -458,6 +468,7 @@ export class WebSocketManager {
       connectedAt: clientState.connectedAt,
       userAgent: clientState.userAgent,
       isAdmin: clientState.isAdmin,
+      fontScaleOverride: clientState.fontScaleOverride,
     };
   }
 
@@ -478,7 +489,7 @@ export class WebSocketManager {
 
   pushSettingsToClient(
     clientId: string,
-    settings: { layout?: LayoutType; font?: FontType; background?: BackgroundType; zoneId?: string }
+    settings: { layout?: LayoutType; font?: FontType; background?: BackgroundType; zoneId?: string; fontScaleOverride?: number | null }
   ): boolean {
     const clientState = this.clientsById.get(clientId);
     if (!clientState || clientState.ws.readyState !== WebSocket.OPEN) {
@@ -502,6 +513,7 @@ export class WebSocketManager {
       background: settings.background,
       zoneId: settings.zoneId,
       zoneName,
+      fontScaleOverride: settings.fontScaleOverride,
     };
 
     this.sendToClient(clientState.ws, message);
@@ -513,6 +525,9 @@ export class WebSocketManager {
     if (settings.zoneId) {
       clientState.subscribedZoneId = settings.zoneId;
       clientState.subscribedZoneName = zoneName || null;
+    }
+    if (settings.fontScaleOverride !== undefined) {
+      clientState.fontScaleOverride = settings.fontScaleOverride;
     }
 
     // Notify admins about the update
@@ -578,5 +593,19 @@ export class WebSocketManager {
       }
     }
     return null;
+  }
+
+  broadcastDisplaySettings(settings: DisplaySettings): void {
+    const message = JSON.stringify({
+      type: 'display_settings_update',
+      settings,
+    });
+
+    // Broadcast to all non-admin clients
+    for (const clientState of this.clients.values()) {
+      if (!clientState.isAdmin && clientState.ws.readyState === WebSocket.OPEN) {
+        clientState.ws.send(message);
+      }
+    }
   }
 }

@@ -112,29 +112,14 @@ watch(
 <style scoped>
 /*
  * ============================================
- * TYPOGRAPHY CONFIGURATION
- * Adjust these values to tweak font sizes and line heights.
- * Format: clamp(min, preferred, max)
+ * TYPOGRAPHY
+ * Uses token-based container queries for responsive scaling.
+ * See: packages/client/src/styles/typography.css
  * ============================================
  */
 .facts-overlay-layout {
-  /* Fact text (main content) */
-  --font-fact: clamp(26px, 4vw, 52px);
-  --line-height-fact: 1.35;
-
-  /* Track metadata */
-  --font-title: clamp(18px, 2.2vw, 28px);
-  --line-height-title: 1.2;
-  --font-artist-album: clamp(14px, 1.6vw, 22px);
-  --line-height-artist-album: 1.3;
-
-  /* Secondary text */
-  --font-loading: clamp(20px, 2.5vw, 32px);
-  --font-error: clamp(16px, 1.5vw, 22px);
-
-  /* No playback state */
-  --font-no-playback: clamp(24px, 3vw, 48px);
-  --font-zone-hint: clamp(16px, 2vw, 28px);
+  container-type: inline-size;
+  container-name: layout;
 
   /* Base styles */
   position: relative;
@@ -219,9 +204,9 @@ watch(
 }
 
 .fact-text {
-  font-size: var(--font-fact);
-  font-weight: 400;
-  line-height: var(--line-height-fact);
+  font-size: calc(var(--text-lg) * var(--font-scale, 1));
+  font-weight: var(--font-normal);
+  line-height: var(--leading-snug);
   margin: 0;
   color: #fff;
   text-shadow: 0 2px 20px rgba(0, 0, 0, 0.5);
@@ -229,14 +214,44 @@ watch(
   animation: fadeIn 0.5s ease-out;
 }
 
+@container layout (min-width: 500px) {
+  .fact-text {
+    font-size: calc(var(--text-xl) * var(--font-scale, 1));
+  }
+}
+
+@container layout (min-width: 700px) {
+  .fact-text {
+    font-size: calc(var(--text-2xl) * var(--font-scale, 1));
+  }
+}
+
+@container layout (min-width: 1000px) {
+  .fact-text {
+    font-size: calc(var(--text-3xl) * var(--font-scale, 1));
+  }
+}
+
+@container layout (min-width: 1400px) {
+  .fact-text {
+    font-size: calc(var(--text-4xl) * var(--font-scale, 1));
+  }
+}
+
 .loading-hint {
-  font-size: var(--font-loading);
+  font-size: calc(var(--text-base) * var(--font-scale, 1));
   color: rgba(255, 255, 255, 0.6);
   margin: 0;
 }
 
+@container layout (min-width: 700px) {
+  .loading-hint {
+    font-size: calc(var(--text-lg) * var(--font-scale, 1));
+  }
+}
+
 .error-hint {
-  font-size: var(--font-error);
+  font-size: calc(var(--text-sm) * var(--font-scale, 1));
   color: rgba(255, 255, 255, 0.5);
   margin: 0;
 }
@@ -270,9 +285,9 @@ watch(
 }
 
 .metadata .title {
-  font-size: var(--font-title);
-  font-weight: 600;
-  line-height: var(--line-height-title);
+  font-size: calc(var(--text-lg) * var(--font-scale, 1));
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-tight);
   margin: 0 0 0.2em 0;
   color: #fff;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
@@ -281,10 +296,22 @@ watch(
   white-space: nowrap;
 }
 
+@container layout (min-width: 700px) {
+  .metadata .title {
+    font-size: calc(var(--text-xl) * var(--font-scale, 1));
+  }
+}
+
+@container layout (min-width: 1000px) {
+  .metadata .title {
+    font-size: calc(var(--text-2xl) * var(--font-scale, 1));
+  }
+}
+
 .metadata .artist-album {
-  font-size: var(--font-artist-album);
-  font-weight: 400;
-  line-height: var(--line-height-artist-album);
+  font-size: calc(var(--text-base) * var(--font-scale, 1));
+  font-weight: var(--font-normal);
+  line-height: var(--leading-snug);
   margin: 0;
   color: rgba(255, 255, 255, 0.75);
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
@@ -293,19 +320,49 @@ watch(
   white-space: nowrap;
 }
 
+@container layout (min-width: 700px) {
+  .metadata .artist-album {
+    font-size: calc(var(--text-lg) * var(--font-scale, 1));
+  }
+}
+
+@container layout (min-width: 1000px) {
+  .metadata .artist-album {
+    font-size: calc(var(--text-xl) * var(--font-scale, 1));
+  }
+}
+
 .no-playback {
   color: rgba(255, 255, 255, 0.6);
 }
 
 .no-playback-text {
-  font-size: var(--font-no-playback);
+  font-size: calc(var(--text-xl) * var(--font-scale, 1));
   margin: 0;
 }
 
+@container layout (min-width: 700px) {
+  .no-playback-text {
+    font-size: calc(var(--text-2xl) * var(--font-scale, 1));
+  }
+}
+
+@container layout (min-width: 1000px) {
+  .no-playback-text {
+    font-size: calc(var(--text-3xl) * var(--font-scale, 1));
+  }
+}
+
 .zone-hint {
-  font-size: var(--font-zone-hint);
+  font-size: calc(var(--text-base) * var(--font-scale, 1));
   margin: 0.5em 0 0 0;
   opacity: 0.7;
+}
+
+@container layout (min-width: 700px) {
+  .zone-hint {
+    font-size: calc(var(--text-lg) * var(--font-scale, 1));
+  }
 }
 
 .progress-line {

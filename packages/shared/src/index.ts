@@ -264,6 +264,7 @@ export interface ClientMetadata {
   connectedAt: number;
   userAgent: string | null;
   isAdmin: boolean;
+  fontScaleOverride?: number | null; // null = use global, number = custom
 }
 
 export interface ClientMetadataMessage {
@@ -305,6 +306,21 @@ export interface ServerRemoteSettingsMessage {
   background?: BackgroundType;
   zoneId?: string;
   zoneName?: string;
+  fontScaleOverride?: number | null;
+}
+
+// Display settings (stored on server)
+export interface DisplaySettings {
+  fontScale: number;
+}
+
+export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
+  fontScale: 1.0,
+};
+
+export interface DisplaySettingsUpdateMessage {
+  type: 'display_settings_update';
+  settings: DisplaySettings;
 }
 
 // External source types
@@ -363,4 +379,5 @@ export type ServerMessage =
   | ServerClientConnectedMessage
   | ServerClientDisconnectedMessage
   | ServerClientUpdatedMessage
-  | ServerRemoteSettingsMessage;
+  | ServerRemoteSettingsMessage
+  | DisplaySettingsUpdateMessage;

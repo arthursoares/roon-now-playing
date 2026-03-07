@@ -116,6 +116,7 @@ const secondaryTextColor = computed(() => {
   padding: 2rem;
   box-sizing: border-box;
   overflow: hidden;
+  container-type: inline-size;
 }
 
 .content {
@@ -201,8 +202,8 @@ const secondaryTextColor = computed(() => {
 }
 
 .title {
-  font-size: 1.5rem;
-  font-weight: 600;
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
   margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -210,7 +211,7 @@ const secondaryTextColor = computed(() => {
 }
 
 .artist {
-  font-size: 1.125rem;
+  font-size: var(--text-lg);
   margin: 0;
   margin-top: 0.25rem;
   color: var(--text-secondary);
@@ -220,7 +221,7 @@ const secondaryTextColor = computed(() => {
 }
 
 .album {
-  font-size: 1rem;
+  font-size: var(--text-base);
   margin: 0;
   margin-top: 0.25rem;
   color: var(--text-secondary);
@@ -231,7 +232,7 @@ const secondaryTextColor = computed(() => {
 }
 
 .no-playback {
-  font-size: 1.25rem;
+  font-size: var(--text-lg);
   opacity: 0.6;
 }
 
@@ -244,7 +245,7 @@ const secondaryTextColor = computed(() => {
 }
 
 .zone-hint {
-  font-size: 1rem;
+  font-size: var(--text-base);
   opacity: 0.8;
 }
 
@@ -264,7 +265,7 @@ const secondaryTextColor = computed(() => {
   -webkit-box-pack: justify;
   -webkit-justify-content: space-between;
   justify-content: space-between;
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   margin-top: 0.5rem;
 }
@@ -323,15 +324,15 @@ const secondaryTextColor = computed(() => {
   }
 
   .title {
-    font-size: 2rem;
+    font-size: var(--text-2xl);
   }
 
   .artist {
-    font-size: 1.25rem;
+    font-size: var(--text-lg);
   }
 
   .album {
-    font-size: 1.125rem;
+    font-size: var(--text-lg);
   }
 }
 
@@ -346,30 +347,30 @@ const secondaryTextColor = computed(() => {
   }
 
   .title {
-    font-size: 1.25rem;
+    font-size: var(--text-lg);
   }
 
   .artist {
-    font-size: 1rem;
+    font-size: var(--text-base);
   }
 
   .album {
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
   }
 }
 
 /* Large screens */
 @media (min-width: 1200px) and (orientation: landscape) {
   .title {
-    font-size: 2.5rem;
+    font-size: var(--text-3xl);
   }
 
   .artist {
-    font-size: 1.5rem;
+    font-size: var(--text-xl);
   }
 
   .album {
-    font-size: 1.25rem;
+    font-size: var(--text-lg);
   }
 }
 </style>

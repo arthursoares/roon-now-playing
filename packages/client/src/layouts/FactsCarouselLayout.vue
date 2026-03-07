@@ -125,30 +125,14 @@ watch(
 <style scoped>
 /*
  * ============================================
- * TYPOGRAPHY CONFIGURATION
- * Adjust these values to tweak font sizes and line heights.
- * Format: clamp(min, preferred, max)
+ * TYPOGRAPHY
+ * Uses token-based container queries for responsive scaling.
+ * See: packages/client/src/styles/tokens.css
  * ============================================
  */
 .facts-carousel-layout {
-  /* Fact text (main content) */
-  --font-fact: clamp(22px, 3.2vw, 42px);
-  --line-height-fact: 1.45;
-
-  /* Track metadata */
-  --font-title: clamp(16px, 2vw, 24px);
-  --line-height-title: 1.2;
-  --font-artist-album: clamp(13px, 1.5vw, 18px);
-  --line-height-artist-album: 1.3;
-
-  /* Secondary text */
-  --font-loading: clamp(16px, 1.8vw, 24px);
-  --font-error: clamp(14px, 1.4vw, 20px);
-  --font-bottom-info: clamp(12px, 1.2vw, 16px);
-
-  /* No playback state */
-  --font-no-playback: clamp(20px, 2.5vw, 36px);
-  --font-zone-hint: clamp(14px, 1.5vw, 22px);
+  container-type: inline-size;
+  container-name: layout;
 
   /* Base styles */
   position: relative;
@@ -227,6 +211,9 @@ watch(
 }
 
 .fact-card {
+  container-type: inline-size;
+  container-name: card;
+
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(20px);
   border-radius: 16px;
@@ -251,24 +238,64 @@ watch(
 }
 
 .fact-text {
-  font-size: var(--font-fact);
-  font-weight: 400;
-  line-height: var(--line-height-fact);
+  font-size: calc(var(--text-lg) * var(--font-scale, 1));
+  font-weight: var(--font-normal);
+  line-height: var(--leading-normal);
   margin: 0;
   color: #fff;
   animation: fadeIn 0.5s ease-out;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@container card (min-width: 300px) {
+  .fact-text {
+    font-size: calc(var(--text-xl) * var(--font-scale, 1));
+  }
+}
+
+@container card (min-width: 400px) {
+  .fact-text {
+    font-size: calc(var(--text-2xl) * var(--font-scale, 1));
+  }
+}
+
+@container card (min-width: 600px) {
+  .fact-text {
+    font-size: calc(var(--text-3xl) * var(--font-scale, 1));
+  }
+}
+
+@container card (min-width: 800px) {
+  .fact-text {
+    font-size: calc(var(--text-4xl) * var(--font-scale, 1));
+  }
 }
 
 .loading-hint {
-  font-size: var(--font-loading);
+  font-size: calc(var(--text-base) * var(--font-scale, 1));
   color: rgba(255, 255, 255, 0.5);
   margin: 0;
+  width: 100%;
+}
+
+@container card (min-width: 400px) {
+  .loading-hint {
+    font-size: calc(var(--text-lg) * var(--font-scale, 1));
+  }
 }
 
 .error-hint {
-  font-size: var(--font-error);
+  font-size: calc(var(--text-sm) * var(--font-scale, 1));
   color: rgba(255, 255, 255, 0.5);
   margin: 0;
+  width: 100%;
+}
+
+@container card (min-width: 400px) {
+  .error-hint {
+    font-size: calc(var(--text-base) * var(--font-scale, 1));
+  }
 }
 
 .error-hint a {
@@ -303,9 +330,9 @@ watch(
 }
 
 .metadata .title {
-  font-size: var(--font-title);
-  font-weight: 600;
-  line-height: var(--line-height-title);
+  font-size: calc(var(--text-base) * var(--font-scale, 1));
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-tight);
   margin: 0 0 0.2em 0;
   color: #fff;
   overflow: hidden;
@@ -313,10 +340,22 @@ watch(
   white-space: nowrap;
 }
 
+@container card (min-width: 300px) {
+  .metadata .title {
+    font-size: calc(var(--text-lg) * var(--font-scale, 1));
+  }
+}
+
+@container card (min-width: 500px) {
+  .metadata .title {
+    font-size: calc(var(--text-xl) * var(--font-scale, 1));
+  }
+}
+
 .metadata .artist-album {
-  font-size: var(--font-artist-album);
-  font-weight: 400;
-  line-height: var(--line-height-artist-album);
+  font-size: calc(var(--text-sm) * var(--font-scale, 1));
+  font-weight: var(--font-normal);
+  line-height: var(--leading-snug);
   margin: 0;
   color: rgba(255, 255, 255, 0.7);
   overflow: hidden;
@@ -324,19 +363,51 @@ watch(
   white-space: nowrap;
 }
 
+@container card (min-width: 300px) {
+  .metadata .artist-album {
+    font-size: calc(var(--text-base) * var(--font-scale, 1));
+  }
+}
+
+@container card (min-width: 500px) {
+  .metadata .artist-album {
+    font-size: calc(var(--text-lg) * var(--font-scale, 1));
+  }
+}
+
 .no-playback {
   color: rgba(255, 255, 255, 0.6);
 }
 
 .no-playback-text {
-  font-size: var(--font-no-playback);
+  font-size: calc(var(--text-xl) * var(--font-scale, 1));
   margin: 0;
+  width: 100%;
+}
+
+@container card (min-width: 400px) {
+  .no-playback-text {
+    font-size: calc(var(--text-2xl) * var(--font-scale, 1));
+  }
+}
+
+@container card (min-width: 600px) {
+  .no-playback-text {
+    font-size: calc(var(--text-3xl) * var(--font-scale, 1));
+  }
 }
 
 .zone-hint {
-  font-size: var(--font-zone-hint);
+  font-size: calc(var(--text-base) * var(--font-scale, 1));
   margin: 0.5em 0 0 0;
   opacity: 0.7;
+  width: 100%;
+}
+
+@container card (min-width: 400px) {
+  .zone-hint {
+    font-size: calc(var(--text-lg) * var(--font-scale, 1));
+  }
 }
 
 /* Bottom info - fixed position */
@@ -346,7 +417,19 @@ watch(
   left: 5%;
   right: 5%;
   color: rgba(255, 255, 255, 0.6);
-  font-size: var(--font-bottom-info);
+  font-size: calc(var(--text-xs) * var(--font-scale, 1));
+}
+
+@container layout (min-width: 500px) {
+  .bottom-info {
+    font-size: calc(var(--text-sm) * var(--font-scale, 1));
+  }
+}
+
+@container layout (min-width: 1000px) {
+  .bottom-info {
+    font-size: calc(var(--text-base) * var(--font-scale, 1));
+  }
 }
 
 .progress-line {

@@ -23,12 +23,14 @@ const {
 
 const selectedZoneId = ref<string | null>(null);
 const selectedZoneName = ref<string | null>(null);
+const currentFontScaleOverride = ref<number | null>(null);
 
 // Handle remote settings from admin
 function handleRemoteSettings(settings: {
   layout?: LayoutType;
   font?: FontType;
   background?: BackgroundType;
+  fontScaleOverride?: number | null;
   zoneId?: string;
   zoneName?: string;
 }) {
@@ -40,6 +42,9 @@ function handleRemoteSettings(settings: {
   }
   if (settings.background) {
     saveBackgroundPreference(settings.background);
+  }
+  if (settings.fontScaleOverride !== undefined) {
+    currentFontScaleOverride.value = settings.fontScaleOverride;
   }
   if (settings.zoneId) {
     selectedZoneId.value = settings.zoneId;
@@ -161,6 +166,16 @@ watch(
 watch([layout, font, background], () => {
   updateMetadata();
 });
+
+// Apply font scale override with priority over global setting
+watch(
+  [() => wsState.value.displaySettings?.fontScale, currentFontScaleOverride],
+  ([globalScale, override]) => {
+    const effectiveScale = override !== null ? override : (globalScale || 1);
+    document.documentElement.style.setProperty('--font-scale', String(effectiveScale));
+  },
+  { immediate: true }
+);
 
 // Load preferences on mount
 onMounted(() => {
