@@ -28,9 +28,11 @@ import {
   hslToRgb,
   hslToString,
   getLuminance,
+  getContrastRatio,
   extractDominantColor,
   extractColorPalette,
   generateColors,
+  generateVibrantGradient,
   type HSL,
 } from './colorUtils';
 
@@ -227,6 +229,34 @@ describe('Color Utilities', () => {
 
       expect(greenLum).toBeGreaterThan(redLum);
       expect(greenLum).toBeGreaterThan(blueLum);
+    });
+  });
+
+  describe('getContrastRatio', () => {
+    it('should return 21:1 for black on white', () => {
+      const ratio = getContrastRatio({ r: 0, g: 0, b: 0 }, { r: 255, g: 255, b: 255 });
+      expect(ratio).toBeCloseTo(21, 0);
+    });
+
+    it('should return 1:1 for same colors', () => {
+      const ratio = getContrastRatio({ r: 128, g: 128, b: 128 }, { r: 128, g: 128, b: 128 });
+      expect(ratio).toBeCloseTo(1, 1);
+    });
+
+    it('should be commutative (order of arguments does not matter)', () => {
+      const ratio1 = getContrastRatio({ r: 0, g: 0, b: 0 }, { r: 200, g: 200, b: 200 });
+      const ratio2 = getContrastRatio({ r: 200, g: 200, b: 200 }, { r: 0, g: 0, b: 0 });
+      expect(ratio1).toBeCloseTo(ratio2, 5);
+    });
+
+    it('should return low contrast for similar light colors', () => {
+      const ratio = getContrastRatio({ r: 245, g: 245, b: 245 }, { r: 220, g: 220, b: 220 });
+      expect(ratio).toBeLessThan(4.5);
+    });
+
+    it('should return high contrast for dark text on light background', () => {
+      const ratio = getContrastRatio({ r: 26, g: 26, b: 26 }, { r: 220, g: 220, b: 220 });
+      expect(ratio).toBeGreaterThan(4.5);
     });
   });
 

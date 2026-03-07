@@ -183,6 +183,19 @@ export function getLuminance(r: number, g: number, b: number): number {
 }
 
 /**
+ * Calculate WCAG contrast ratio between two colors
+ * Returns a value between 1 (no contrast) and 21 (max contrast, black on white)
+ * WCAG AA requires 4.5:1 for normal text, 3:1 for large text
+ */
+export function getContrastRatio(color1: RGB, color2: RGB): number {
+  const l1 = getLuminance(color1.r, color1.g, color1.b);
+  const l2 = getLuminance(color2.r, color2.g, color2.b);
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+/**
  * Extract dominant color from image data using hue buckets
  */
 export function extractDominantColor(imageData: ImageData): HSL {
