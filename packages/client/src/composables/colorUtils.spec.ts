@@ -34,6 +34,7 @@ import {
   generateColors,
   generateVibrantGradient,
   type HSL,
+  type RGB,
 } from './colorUtils';
 
 // Polyfill ImageData for Node.js environment
@@ -539,6 +540,83 @@ describe('Color Utilities', () => {
 
       expect(highColors.ready).toBe(true);
       expect(lowColors.ready).toBe(true);
+    });
+
+    it('should meet WCAG 4.5:1 contrast ratio across diverse HSL inputs', () => {
+      const testInputs: HSL[] = [
+        { h: 0, s: 80, l: 30 },    // Dark red
+        { h: 60, s: 90, l: 75 },   // Light yellow
+        { h: 120, s: 50, l: 40 },  // Mid green
+        { h: 180, s: 60, l: 80 },  // Light cyan
+        { h: 210, s: 70, l: 25 },  // Dark blue
+        { h: 300, s: 50, l: 70 },  // Light magenta
+        { h: 0, s: 0, l: 90 },     // Near-white gray
+      ];
+
+      for (const input of testInputs) {
+        const colors = generateColors(input);
+        const bgMatch = colors.background.match(/hsl\((\d+), (\d+)%, (\d+)%\)/);
+        expect(bgMatch).not.toBeNull();
+        const bgRgb = hslToRgb(parseInt(bgMatch![1]), parseInt(bgMatch![2]), parseInt(bgMatch![3]));
+        const textRgb: RGB = colors.text === '#1a1a1a'
+          ? { r: 26, g: 26, b: 26 }
+          : { r: 245, g: 245, b: 245 };
+        const contrast = getContrastRatio(bgRgb, textRgb);
+        expect(contrast).toBeGreaterThanOrEqual(4.5);
+      }
+    });
+  });
+
+  describe('generateVibrantGradient', () => {
+    it('should produce dark text on light pastel backgrounds', () => {
+      const lightPastel: HSL = { h: 60, s: 80, l: 80 };
+      const result = generateVibrantGradient(lightPastel);
+      expect(result.text).toBe('#1a1a1a');
+      expect(result.mode).toBe('light');
+    });
+
+    it('should produce light text on dark backgrounds', () => {
+      const darkInput: HSL = { h: 240, s: 70, l: 20 };
+      const result = generateVibrantGradient(darkInput);
+      expect(result.text).toBe('#f5f5f5');
+      expect(result.mode).toBe('dark');
+    });
+
+    it('should always pick the text color with higher contrast and meet WCAG large text (3:1)', () => {
+      const testInputs: HSL[] = [
+        { h: 0, s: 90, l: 30 },    // Dark red
+        { h: 50, s: 85, l: 75 },   // Light gold
+        { h: 120, s: 60, l: 45 },  // Mid green
+        { h: 180, s: 70, l: 70 },  // Light cyan
+        { h: 220, s: 80, l: 25 },  // Dark blue
+        { h: 280, s: 65, l: 60 },  // Mid purple
+        { h: 330, s: 75, l: 80 },  // Light pink
+        { h: 0, s: 0, l: 50 },     // Mid gray
+      ];
+
+      const lightText: RGB = { r: 245, g: 245, b: 245 };
+      const darkText: RGB = { r: 26, g: 26, b: 26 };
+
+      for (const input of testInputs) {
+        const result = generateVibrantGradient(input);
+        const centerMatch = result.center.match(/hsl\((\d+), (\d+)%, (\d+)%\)/);
+        expect(centerMatch).not.toBeNull();
+        const centerRgb = hslToRgb(parseInt(centerMatch![1]), parseInt(centerMatch![2]), parseInt(centerMatch![3]));
+
+        const lightContrast = getContrastRatio(centerRgb, lightText);
+        const darkContrast = getContrastRatio(centerRgb, darkText);
+        const chosenContrast = Math.max(lightContrast, darkContrast);
+
+        // Should pick the text color with higher contrast
+        if (result.text === '#1a1a1a') {
+          expect(darkContrast).toBeGreaterThanOrEqual(lightContrast);
+        } else {
+          expect(lightContrast).toBeGreaterThanOrEqual(darkContrast);
+        }
+
+        // Should meet at least WCAG AA large text (3:1)
+        expect(chosenContrast).toBeGreaterThanOrEqual(3);
+      }
     });
   });
 });

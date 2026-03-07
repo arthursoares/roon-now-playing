@@ -418,10 +418,13 @@ export function generateVibrantGradient(dominant: HSL): {
     ? Math.max(5, centerL - 20)
     : Math.max(40, centerL - 25);
 
-  // Calculate text color based on center luminance
+  // Calculate text color based on WCAG contrast ratio against center color
   const centerRgb = hslToRgb(dominant.h, centerS, centerL);
-  const luminance = getLuminance(centerRgb.r, centerRgb.g, centerRgb.b);
-  const useDarkText = luminance > 0.35;
+  const lightText: RGB = { r: 245, g: 245, b: 245 };
+  const darkText: RGB = { r: 26, g: 26, b: 26 };
+  const lightContrast = getContrastRatio(centerRgb, lightText);
+  const darkContrast = getContrastRatio(centerRgb, darkText);
+  const useDarkText = lightContrast < 4.5 || darkContrast > lightContrast;
 
   return {
     center: hslToString(dominant.h, centerS, centerL),
@@ -462,12 +465,13 @@ export function generateColors(dominant: HSL): ExtractedColors {
   const shadowS = Math.min(bgS + 15, 50);
   const shadowL = isDarkMode ? 5 : 30;
 
-  // Calculate text color based on background luminance
+  // Calculate text color based on WCAG contrast ratio against background
   const bgRgb = hslToRgb(bgH, bgS, bgL);
-  const luminance = getLuminance(bgRgb.r, bgRgb.g, bgRgb.b);
-
-  // Use dark text on light backgrounds, light text on dark backgrounds
-  const useDarkText = luminance > 0.4;
+  const lightText: RGB = { r: 245, g: 245, b: 245 };
+  const darkText: RGB = { r: 26, g: 26, b: 26 };
+  const lightContrast = getContrastRatio(bgRgb, lightText);
+  const darkContrast = getContrastRatio(bgRgb, darkText);
+  const useDarkText = lightContrast < 4.5 || darkContrast > lightContrast;
   const textColor = useDarkText ? '#1a1a1a' : '#f5f5f5';
   const textSecondary = useDarkText ? 'rgba(26, 26, 26, 0.75)' : 'rgba(245, 245, 245, 0.8)';
   const textTertiary = useDarkText ? 'rgba(26, 26, 26, 0.55)' : 'rgba(245, 245, 245, 0.6)';

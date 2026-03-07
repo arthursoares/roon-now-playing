@@ -36,6 +36,20 @@ export function useBackgroundStyle(
     ].includes(backgroundType.value);
   });
 
+  // Progress bar colors that match the text color (light text = light bar, dark text = dark bar)
+  const lightProgressBar = {
+    '--progress-bar-bg': 'rgba(255, 255, 255, 0.2)',
+    '--progress-bar-fill': 'rgba(255, 255, 255, 0.9)',
+  };
+  const darkProgressBar = {
+    '--progress-bar-bg': 'rgba(26, 26, 26, 0.15)',
+    '--progress-bar-fill': 'rgba(26, 26, 26, 0.7)',
+  };
+
+  function progressBarForText(textColor: string) {
+    return textColor === '#1a1a1a' ? darkProgressBar : lightProgressBar;
+  }
+
   const style = computed(() => {
     switch (backgroundType.value) {
       case 'black':
@@ -44,8 +58,7 @@ export function useBackgroundStyle(
           '--text-color': '#ffffff',
           '--text-secondary': 'rgba(255, 255, 255, 0.8)',
           '--text-tertiary': 'rgba(255, 255, 255, 0.6)',
-          '--progress-bar-bg': 'rgba(255, 255, 255, 0.2)',
-          '--progress-bar-fill': 'rgba(255, 255, 255, 0.9)',
+          ...lightProgressBar,
         };
 
       case 'white':
@@ -54,21 +67,18 @@ export function useBackgroundStyle(
           '--text-color': '#1a1a1a',
           '--text-secondary': 'rgba(26, 26, 26, 0.8)',
           '--text-tertiary': 'rgba(26, 26, 26, 0.6)',
-          '--progress-bar-bg': 'rgba(26, 26, 26, 0.15)',
-          '--progress-bar-fill': 'rgba(26, 26, 26, 0.7)',
+          ...darkProgressBar,
         };
 
       case 'dominant':
         // Use vibrant colors for a more punchy dominant background
         if (vibrantGradient?.value?.ready) {
-          const isDark = vibrantGradient.value.mode === 'dark';
           return {
             background: vibrantGradient.value.center,
             '--text-color': vibrantGradient.value.text,
             '--text-secondary': vibrantGradient.value.textSecondary,
             '--text-tertiary': vibrantGradient.value.textTertiary,
-            '--progress-bar-bg': isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(26, 26, 26, 0.15)',
-            '--progress-bar-fill': isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(26, 26, 26, 0.7)',
+            ...progressBarForText(vibrantGradient.value.text),
           };
         }
         // Fallback to black if no colors available
@@ -77,20 +87,17 @@ export function useBackgroundStyle(
           '--text-color': '#ffffff',
           '--text-secondary': 'rgba(255, 255, 255, 0.8)',
           '--text-tertiary': 'rgba(255, 255, 255, 0.6)',
-          '--progress-bar-bg': 'rgba(255, 255, 255, 0.2)',
-          '--progress-bar-fill': 'rgba(255, 255, 255, 0.9)',
+          ...lightProgressBar,
         };
 
       case 'gradient-radial':
         if (vibrantGradient?.value?.ready) {
-          const isDark = vibrantGradient.value.mode === 'dark';
           return {
             background: `radial-gradient(ellipse 120% 100% at 50% 50%, ${vibrantGradient.value.center} 0%, ${vibrantGradient.value.edge} 100%)`,
             '--text-color': vibrantGradient.value.text,
             '--text-secondary': vibrantGradient.value.textSecondary,
             '--text-tertiary': vibrantGradient.value.textTertiary,
-            '--progress-bar-bg': isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(26, 26, 26, 0.15)',
-            '--progress-bar-fill': isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(26, 26, 26, 0.7)',
+            ...progressBarForText(vibrantGradient.value.text),
           };
         }
         // Fallback gradient
@@ -99,20 +106,17 @@ export function useBackgroundStyle(
           '--text-color': '#ffffff',
           '--text-secondary': 'rgba(255, 255, 255, 0.8)',
           '--text-tertiary': 'rgba(255, 255, 255, 0.6)',
-          '--progress-bar-bg': 'rgba(255, 255, 255, 0.2)',
-          '--progress-bar-fill': 'rgba(255, 255, 255, 0.9)',
+          ...lightProgressBar,
         };
 
       case 'gradient-linear':
         if (vibrantGradient?.value?.ready) {
-          const isDark = vibrantGradient.value.mode === 'dark';
           return {
             background: `linear-gradient(135deg, ${vibrantGradient.value.center} 0%, ${vibrantGradient.value.edge} 100%)`,
             '--text-color': vibrantGradient.value.text,
             '--text-secondary': vibrantGradient.value.textSecondary,
             '--text-tertiary': vibrantGradient.value.textTertiary,
-            '--progress-bar-bg': isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(26, 26, 26, 0.15)',
-            '--progress-bar-fill': isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(26, 26, 26, 0.7)',
+            ...progressBarForText(vibrantGradient.value.text),
           };
         }
         // Fallback gradient
@@ -121,8 +125,7 @@ export function useBackgroundStyle(
           '--text-color': '#ffffff',
           '--text-secondary': 'rgba(255, 255, 255, 0.8)',
           '--text-tertiary': 'rgba(255, 255, 255, 0.6)',
-          '--progress-bar-bg': 'rgba(255, 255, 255, 0.2)',
-          '--progress-bar-fill': 'rgba(255, 255, 255, 0.9)',
+          ...lightProgressBar,
         };
 
       // Gradient types handled by DynamicBackground component
@@ -132,14 +135,12 @@ export function useBackgroundStyle(
       case 'gradient-mesh':
       case 'gradient-noise':
         if (vibrantGradient?.value?.ready) {
-          const isDark = vibrantGradient.value.mode === 'dark';
           return {
             background: 'transparent', // DynamicBackground handles the actual background
             '--text-color': vibrantGradient.value.text,
             '--text-secondary': vibrantGradient.value.textSecondary,
             '--text-tertiary': vibrantGradient.value.textTertiary,
-            '--progress-bar-bg': isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(26, 26, 26, 0.15)',
-            '--progress-bar-fill': isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(26, 26, 26, 0.7)',
+            ...progressBarForText(vibrantGradient.value.text),
           };
         }
         // Fallback when colors aren't ready
@@ -148,8 +149,7 @@ export function useBackgroundStyle(
           '--text-color': '#ffffff',
           '--text-secondary': 'rgba(255, 255, 255, 0.8)',
           '--text-tertiary': 'rgba(255, 255, 255, 0.6)',
-          '--progress-bar-bg': 'rgba(255, 255, 255, 0.2)',
-          '--progress-bar-fill': 'rgba(255, 255, 255, 0.9)',
+          ...lightProgressBar,
         };
 
       // Artwork-based types that use extracted colors for text
@@ -159,14 +159,12 @@ export function useBackgroundStyle(
       case 'duotone':
       case 'posterized':
         if (colors?.value) {
-          const isDark = colors.value.mode === 'dark';
           return {
             background: 'transparent', // DynamicBackground handles the actual background
             '--text-color': colors.value.text,
             '--text-secondary': colors.value.textSecondary,
             '--text-tertiary': colors.value.textTertiary,
-            '--progress-bar-bg': isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(26, 26, 26, 0.15)',
-            '--progress-bar-fill': isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(26, 26, 26, 0.7)',
+            ...progressBarForText(colors.value.text),
           };
         }
         // Fallback when colors aren't ready
@@ -175,8 +173,7 @@ export function useBackgroundStyle(
           '--text-color': '#ffffff',
           '--text-secondary': 'rgba(255, 255, 255, 0.8)',
           '--text-tertiary': 'rgba(255, 255, 255, 0.6)',
-          '--progress-bar-bg': 'rgba(255, 255, 255, 0.2)',
-          '--progress-bar-fill': 'rgba(255, 255, 255, 0.9)',
+          ...lightProgressBar,
         };
 
       default:
@@ -185,8 +182,7 @@ export function useBackgroundStyle(
           '--text-color': '#ffffff',
           '--text-secondary': 'rgba(255, 255, 255, 0.8)',
           '--text-tertiary': 'rgba(255, 255, 255, 0.6)',
-          '--progress-bar-bg': 'rgba(255, 255, 255, 0.2)',
-          '--progress-bar-fill': 'rgba(255, 255, 255, 0.9)',
+          ...lightProgressBar,
         };
     }
   });

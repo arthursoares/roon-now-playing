@@ -78,12 +78,12 @@ const ambientStyle = computed(() => {
     // Progress bar customization
     '--progress-bar-height': '6px',
     '--progress-time-size': 'clamp(14px, 1.5vw, 18px)',
-    '--progress-bar-bg': effectiveColorMode.value === 'dark'
-      ? 'rgba(255, 255, 255, 0.15)'
-      : 'rgba(0, 0, 0, 0.15)',
-    '--progress-bar-fill': effectiveColorMode.value === 'dark'
-      ? 'rgba(255, 255, 255, 0.8)'
-      : 'rgba(0, 0, 0, 0.6)',
+    '--progress-bar-bg': colors.value.text === '#1a1a1a'
+      ? 'rgba(0, 0, 0, 0.15)'
+      : 'rgba(255, 255, 255, 0.15)',
+    '--progress-bar-fill': colors.value.text === '#1a1a1a'
+      ? 'rgba(0, 0, 0, 0.6)'
+      : 'rgba(255, 255, 255, 0.8)',
   };
 
   // For new background types, DynamicBackground handles the background

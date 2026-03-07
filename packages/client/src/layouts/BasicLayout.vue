@@ -52,7 +52,7 @@ const secondaryTextColor = computed(() => {
       backgroundColor: backgroundColor,
       color: textColor,
       '--text-secondary': secondaryTextColor,
-      '--progress-bar-bg': props.background === 'white' ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.2)',
+      '--progress-bar-bg': textColor === '#000000' ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.2)',
       '--progress-bar-fill': textColor,
     }"
   >
