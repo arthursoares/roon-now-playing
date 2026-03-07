@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { logger } from './logger.js';
 
-const DATA_DIR = process.env.DATA_DIR || '.';
+const DATA_DIR = process.env.DATA_DIR || './config';
 const NAMES_FILE = path.join(DATA_DIR, 'client-names.json');
 
 export class ClientNameStore {
