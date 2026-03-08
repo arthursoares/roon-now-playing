@@ -143,13 +143,25 @@ export class WebSocketManager {
         const state = this.clients.get(ws);
         if (state?.clientId) {
           this.clientsById.delete(state.clientId);
-          // Notify admins about disconnection
+        }
+        this.clients.delete(ws);
+
+        // Only notify admins if no other connections remain for this device
+        if (state?.deviceId && !this.hasActiveConnectionsForDevice(state.deviceId)) {
           this.broadcastToAdmins({
             type: 'client_disconnected',
             clientId: state.clientId,
           });
+        } else if (state?.deviceId) {
+          // Another connection exists — send an update with the remaining one
+          const remaining = this.getLatestClientForDevice(state.deviceId);
+          if (remaining) {
+            this.broadcastToAdmins({
+              type: 'client_updated',
+              client: this.getClientMetadata(remaining),
+            });
+          }
         }
-        this.clients.delete(ws);
       });
 
       ws.on('error', (error: Error) => {
@@ -350,8 +362,9 @@ export class WebSocketManager {
       friendly_name: clientState.friendlyName ?? undefined,
     });
 
-    // Notify admins
-    if (isNewClient) {
+    // Notify admins — only send client_connected if this device has no other connections
+    const isNewDevice = isNewClient && !this.hasOtherConnectionsForDevice(deviceId, message.clientId);
+    if (isNewDevice) {
       this.broadcastToAdmins({
         type: 'client_connected',
         client: this.getClientMetadata(clientState),
@@ -473,18 +486,58 @@ export class WebSocketManager {
   }
 
   getAllClientsMetadata(): ClientMetadata[] {
-    const clients: ClientMetadata[] = [];
+    // Deduplicate by deviceId — keep the most recently connected per device
+    const byDevice = new Map<string, ClientState>();
     for (const clientState of this.clients.values()) {
-      // Only include clients that have sent metadata (have a clientId)
-      if (clientState.clientId) {
-        clients.push(this.getClientMetadata(clientState));
+      if (!clientState.clientId || !clientState.deviceId) continue;
+      const existing = byDevice.get(clientState.deviceId);
+      if (!existing || clientState.connectedAt > existing.connectedAt) {
+        byDevice.set(clientState.deviceId, clientState);
       }
     }
-    return clients;
+    return Array.from(byDevice.values()).map((s) => this.getClientMetadata(s));
   }
 
   getClientById(clientId: string): ClientState | undefined {
     return this.clientsById.get(clientId);
+  }
+
+  private hasOtherConnectionsForDevice(deviceId: string, excludeClientId: string): boolean {
+    for (const state of this.clients.values()) {
+      if (state.deviceId === deviceId && state.clientId && state.clientId !== excludeClientId) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private hasActiveConnectionsForDevice(deviceId: string): boolean {
+    for (const state of this.clients.values()) {
+      if (state.deviceId === deviceId) return true;
+    }
+    return false;
+  }
+
+  private getLatestClientForDevice(deviceId: string): ClientState | undefined {
+    let latest: ClientState | undefined;
+    for (const state of this.clients.values()) {
+      if (state.deviceId === deviceId && state.clientId) {
+        if (!latest || state.connectedAt > latest.connectedAt) {
+          latest = state;
+        }
+      }
+    }
+    return latest;
+  }
+
+  private getAllConnectionsForDevice(deviceId: string): ClientState[] {
+    const connections: ClientState[] = [];
+    for (const state of this.clients.values()) {
+      if (state.deviceId === deviceId && state.clientId) {
+        connections.push(state);
+      }
+    }
+    return connections;
   }
 
   pushSettingsToClient(
@@ -492,7 +545,7 @@ export class WebSocketManager {
     settings: { layout?: LayoutType; font?: FontType; background?: BackgroundType; zoneId?: string; fontScaleOverride?: number | null }
   ): boolean {
     const clientState = this.clientsById.get(clientId);
-    if (!clientState || clientState.ws.readyState !== WebSocket.OPEN) {
+    if (!clientState) {
       return false;
     }
 
@@ -516,19 +569,28 @@ export class WebSocketManager {
       fontScaleOverride: settings.fontScaleOverride,
     };
 
-    this.sendToClient(clientState.ws, message);
+    // Push to ALL connections from this device
+    const deviceConnections = this.getAllConnectionsForDevice(clientState.deviceId);
+    let anySent = false;
+    for (const conn of deviceConnections) {
+      if (conn.ws.readyState === WebSocket.OPEN) {
+        this.sendToClient(conn.ws, message);
+        anySent = true;
+      }
+      // Update local state for all connections
+      if (settings.layout) conn.layout = settings.layout;
+      if (settings.font) conn.font = settings.font;
+      if (settings.background) conn.background = settings.background;
+      if (settings.zoneId) {
+        conn.subscribedZoneId = settings.zoneId;
+        conn.subscribedZoneName = zoneName || null;
+      }
+      if (settings.fontScaleOverride !== undefined) {
+        conn.fontScaleOverride = settings.fontScaleOverride;
+      }
+    }
 
-    // Update local state
-    if (settings.layout) clientState.layout = settings.layout;
-    if (settings.font) clientState.font = settings.font;
-    if (settings.background) clientState.background = settings.background;
-    if (settings.zoneId) {
-      clientState.subscribedZoneId = settings.zoneId;
-      clientState.subscribedZoneName = zoneName || null;
-    }
-    if (settings.fontScaleOverride !== undefined) {
-      clientState.fontScaleOverride = settings.fontScaleOverride;
-    }
+    if (!anySent) return false;
 
     // Notify admins about the update
     this.broadcastToAdmins({
