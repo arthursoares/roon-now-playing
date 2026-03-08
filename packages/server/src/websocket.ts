@@ -26,6 +26,7 @@ import { ExternalSourceManager } from './externalSources.js';
 import { generateFriendlyName } from './nameGenerator.js';
 import { logger } from './logger.js';
 import { loadDisplaySettings } from './display-settings.js';
+import type { ClientSettingsStore, ClientSettings } from './clientSettings.js';
 
 interface ClientState {
   ws: WebSocket;
@@ -55,6 +56,7 @@ export class WebSocketManager {
   private clientsById: Map<string, ClientState> = new Map();
   private roonClient: RoonClient | null;
   private externalSourceManager: ExternalSourceManager | null = null;
+  private clientSettingsStore: ClientSettingsStore | null = null;
   private friendlyNames: Map<string, string> = new Map();
   private onFriendlyNameChange?: (clientId: string, name: string | null) => void;
 
@@ -71,6 +73,10 @@ export class WebSocketManager {
   setExternalSourceManager(manager: ExternalSourceManager): void {
     this.externalSourceManager = manager;
     this.setupExternalSourceListeners();
+  }
+
+  setClientSettingsStore(store: ClientSettingsStore): void {
+    this.clientSettingsStore = store;
   }
 
   setFriendlyNameChangeCallback(callback: (clientId: string, name: string | null) => void): void {

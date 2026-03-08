@@ -8,6 +8,7 @@ import { createArtworkRouter } from './artwork.js';
 import { createAdminRouter } from './admin.js';
 import { createFactsRouter } from './facts.js';
 import { ClientNameStore } from './clientNames.js';
+import { ClientSettingsStore } from './clientSettings.js';
 import { logger } from './logger.js';
 import { ExternalSourceManager } from './externalSources.js';
 import { SourcesConfigStore } from './sourcesConfig.js';
@@ -30,6 +31,9 @@ async function main(): Promise<void> {
   // Initialize client name store
   const clientNameStore = new ClientNameStore();
 
+  // Initialize client settings store
+  const clientSettingsStore = new ClientSettingsStore();
+
   // Initialize sources config store
   const sourcesConfigStore = new SourcesConfigStore();
 
@@ -47,6 +51,9 @@ async function main(): Promise<void> {
   wsManager.setFriendlyNameChangeCallback((clientId, name) => {
     clientNameStore.set(clientId, name);
   });
+
+  // Wire client settings store for persistence
+  wsManager.setClientSettingsStore(clientSettingsStore);
 
   // Connect external source manager to WebSocket
   wsManager.setExternalSourceManager(externalSourceManager);
