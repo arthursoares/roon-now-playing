@@ -20,12 +20,14 @@ import type {
   ServerClientUpdatedMessage,
   ServerRemoteSettingsMessage,
   DisplaySettings,
+  ServerClientResetMessage,
 } from '@roon-screen-cover/shared';
 import { RoonClient } from './roon.js';
 import { ExternalSourceManager } from './externalSources.js';
 import { generateFriendlyName } from './nameGenerator.js';
 import { logger } from './logger.js';
 import { loadDisplaySettings } from './display-settings.js';
+import type { ClientSettingsStore, ClientSettings } from './clientSettings.js';
 
 interface ClientState {
   ws: WebSocket;
@@ -55,6 +57,7 @@ export class WebSocketManager {
   private clientsById: Map<string, ClientState> = new Map();
   private roonClient: RoonClient | null;
   private externalSourceManager: ExternalSourceManager | null = null;
+  private clientSettingsStore: ClientSettingsStore | null = null;
   private friendlyNames: Map<string, string> = new Map();
   private onFriendlyNameChange?: (clientId: string, name: string | null) => void;
 
@@ -71,6 +74,10 @@ export class WebSocketManager {
   setExternalSourceManager(manager: ExternalSourceManager): void {
     this.externalSourceManager = manager;
     this.setupExternalSourceListeners();
+  }
+
+  setClientSettingsStore(store: ClientSettingsStore): void {
+    this.clientSettingsStore = store;
   }
 
   setFriendlyNameChangeCallback(callback: (clientId: string, name: string | null) => void): void {
@@ -348,6 +355,18 @@ export class WebSocketManager {
     }
     this.clientsById.set(message.clientId, clientState);
 
+    // Persist client settings
+    if (this.clientSettingsStore) {
+      this.clientSettingsStore.set(deviceId, {
+        layout: clientState.layout,
+        font: clientState.font,
+        background: clientState.background,
+        zoneId: clientState.subscribedZoneId,
+        zoneName: clientState.subscribedZoneName,
+        fontScaleOverride: clientState.fontScaleOverride ?? null,
+      });
+    }
+
     logger.info(
       `Client metadata: ${message.clientId} (${clientState.friendlyName || 'unnamed'}) - ` +
         `layout: ${message.layout}, zone: ${message.zoneName || 'none'}`
@@ -361,6 +380,39 @@ export class WebSocketManager {
       roon_enabled: this.roonClient !== null,
       friendly_name: clientState.friendlyName ?? undefined,
     });
+
+    // On first connect, push server-stored settings if they differ from what client sent
+    if (isNewClient && this.clientSettingsStore) {
+      const storedSettings = this.clientSettingsStore.get(deviceId);
+      if (storedSettings) {
+        const needsPush =
+          storedSettings.layout !== clientState.layout ||
+          storedSettings.font !== clientState.font ||
+          storedSettings.background !== clientState.background ||
+          storedSettings.zoneId !== clientState.subscribedZoneId ||
+          storedSettings.fontScaleOverride !== (clientState.fontScaleOverride ?? null);
+
+        if (needsPush) {
+          this.sendToClient(clientState.ws, {
+            type: 'remote_settings',
+            layout: storedSettings.layout,
+            font: storedSettings.font,
+            background: storedSettings.background,
+            zoneId: storedSettings.zoneId ?? undefined,
+            zoneName: storedSettings.zoneName ?? undefined,
+            fontScaleOverride: storedSettings.fontScaleOverride,
+          } as ServerRemoteSettingsMessage);
+
+          // Update local state to match
+          clientState.layout = storedSettings.layout;
+          clientState.font = storedSettings.font;
+          clientState.background = storedSettings.background;
+          clientState.subscribedZoneId = storedSettings.zoneId;
+          clientState.subscribedZoneName = storedSettings.zoneName;
+          clientState.fontScaleOverride = storedSettings.fontScaleOverride;
+        }
+      }
+    }
 
     // Notify admins — only send client_connected if this device has no other connections
     const isNewDevice = isNewClient && !this.hasOtherConnectionsForDevice(deviceId, message.clientId);
@@ -592,6 +644,18 @@ export class WebSocketManager {
 
     if (!anySent) return false;
 
+    // Persist to settings store
+    if (this.clientSettingsStore) {
+      this.clientSettingsStore.set(clientState.deviceId, {
+        layout: clientState.layout,
+        font: clientState.font,
+        background: clientState.background,
+        zoneId: clientState.subscribedZoneId,
+        zoneName: clientState.subscribedZoneName,
+        fontScaleOverride: clientState.fontScaleOverride ?? null,
+      });
+    }
+
     // Notify admins about the update
     this.broadcastToAdmins({
       type: 'client_updated',
@@ -635,6 +699,41 @@ export class WebSocketManager {
     this.broadcastToAdmins({
       type: 'client_updated',
       client: this.getClientMetadata(clientState),
+    });
+
+    return true;
+  }
+
+  removeClient(clientId: string): boolean {
+    const clientState = this.clientsById.get(clientId);
+    if (!clientState) return false;
+
+    const deviceId = clientState.deviceId;
+
+    // Delete stored settings and friendly name
+    if (this.clientSettingsStore) {
+      this.clientSettingsStore.delete(deviceId);
+    }
+    this.friendlyNames.delete(deviceId);
+    if (this.onFriendlyNameChange) {
+      this.onFriendlyNameChange(deviceId, null);
+    }
+
+    // Send reset to all connections from this device, then close them
+    const deviceConnections = this.getAllConnectionsForDevice(deviceId);
+    for (const conn of deviceConnections) {
+      if (conn.ws.readyState === WebSocket.OPEN) {
+        this.sendToClient(conn.ws, { type: 'client_reset' } as ServerClientResetMessage);
+        conn.ws.close();
+      }
+      this.clientsById.delete(conn.clientId);
+      this.clients.delete(conn.ws);
+    }
+
+    // Notify admins
+    this.broadcastToAdmins({
+      type: 'client_disconnected',
+      clientId,
     });
 
     return true;

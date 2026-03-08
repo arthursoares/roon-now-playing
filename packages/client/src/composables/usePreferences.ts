@@ -103,6 +103,13 @@ export function usePreferences() {
     localStorage.setItem(STORAGE_KEY_BACKGROUND, newBackground);
   }
 
+  function reapplyUrlParams(): void {
+    const urlParams = getUrlParams();
+    if (urlParams.layout) layout.value = urlParams.layout;
+    if (urlParams.font) font.value = urlParams.font;
+    if (urlParams.background) background.value = urlParams.background;
+  }
+
   function clearZonePreference(): void {
     preferredZone.value = null;
     localStorage.removeItem(STORAGE_KEY_ZONE);
@@ -139,5 +146,6 @@ export function usePreferences() {
     saveBackgroundPreference,
     clearZonePreference,
     loadPreferences,
+    reapplyUrlParams,
   };
 }

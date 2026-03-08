@@ -19,6 +19,7 @@ const {
   saveBackgroundPreference,
   clearZonePreference,
   loadPreferences,
+  reapplyUrlParams,
 } = usePreferences();
 
 const selectedZoneId = ref<string | null>(null);
@@ -55,6 +56,9 @@ function handleRemoteSettings(settings: {
     subscribeToZone(settings.zoneId, settings.zoneName);
     showZonePicker.value = false;
   }
+
+  // URL params always win — re-apply after server push
+  reapplyUrlParams();
 }
 
 const { state: wsState, subscribeToZone, unsubscribe, updateMetadata } = useWebSocket({
