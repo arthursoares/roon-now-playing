@@ -20,6 +20,7 @@ import type {
   ServerClientUpdatedMessage,
   ServerRemoteSettingsMessage,
   DisplaySettings,
+  ServerClientResetMessage,
 } from '@roon-screen-cover/shared';
 import { RoonClient } from './roon.js';
 import { ExternalSourceManager } from './externalSources.js';
@@ -698,6 +699,41 @@ export class WebSocketManager {
     this.broadcastToAdmins({
       type: 'client_updated',
       client: this.getClientMetadata(clientState),
+    });
+
+    return true;
+  }
+
+  removeClient(clientId: string): boolean {
+    const clientState = this.clientsById.get(clientId);
+    if (!clientState) return false;
+
+    const deviceId = clientState.deviceId;
+
+    // Delete stored settings and friendly name
+    if (this.clientSettingsStore) {
+      this.clientSettingsStore.delete(deviceId);
+    }
+    this.friendlyNames.delete(deviceId);
+    if (this.onFriendlyNameChange) {
+      this.onFriendlyNameChange(deviceId, null);
+    }
+
+    // Send reset to all connections from this device, then close them
+    const deviceConnections = this.getAllConnectionsForDevice(deviceId);
+    for (const conn of deviceConnections) {
+      if (conn.ws.readyState === WebSocket.OPEN) {
+        this.sendToClient(conn.ws, { type: 'client_reset' } as ServerClientResetMessage);
+        conn.ws.close();
+      }
+      this.clientsById.delete(conn.clientId);
+      this.clients.delete(conn.ws);
+    }
+
+    // Notify admins
+    this.broadcastToAdmins({
+      type: 'client_disconnected',
+      clientId,
     });
 
     return true;
