@@ -42,6 +42,20 @@ Server persists per-device config in `config/client-settings.json`, keyed by `de
 - Local user changes are sent to server immediately (already happening via `sendMetadata`)
 - Admin changes always stick (persisted server-side, pushed on connect)
 
+### Remove Client (Admin)
+
+Admin can remove a client from the UI, triggering a full reset:
+
+1. **Server**: delete stored config from `client-settings.json`, delete friendly name from `client-names.json`
+2. **Server**: send a `client_reset` message to all active connections from that device
+3. **Server**: close the WebSocket connections for that device
+4. **Client**: on receiving `client_reset`, clear all localStorage keys (`device-id`, `zone`, `layout`, `font`, `background`), then reload — showing the welcome/onboarding screen with a fresh identity
+5. **Server**: broadcast `client_disconnected` to admin
+
+New API endpoint: `DELETE /api/admin/clients/:clientId`
+
+New WebSocket message type: `client_reset` (server → client, no payload needed)
+
 ### Error Handling
 
 - Corrupt/missing `client-settings.json` — start fresh (same as `client-names.json` pattern)
