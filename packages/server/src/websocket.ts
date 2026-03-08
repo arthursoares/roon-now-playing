@@ -354,6 +354,18 @@ export class WebSocketManager {
     }
     this.clientsById.set(message.clientId, clientState);
 
+    // Persist client settings
+    if (this.clientSettingsStore) {
+      this.clientSettingsStore.set(deviceId, {
+        layout: clientState.layout,
+        font: clientState.font,
+        background: clientState.background,
+        zoneId: clientState.subscribedZoneId,
+        zoneName: clientState.subscribedZoneName,
+        fontScaleOverride: clientState.fontScaleOverride ?? null,
+      });
+    }
+
     logger.info(
       `Client metadata: ${message.clientId} (${clientState.friendlyName || 'unnamed'}) - ` +
         `layout: ${message.layout}, zone: ${message.zoneName || 'none'}`
@@ -367,6 +379,39 @@ export class WebSocketManager {
       roon_enabled: this.roonClient !== null,
       friendly_name: clientState.friendlyName ?? undefined,
     });
+
+    // On first connect, push server-stored settings if they differ from what client sent
+    if (isNewClient && this.clientSettingsStore) {
+      const storedSettings = this.clientSettingsStore.get(deviceId);
+      if (storedSettings) {
+        const needsPush =
+          storedSettings.layout !== clientState.layout ||
+          storedSettings.font !== clientState.font ||
+          storedSettings.background !== clientState.background ||
+          storedSettings.zoneId !== clientState.subscribedZoneId ||
+          storedSettings.fontScaleOverride !== (clientState.fontScaleOverride ?? null);
+
+        if (needsPush) {
+          this.sendToClient(clientState.ws, {
+            type: 'remote_settings',
+            layout: storedSettings.layout,
+            font: storedSettings.font,
+            background: storedSettings.background,
+            zoneId: storedSettings.zoneId ?? undefined,
+            zoneName: storedSettings.zoneName ?? undefined,
+            fontScaleOverride: storedSettings.fontScaleOverride,
+          } as ServerRemoteSettingsMessage);
+
+          // Update local state to match
+          clientState.layout = storedSettings.layout;
+          clientState.font = storedSettings.font;
+          clientState.background = storedSettings.background;
+          clientState.subscribedZoneId = storedSettings.zoneId;
+          clientState.subscribedZoneName = storedSettings.zoneName;
+          clientState.fontScaleOverride = storedSettings.fontScaleOverride;
+        }
+      }
+    }
 
     // Notify admins — only send client_connected if this device has no other connections
     const isNewDevice = isNewClient && !this.hasOtherConnectionsForDevice(deviceId, message.clientId);
@@ -597,6 +642,18 @@ export class WebSocketManager {
     }
 
     if (!anySent) return false;
+
+    // Persist to settings store
+    if (this.clientSettingsStore) {
+      this.clientSettingsStore.set(clientState.deviceId, {
+        layout: clientState.layout,
+        font: clientState.font,
+        background: clientState.background,
+        zoneId: clientState.subscribedZoneId,
+        zoneName: clientState.subscribedZoneName,
+        fontScaleOverride: clientState.fontScaleOverride ?? null,
+      });
+    }
 
     // Notify admins about the update
     this.broadcastToAdmins({
