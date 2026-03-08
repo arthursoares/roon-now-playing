@@ -228,6 +228,16 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         case 'display_settings_update':
           state.value.displaySettings = message.settings;
           break;
+
+        case 'client_reset':
+          console.log('[WS] Received client reset — clearing all local state');
+          localStorage.removeItem('roon-screen-cover:device-id');
+          localStorage.removeItem('roon-screen-cover:zone');
+          localStorage.removeItem('roon-screen-cover:layout');
+          localStorage.removeItem('roon-screen-cover:font');
+          localStorage.removeItem('roon-screen-cover:background');
+          window.location.reload();
+          break;
       }
     } catch (error) {
       console.error('[WS] Failed to parse message:', error);
