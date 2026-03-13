@@ -168,7 +168,7 @@ const usesDynamicBackground = computed(() =>
   transition: background 0.5s ease-out;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 768px) and (min-aspect-ratio: 1/1) {
   .detailed-layout {
     flex-direction: row;
     padding: 3rem;
@@ -183,7 +183,7 @@ const usesDynamicBackground = computed(() =>
   align-self: center;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 768px) and (min-aspect-ratio: 1/1) {
   .artwork-container {
     max-height: none;
     height: 100%;
