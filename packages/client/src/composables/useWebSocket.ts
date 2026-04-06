@@ -32,6 +32,8 @@ export interface RemoteSettingsHandler {
     font?: FontType;
     background?: BackgroundType;
     fontScaleOverride?: number | null;
+    artworkScaleOverride?: number | null;
+    enabledLayouts?: LayoutType[] | null;
     zoneId?: string;
     zoneName?: string;
   }) => void;
@@ -51,6 +53,8 @@ export interface UseWebSocketOptions {
     font?: FontType;
     background?: BackgroundType;
     fontScaleOverride?: number | null;
+    artworkScaleOverride?: number | null;
+    enabledLayouts?: LayoutType[] | null;
     zoneId?: string;
     zoneName?: string;
   }) => void;
@@ -67,7 +71,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     zones: [],
     nowPlaying: null,
     clients: [],
-    displaySettings: { fontScale: 1 },
+    displaySettings: { fontScale: 1, artworkScale: 100 },
   });
 
   let ws: WebSocket | null = null;
@@ -218,6 +222,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
               font: message.font,
               background: message.background,
               fontScaleOverride: message.fontScaleOverride,
+              artworkScaleOverride: message.artworkScaleOverride,
+              enabledLayouts: message.enabledLayouts,
               zoneId: message.zoneId,
               zoneName: message.zoneName,
             });
