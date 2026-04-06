@@ -56,12 +56,14 @@ export function createAdminRouter(wsManager: WebSocketManager): Router {
   // Push settings to client
   router.post('/clients/:clientId/push', (req, res) => {
     const { clientId } = req.params;
-    const { layout, font, background, zoneId, fontScaleOverride } = req.body as {
+    const { layout, font, background, zoneId, fontScaleOverride, artworkScaleOverride, enabledLayouts } = req.body as {
       layout?: LayoutType;
       font?: FontType;
       background?: BackgroundType;
       zoneId?: string;
       fontScaleOverride?: number | null;
+      artworkScaleOverride?: number | null;
+      enabledLayouts?: LayoutType[] | null;
     };
 
     // Validate layout
@@ -90,13 +92,35 @@ export function createAdminRouter(wsManager: WebSocketManager): Router {
       }
     }
 
+    // Validate artworkScaleOverride
+    if (artworkScaleOverride !== undefined && artworkScaleOverride !== null) {
+      if (typeof artworkScaleOverride !== 'number' || artworkScaleOverride < 50 || artworkScaleOverride > 100) {
+        res.status(400).json({ error: 'artworkScaleOverride must be a number between 50 and 100, or null' });
+        return;
+      }
+    }
+
+    // Validate enabledLayouts
+    if (enabledLayouts !== undefined && enabledLayouts !== null) {
+      if (!Array.isArray(enabledLayouts) || enabledLayouts.length === 0) {
+        res.status(400).json({ error: 'enabledLayouts must be a non-empty array of layout types, or null' });
+        return;
+      }
+      for (const l of enabledLayouts) {
+        if (!(LAYOUTS as readonly string[]).includes(l)) {
+          res.status(400).json({ error: `Invalid layout in enabledLayouts: ${l}. Must be one of: ${LAYOUTS.join(', ')}` });
+          return;
+        }
+      }
+    }
+
     // Check if any settings provided
-    if (layout === undefined && font === undefined && background === undefined && zoneId === undefined && fontScaleOverride === undefined) {
-      res.status(400).json({ error: 'At least one setting (layout, font, background, zoneId, or fontScaleOverride) is required' });
+    if (layout === undefined && font === undefined && background === undefined && zoneId === undefined && fontScaleOverride === undefined && artworkScaleOverride === undefined && enabledLayouts === undefined) {
+      res.status(400).json({ error: 'At least one setting is required' });
       return;
     }
 
-    const success = wsManager.pushSettingsToClient(clientId, { layout, font, background, zoneId, fontScaleOverride });
+    const success = wsManager.pushSettingsToClient(clientId, { layout, font, background, zoneId, fontScaleOverride, artworkScaleOverride, enabledLayouts });
     if (success) {
       logger.info(
         `Pushed settings to ${clientId}: layout=${layout}, font=${font}, background=${background}, zoneId=${zoneId}, fontScaleOverride=${fontScaleOverride}`
@@ -126,18 +150,19 @@ export function createAdminRouter(wsManager: WebSocketManager): Router {
 
   // Update display settings
   router.post('/display-settings', (req, res) => {
-    const { fontScale } = req.body;
+    const { fontScale, artworkScale } = req.body;
     const settings = loadDisplaySettings();
 
     if (typeof fontScale === 'number' && fontScale >= 0.75 && fontScale <= 1.5) {
       settings.fontScale = fontScale;
     }
 
+    if (typeof artworkScale === 'number' && artworkScale >= 50 && artworkScale <= 100) {
+      settings.artworkScale = artworkScale;
+    }
+
     saveDisplaySettings(settings);
-
-    // Broadcast to all connected display clients
     wsManager.broadcastDisplaySettings(settings);
-
     res.json(settings);
   });
 
