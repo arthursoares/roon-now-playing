@@ -13,17 +13,20 @@ const {
   layout,
   font,
   background,
+  enabledLayouts,
   saveZonePreference,
   saveLayoutPreference,
   saveFontPreference,
   saveBackgroundPreference,
   clearZonePreference,
+  saveEnabledLayoutsPreference,
   loadPreferences,
 } = usePreferences();
 
 const selectedZoneId = ref<string | null>(null);
 const selectedZoneName = ref<string | null>(null);
 const currentFontScaleOverride = ref<number | null>(null);
+const currentArtworkScaleOverride = ref<number | null>(null);
 
 // Handle remote settings from admin
 function handleRemoteSettings(settings: {
@@ -31,6 +34,8 @@ function handleRemoteSettings(settings: {
   font?: FontType;
   background?: BackgroundType;
   fontScaleOverride?: number | null;
+  artworkScaleOverride?: number | null;
+  enabledLayouts?: LayoutType[] | null;
   zoneId?: string;
   zoneName?: string;
 }) {
@@ -45,6 +50,12 @@ function handleRemoteSettings(settings: {
   }
   if (settings.fontScaleOverride !== undefined) {
     currentFontScaleOverride.value = settings.fontScaleOverride;
+  }
+  if (settings.artworkScaleOverride !== undefined) {
+    currentArtworkScaleOverride.value = settings.artworkScaleOverride;
+  }
+  if (settings.enabledLayouts !== undefined) {
+    saveEnabledLayoutsPreference(settings.enabledLayouts);
   }
   if (settings.zoneId) {
     selectedZoneId.value = settings.zoneId;
@@ -132,9 +143,12 @@ function changeZone(): void {
 }
 
 function cycleLayout(): void {
-  const currentIndex = LAYOUTS.indexOf(layout.value);
-  const nextIndex = (currentIndex + 1) % LAYOUTS.length;
-  const newLayout = LAYOUTS[nextIndex];
+  const enabled = enabledLayouts.value && enabledLayouts.value.length > 0
+    ? enabledLayouts.value
+    : [...LAYOUTS];
+  const currentIndex = enabled.indexOf(layout.value);
+  const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % enabled.length;
+  const newLayout = enabled[nextIndex];
   saveLayoutPreference(newLayout);
   updateMetadata();
 }
@@ -173,6 +187,16 @@ watch(
   ([globalScale, override]) => {
     const effectiveScale = override !== null ? override : (globalScale || 1);
     document.documentElement.style.setProperty('--font-scale', String(effectiveScale));
+  },
+  { immediate: true }
+);
+
+// Apply artwork scale override with priority over global setting
+watch(
+  [() => wsState.value.displaySettings?.artworkScale, currentArtworkScaleOverride],
+  ([globalScale, override]) => {
+    const effectiveScale = override !== null ? override : (globalScale || 100);
+    document.documentElement.style.setProperty('--artwork-scale', String(effectiveScale / 100));
   },
   { immediate: true }
 );
