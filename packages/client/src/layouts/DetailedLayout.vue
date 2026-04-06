@@ -179,7 +179,8 @@ const usesDynamicBackground = computed(() =>
 .artwork-container {
   flex-shrink: 0;
   aspect-ratio: 1;
-  max-height: 50vh;
+  max-height: 70vh;
+  max-width: calc(100% * var(--artwork-scale, 1));
   align-self: center;
 }
 
