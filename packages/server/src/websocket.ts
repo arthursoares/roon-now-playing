@@ -41,6 +41,8 @@ interface ClientState {
   userAgent: string | null;
   isAdmin: boolean;
   fontScaleOverride?: number | null;
+  artworkScaleOverride?: number | null;
+  enabledLayouts?: LayoutType[] | null;
 }
 
 function extractDeviceId(clientId: string): string {
@@ -482,6 +484,8 @@ export class WebSocketManager {
       userAgent: clientState.userAgent,
       isAdmin: clientState.isAdmin,
       fontScaleOverride: clientState.fontScaleOverride,
+      artworkScaleOverride: clientState.artworkScaleOverride,
+      enabledLayouts: clientState.enabledLayouts,
     };
   }
 
@@ -542,7 +546,7 @@ export class WebSocketManager {
 
   pushSettingsToClient(
     clientId: string,
-    settings: { layout?: LayoutType; font?: FontType; background?: BackgroundType; zoneId?: string; fontScaleOverride?: number | null }
+    settings: { layout?: LayoutType; font?: FontType; background?: BackgroundType; zoneId?: string; fontScaleOverride?: number | null; artworkScaleOverride?: number | null; enabledLayouts?: LayoutType[] | null }
   ): boolean {
     const clientState = this.clientsById.get(clientId);
     if (!clientState) {
@@ -567,6 +571,8 @@ export class WebSocketManager {
       zoneId: settings.zoneId,
       zoneName,
       fontScaleOverride: settings.fontScaleOverride,
+      artworkScaleOverride: settings.artworkScaleOverride,
+      enabledLayouts: settings.enabledLayouts,
     };
 
     // Push to ALL connections from this device
@@ -587,6 +593,12 @@ export class WebSocketManager {
       }
       if (settings.fontScaleOverride !== undefined) {
         conn.fontScaleOverride = settings.fontScaleOverride;
+      }
+      if (settings.artworkScaleOverride !== undefined) {
+        conn.artworkScaleOverride = settings.artworkScaleOverride;
+      }
+      if (settings.enabledLayouts !== undefined) {
+        conn.enabledLayouts = settings.enabledLayouts;
       }
     }
 
