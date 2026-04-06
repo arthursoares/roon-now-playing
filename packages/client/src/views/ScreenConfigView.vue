@@ -355,6 +355,7 @@ onUnmounted(() => {
               :key="l"
               class="option-btn"
               :class="{ active: isLayoutEnabled(l) }"
+              :disabled="isLayoutEnabled(l) && (screen.enabledLayouts?.length ?? LAYOUTS.length) <= 1"
               @click="toggleLayout(l)"
             >
               {{ getLayoutDisplayName(l) }}

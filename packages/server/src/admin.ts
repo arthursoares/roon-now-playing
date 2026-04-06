@@ -123,7 +123,7 @@ export function createAdminRouter(wsManager: WebSocketManager): Router {
     const success = wsManager.pushSettingsToClient(clientId, { layout, font, background, zoneId, fontScaleOverride, artworkScaleOverride, enabledLayouts });
     if (success) {
       logger.info(
-        `Pushed settings to ${clientId}: layout=${layout}, font=${font}, background=${background}, zoneId=${zoneId}, fontScaleOverride=${fontScaleOverride}`
+        `Pushed settings to ${clientId}: layout=${layout}, font=${font}, background=${background}, zoneId=${zoneId}, fontScaleOverride=${fontScaleOverride}, artworkScaleOverride=${artworkScaleOverride}, enabledLayouts=${enabledLayouts}`
       );
       res.json({ success: true });
     } else {
