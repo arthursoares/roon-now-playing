@@ -80,7 +80,7 @@ const deletingZone = ref<string | null>(null);
 const apiKeyCopied = ref(false);
 
 // Display settings state
-const displaySettings = ref<{ fontScale: number }>({ fontScale: 1 });
+const displaySettings = ref<{ fontScale: number; artworkScale: number }>({ fontScale: 1, artworkScale: 100 });
 const displaySettingsLoading = ref(true);
 const displaySettingsSaving = ref(false);
 
@@ -104,6 +104,14 @@ let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 function onFontScaleChange(event: Event): void {
   const value = parseFloat((event.target as HTMLInputElement).value);
   displaySettings.value.fontScale = value;
+
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => saveDisplaySettings(), 300);
+}
+
+function onArtworkScaleChange(event: Event): void {
+  const value = parseInt((event.target as HTMLInputElement).value, 10);
+  displaySettings.value.artworkScale = value;
 
   if (saveTimeout) clearTimeout(saveTimeout);
   saveTimeout = setTimeout(() => saveDisplaySettings(), 300);
@@ -1217,6 +1225,37 @@ onMounted(() => {
               <span>0.75x</span>
               <span>1.0x</span>
               <span>1.5x</span>
+            </div>
+          </div>
+
+          <div v-if="displaySettingsSaving" class="saving-indicator">
+            Saving...
+          </div>
+        </div>
+
+        <div class="config-card">
+          <h2 class="card-title">Artwork Scale</h2>
+          <p class="card-desc">Adjust the global artwork size in portrait/stacked layouts. Individual screens can override this setting.</p>
+
+          <div class="slider-field">
+            <div class="slider-header">
+              <label for="artworkScale">Scale</label>
+              <span class="slider-value">{{ displaySettings.artworkScale }}%</span>
+            </div>
+            <input
+              id="artworkScale"
+              type="range"
+              min="50"
+              max="100"
+              step="5"
+              :value="displaySettings.artworkScale"
+              @input="onArtworkScaleChange"
+              class="slider-input"
+            />
+            <div class="slider-labels">
+              <span>50%</span>
+              <span>75%</span>
+              <span>100%</span>
             </div>
           </div>
 
