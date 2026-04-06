@@ -296,7 +296,7 @@ const ambientStyle = computed(() => {
   gap: 2rem;
 }
 
-@media (min-width: 900px) {
+@media (min-width: 900px) and (min-aspect-ratio: 1/1) {
   .content {
     flex-direction: row;
     align-items: center;
@@ -311,10 +311,10 @@ const ambientStyle = computed(() => {
   flex-direction: column;
   align-items: center;
   width: 100%;
-  max-width: 45vh;
+  max-width: calc(100% * var(--artwork-scale, 1));
 }
 
-@media (min-width: 900px) {
+@media (min-width: 900px) and (min-aspect-ratio: 1/1) {
   .artwork-column {
     width: 55%;
     max-width: none;
@@ -388,7 +388,7 @@ const ambientStyle = computed(() => {
   padding-right: 2.5%; /* Extra text safe margin */
 }
 
-@media (min-width: 900px) {
+@media (min-width: 900px) and (min-aspect-ratio: 1/1) {
   .metadata-column {
     flex: 0 0 40%;
   }
