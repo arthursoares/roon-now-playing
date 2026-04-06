@@ -265,6 +265,8 @@ export interface ClientMetadata {
   userAgent: string | null;
   isAdmin: boolean;
   fontScaleOverride?: number | null; // null = use global, number = custom
+  artworkScaleOverride?: number | null;
+  enabledLayouts?: LayoutType[] | null;
 }
 
 export interface ClientMetadataMessage {
@@ -307,15 +309,19 @@ export interface ServerRemoteSettingsMessage {
   zoneId?: string;
   zoneName?: string;
   fontScaleOverride?: number | null;
+  artworkScaleOverride?: number | null;
+  enabledLayouts?: LayoutType[] | null;
 }
 
 // Display settings (stored on server)
 export interface DisplaySettings {
   fontScale: number;
+  artworkScale: number;
 }
 
 export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
   fontScale: 1.0,
+  artworkScale: 100,
 };
 
 export interface DisplaySettingsUpdateMessage {
