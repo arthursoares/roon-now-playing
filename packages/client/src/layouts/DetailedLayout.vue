@@ -162,6 +162,7 @@ const usesDynamicBackground = computed(() =>
   height: 100%;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   padding: 2rem;
   gap: 2rem;
   color: var(--text-color, #fff);
@@ -179,7 +180,9 @@ const usesDynamicBackground = computed(() =>
 .artwork-container {
   flex-shrink: 0;
   aspect-ratio: 1;
-  max-height: 50vh;
+  max-height: 70vh;
+  width: calc(100% * var(--artwork-scale, 1));
+  max-width: 100%;
   align-self: center;
 }
 
@@ -187,7 +190,8 @@ const usesDynamicBackground = computed(() =>
   .artwork-container {
     max-height: none;
     height: 100%;
-    max-width: 50%;
+    width: auto;
+    max-width: calc(50% * var(--artwork-scale, 1));
   }
 }
 

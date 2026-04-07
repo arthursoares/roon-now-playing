@@ -77,7 +77,7 @@ async function saveName(): Promise<void> {
 }
 
 async function pushSetting(
-  setting: { layout?: LayoutType; font?: FontType; background?: BackgroundType; zoneId?: string; fontScaleOverride?: number | null }
+  setting: { layout?: LayoutType; font?: FontType; background?: BackgroundType; zoneId?: string; fontScaleOverride?: number | null; artworkScaleOverride?: number | null; enabledLayouts?: LayoutType[] | null }
 ): Promise<void> {
   if (!screen.value) return;
   saving.value = true;
@@ -112,6 +112,51 @@ function onFontScaleOverrideChange(event: Event): void {
   fontScaleTimeout = setTimeout(() => {
     pushSetting({ fontScaleOverride: value });
   }, 300);
+}
+
+function toggleArtworkScaleOverride(event: Event): void {
+  const useGlobal = (event.target as HTMLInputElement).checked;
+  pushSetting({ artworkScaleOverride: useGlobal ? null : 100 });
+}
+
+let artworkScaleTimeout: ReturnType<typeof setTimeout> | null = null;
+
+function onArtworkScaleOverrideChange(event: Event): void {
+  const value = parseInt((event.target as HTMLInputElement).value, 10);
+  if (artworkScaleTimeout) clearTimeout(artworkScaleTimeout);
+  artworkScaleTimeout = setTimeout(() => {
+    pushSetting({ artworkScaleOverride: value });
+  }, 300);
+}
+
+function toggleLayout(layoutName: LayoutType): void {
+  const current = screen.value?.enabledLayouts ?? [...LAYOUTS];
+  const index = current.indexOf(layoutName);
+
+  if (index > -1) {
+    // Don't allow deselecting the last one
+    if (current.length <= 1) return;
+    const updated = current.filter((l) => l !== layoutName);
+    pushSetting({ enabledLayouts: updated });
+  } else {
+    const updated = [...current, layoutName];
+    // If all layouts are now selected, send null (means "all")
+    if (updated.length === LAYOUTS.length) {
+      pushSetting({ enabledLayouts: null });
+    } else {
+      pushSetting({ enabledLayouts: updated });
+    }
+  }
+}
+
+function isLayoutEnabled(layoutName: LayoutType): boolean {
+  const enabled = screen.value?.enabledLayouts;
+  if (!enabled) return true; // null = all enabled
+  return enabled.includes(layoutName);
+}
+
+function selectAllLayouts(): void {
+  pushSetting({ enabledLayouts: null });
 }
 
 // Auto-clear errors
@@ -270,6 +315,59 @@ onUnmounted(() => {
             />
             <span class="slider-value">{{ screen.fontScaleOverride?.toFixed(2) || '1.00' }}x</span>
           </div>
+        </section>
+
+        <!-- Artwork Scale Override -->
+        <section class="config-section">
+          <label class="config-label">Artwork Scale</label>
+
+          <div class="override-toggle">
+            <label class="checkbox-label">
+              <input
+                type="checkbox"
+                :checked="screen.artworkScaleOverride === null || screen.artworkScaleOverride === undefined"
+                @change="toggleArtworkScaleOverride"
+              />
+              Use global setting
+            </label>
+          </div>
+
+          <div v-if="screen.artworkScaleOverride !== null && screen.artworkScaleOverride !== undefined" class="slider-compact">
+            <input
+              type="range"
+              min="50"
+              max="100"
+              step="5"
+              :value="screen.artworkScaleOverride"
+              @input="onArtworkScaleOverrideChange"
+            />
+            <span class="slider-value">{{ screen.artworkScaleOverride ?? 100 }}%</span>
+          </div>
+        </section>
+
+        <!-- Enabled Layouts for Cycling -->
+        <section class="config-section">
+          <label class="config-label">Layouts for Cycling</label>
+          <p class="config-hint">Select which layouts to cycle through when tapping the screen.</p>
+          <div class="option-grid">
+            <button
+              v-for="l in LAYOUTS"
+              :key="l"
+              class="option-btn"
+              :class="{ active: isLayoutEnabled(l) }"
+              :disabled="isLayoutEnabled(l) && (screen.enabledLayouts?.length ?? LAYOUTS.length) <= 1"
+              @click="toggleLayout(l)"
+            >
+              {{ getLayoutDisplayName(l) }}
+            </button>
+          </div>
+          <button
+            class="btn btn-small btn-ghost"
+            style="margin-top: 0.5rem"
+            @click="selectAllLayouts"
+          >
+            Select All
+          </button>
         </section>
       </template>
 
@@ -511,5 +609,11 @@ onUnmounted(() => {
   font-size: 0.9rem;
   color: #888;
   min-width: 48px;
+}
+
+.config-hint {
+  font-size: 0.8rem;
+  color: #666;
+  margin: 0 0 0.75rem 0;
 }
 </style>

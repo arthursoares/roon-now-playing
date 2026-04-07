@@ -45,5 +45,8 @@ e2e/screenshots/
 # Roon
 config.json
 
+# Runtime config (server-generated)
+packages/server/config/
+
 # Claude
 .claude/settings.local.json
