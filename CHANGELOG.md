@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.0] - 2026-04-07
+
+### Added
+
+- **Artwork Scale Control**: New global slider (50–100%) in admin Display Settings to control album cover size across layouts. Applies to Detailed, Ambient, Basic, Cover, and Facts Columns layouts. Layouts using artwork as a full-screen background (Fullscreen, Minimal, Facts Overlay, Facts Carousel) are not affected.
+
+- **Per-Screen Overrides in Admin Panel**: Font Scale and Artwork Scale override sliders directly on each screen card in the main admin view. Check the box to override the global setting for that screen.
+
+- **Layout Cycling Control**: Per-screen configuration to select which layouts participate in tap-to-cycle. Available on the per-screen config page (`/admin/screen/:name`).
+
+- **Per-Screen Artwork Scale Override**: Override the global artwork scale on individual screens from the per-screen config page.
+
+### Fixed
+
+- **iPad Portrait Layout**: Ambient and Facts Columns layouts no longer show side-by-side mode on iPads in portrait. Added `min-aspect-ratio: 1/1` guard to all `min-width` media queries so landscape-only layouts are never triggered on tall viewports.
+
+- **Artwork Centering**: Album artwork now resizes from the center (not top-left or top-center) when the artwork scale is adjusted.
+
+- **Artwork Scale in Landscape**: The artwork scale slider now works in both portrait and landscape orientations. Previously, landscape media queries overrode the scale with fixed values.
+
+- **Basic Layout Portrait Space**: Removed fixed `max-width: 400px` constraint that prevented artwork from using available space on iPad portrait. Layout now uses `--artwork-scale` for responsive sizing.
+
+### Changed
+
+- Runtime config files (`packages/server/config/`) are now gitignored to avoid tracking environment-specific state.
+
+## [1.7.3] - 2026-03-28
+
+### Fixed
+
+- **DetailedLayout tablet portrait**: Use stacked layout for tablets in portrait mode
+- **Adaptive text contrast**: Use WCAG contrast ratios for text readability on colored backgrounds
+- **Admin panel**: Fix duplicate screens appearing in client list
+
 ## [1.7.1] - 2026-02-10
 
 ### Fixed
