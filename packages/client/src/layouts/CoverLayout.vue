@@ -177,9 +177,8 @@ const layoutClass = computed(() => ({
 
 .artwork-container {
     position: relative;
-    /* 70%-80% of viewport height or width, whichever is smaller */
-    width: min(70vh, 80vw);
-    height: min(70vh, 80vw);
+    width: calc(min(70vh, 80vw) * var(--artwork-scale, 1));
+    height: calc(min(70vh, 80vw) * var(--artwork-scale, 1));
     aspect-ratio: 1;
 }
 
@@ -257,16 +256,16 @@ const layoutClass = computed(() => ({
 /* Responsive adjustments for smaller screens */
 @media (max-width: 600px) {
     .artwork-container {
-        width: min(70vh, 80vw);
-        height: min(70vh, 80vw);
+        width: calc(min(70vh, 80vw) * var(--artwork-scale, 1));
+        height: calc(min(70vh, 80vw) * var(--artwork-scale, 1));
     }
 }
 
 /* Larger displays - keep artwork appropriately sized */
 @media (min-width: 1900px) {
     .artwork-container {
-        width: min(80vh, 80vw);
-        height: min(80vh, 80vw);
+        width: calc(min(80vh, 80vw) * var(--artwork-scale, 1));
+        height: calc(min(80vh, 80vw) * var(--artwork-scale, 1));
     }
 }
 </style>

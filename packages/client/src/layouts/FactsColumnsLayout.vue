@@ -392,6 +392,7 @@ watch(
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 2rem;
 }
 
@@ -408,16 +409,17 @@ watch(
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 100%;
-  max-width: calc(100% * var(--artwork-scale, 1));
+  align-self: center;
+  width: calc(100% * var(--artwork-scale, 1));
+  max-width: 100%;
 }
 
 @media (min-width: 900px) and (min-aspect-ratio: 1/1) {
   .artwork-column {
-    width: 55%;
-    max-width: none;
-    max-height: 100%; /* Don't exceed container height */
-    flex: 0 0 55%;
+    width: calc(55% * var(--artwork-scale, 1));
+    max-width: 55%;
+    max-height: 100%;
+    flex: 0 0 auto;
   }
 }
 

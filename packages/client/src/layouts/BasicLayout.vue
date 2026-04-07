@@ -130,16 +130,18 @@ const secondaryTextColor = computed(() => {
   -webkit-box-align: center;
   -webkit-align-items: center;
   align-items: center;
+  -webkit-box-pack: center;
+  -webkit-justify-content: center;
+  justify-content: center;
   width: 100%;
-  max-width: 800px;
   height: 100%;
   max-height: 100%;
 }
 
 /* Artwork - using padding-bottom hack for aspect ratio */
 .artwork-wrapper {
-  width: 100%;
-  max-width: 400px;
+  width: calc(100% * var(--artwork-scale, 1));
+  max-width: 100%;
   -webkit-flex-shrink: 0;
   flex-shrink: 0;
 }
@@ -252,7 +254,7 @@ const secondaryTextColor = computed(() => {
 /* Progress section */
 .progress-section {
   width: 100%;
-  max-width: 400px;
+  max-width: calc(100% * var(--artwork-scale, 1));
   margin-top: 1.5rem;
   margin-left: auto;
   margin-right: auto;
@@ -284,8 +286,8 @@ const secondaryTextColor = computed(() => {
   }
 
   .artwork-wrapper {
-    width: 40%;
-    max-width: none;
+    width: calc(40% * var(--artwork-scale, 1));
+    max-width: 40%;
     height: 80%;
     max-height: 500px;
   }
@@ -340,10 +342,6 @@ const secondaryTextColor = computed(() => {
 @media (max-width: 480px) {
   .basic-layout {
     padding: 1rem;
-  }
-
-  .artwork-wrapper {
-    max-width: 280px;
   }
 
   .title {

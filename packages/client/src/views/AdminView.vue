@@ -190,7 +190,7 @@ async function saveName(clientId: string): Promise<void> {
 
 async function pushSetting(
   clientId: string,
-  setting: { layout?: LayoutType; font?: FontType; background?: BackgroundType; zoneId?: string }
+  setting: { layout?: LayoutType; font?: FontType; background?: BackgroundType; zoneId?: string; fontScaleOverride?: number | null; artworkScaleOverride?: number | null }
 ): Promise<void> {
   pushing.value[clientId] = true;
   try {
@@ -216,6 +216,36 @@ function getFontDisplayName(font: FontType): string {
 
 function getBackgroundDisplayName(background: BackgroundType): string {
   return BACKGROUND_CONFIG[background]?.displayName || background;
+}
+
+// Per-screen override helpers
+const fontScaleTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+const artworkScaleTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+
+function onClientFontScaleChange(clientId: string, event: Event): void {
+  const value = parseFloat((event.target as HTMLInputElement).value);
+  if (fontScaleTimers[clientId]) clearTimeout(fontScaleTimers[clientId]);
+  fontScaleTimers[clientId] = setTimeout(() => {
+    pushSetting(clientId, { fontScaleOverride: value });
+  }, 300);
+}
+
+function toggleClientFontScale(clientId: string, client: ClientMetadata): void {
+  const useGlobal = client.fontScaleOverride !== null && client.fontScaleOverride !== undefined;
+  pushSetting(clientId, { fontScaleOverride: useGlobal ? null : 1.0 });
+}
+
+function onClientArtworkScaleChange(clientId: string, event: Event): void {
+  const value = parseInt((event.target as HTMLInputElement).value, 10);
+  if (artworkScaleTimers[clientId]) clearTimeout(artworkScaleTimers[clientId]);
+  artworkScaleTimers[clientId] = setTimeout(() => {
+    pushSetting(clientId, { artworkScaleOverride: value });
+  }, 300);
+}
+
+function toggleClientArtworkScale(clientId: string, client: ClientMetadata): void {
+  const useGlobal = client.artworkScaleOverride !== null && client.artworkScaleOverride !== undefined;
+  pushSetting(clientId, { artworkScaleOverride: useGlobal ? null : 100 });
 }
 
 // Facts configuration functions
@@ -727,6 +757,55 @@ onMounted(() => {
               </div>
             </div>
 
+            <!-- Per-screen scale overrides -->
+            <div class="card-overrides">
+              <div class="override-row">
+                <label class="override-label">
+                  <input
+                    type="checkbox"
+                    :checked="client.fontScaleOverride !== null && client.fontScaleOverride !== undefined"
+                    @change="toggleClientFontScale(client.clientId, client)"
+                  />
+                  Font Scale
+                </label>
+                <div v-if="client.fontScaleOverride !== null && client.fontScaleOverride !== undefined" class="override-slider">
+                  <input
+                    type="range"
+                    min="0.75"
+                    max="1.5"
+                    step="0.05"
+                    :value="client.fontScaleOverride"
+                    @input="(e) => onClientFontScaleChange(client.clientId, e)"
+                  />
+                  <span class="override-value">{{ client.fontScaleOverride?.toFixed(2) }}x</span>
+                </div>
+                <span v-else class="override-global">Global</span>
+              </div>
+
+              <div class="override-row">
+                <label class="override-label">
+                  <input
+                    type="checkbox"
+                    :checked="client.artworkScaleOverride !== null && client.artworkScaleOverride !== undefined"
+                    @change="toggleClientArtworkScale(client.clientId, client)"
+                  />
+                  Artwork Scale
+                </label>
+                <div v-if="client.artworkScaleOverride !== null && client.artworkScaleOverride !== undefined" class="override-slider">
+                  <input
+                    type="range"
+                    min="50"
+                    max="100"
+                    step="5"
+                    :value="client.artworkScaleOverride"
+                    @input="(e) => onClientArtworkScaleChange(client.clientId, e)"
+                  />
+                  <span class="override-value">{{ client.artworkScaleOverride }}%</span>
+                </div>
+                <span v-else class="override-global">Global</span>
+              </div>
+            </div>
+
             <div v-if="pushing[client.clientId]" class="card-loading">
               <div class="loading-bar"></div>
             </div>
@@ -1235,7 +1314,8 @@ onMounted(() => {
 
         <div class="config-card">
           <h2 class="card-title">Artwork Scale</h2>
-          <p class="card-desc">Adjust the global artwork size in portrait/stacked layouts. Individual screens can override this setting.</p>
+          <p class="card-desc">Adjust the global artwork size. Individual screens can override this setting.</p>
+          <p class="card-hint">Applies to: Detailed, Ambient, Basic, Cover, and Facts Columns layouts. Layouts that use artwork as a full-screen background (Fullscreen, Minimal, Facts Overlay, Facts Carousel) are not affected.</p>
 
           <div class="slider-field">
             <div class="slider-header">
@@ -1742,6 +1822,63 @@ onMounted(() => {
 .setting-select:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.card-overrides {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border-default);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.override-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 28px;
+}
+
+.override-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+  min-width: 120px;
+}
+
+.override-label input[type="checkbox"] {
+  accent-color: var(--accent-primary);
+}
+
+.override-slider {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.override-slider input[type="range"] {
+  flex: 1;
+  height: 4px;
+  accent-color: var(--accent-primary);
+}
+
+.override-value {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  min-width: 40px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.override-global {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  opacity: 0.6;
 }
 
 .card-loading {
@@ -2584,6 +2721,14 @@ onMounted(() => {
   margin: 0 0 24px 0;
   color: var(--text-muted);
   font-size: 14px;
+}
+
+.card-hint {
+  margin: -16px 0 24px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  opacity: 0.7;
+  line-height: 1.4;
 }
 
 .slider-field {
