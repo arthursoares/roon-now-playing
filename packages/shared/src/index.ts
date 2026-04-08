@@ -313,6 +313,10 @@ export interface ServerRemoteSettingsMessage {
   enabledLayouts?: LayoutType[] | null;
 }
 
+export interface ServerClientResetMessage {
+  type: 'client_reset';
+}
+
 // Display settings (stored on server)
 export interface DisplaySettings {
   fontScale: number;
@@ -386,4 +390,5 @@ export type ServerMessage =
   | ServerClientDisconnectedMessage
   | ServerClientUpdatedMessage
   | ServerRemoteSettingsMessage
+  | ServerClientResetMessage
   | DisplaySettingsUpdateMessage;

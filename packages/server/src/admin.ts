@@ -166,5 +166,17 @@ export function createAdminRouter(wsManager: WebSocketManager): Router {
     res.json(settings);
   });
 
+  // Remove a client (full reset)
+  router.delete('/clients/:clientId', (req, res) => {
+    const { clientId } = req.params;
+    const success = wsManager.removeClient(clientId);
+    if (success) {
+      logger.info(`Removed client ${clientId}`);
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ error: 'Client not found' });
+    }
+  });
+
   return router;
 }
