@@ -472,7 +472,17 @@ pnpm test:e2e:screenshots
 # Full approval matrix: every layout × every background type
 pnpm test:e2e:matrix
 npx playwright show-report   # browse the matrix for visual approval
+
+# Review pack: labelled contact sheets (one layout × all backgrounds) for a
+# model-driven consistency audit (requires ImageMagick)
+pnpm run review:pack         # → e2e/screenshots/matrix/_review/<res>/<layout>.png
 ```
+
+To audit consistency across the whole matrix at once, hand the contact sheets in
+`e2e/screenshots/matrix/_review/` plus [`e2e/visual-review-prompt.md`](e2e/visual-review-prompt.md)
+to a vision-capable model — it returns a ranked table of contrast/legibility/
+consistency problems. CI uploads this pack as the `visual-review-pack` artifact
+on every PR.
 
 The matrix renders the full cross-product of all 9 layouts × all 14 background
 types at each approved resolution and attaches every frame to the Playwright

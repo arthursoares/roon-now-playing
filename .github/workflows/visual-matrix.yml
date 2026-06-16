@@ -41,6 +41,20 @@ jobs:
       - name: Render visual approval matrix
         run: pnpm run test:e2e:matrix
 
+      - name: Build review pack (contact sheets)
+        if: ${{ !cancelled() }}
+        run: |
+          sudo apt-get update && sudo apt-get install -y imagemagick fonts-dejavu-core
+          pnpm run review:pack
+
+      - name: Upload review pack (contact sheets + prompt)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-review-pack
+          path: e2e/screenshots/matrix/_review/
+          retention-days: 14
+
       - name: Upload approval matrix (HTML report)
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4

@@ -19,6 +19,7 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:screenshots": "playwright test --grep 'Screenshot' --project=iPad-landscape --project=TV-1080p --project=TV-4K",
     "test:e2e:matrix": "playwright test --grep 'Matrix' --project=iPad-landscape --project=TV-1080p --project=TV-4K",
+    "review:pack": "bash e2e/build-review-pack.sh",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint packages --ext .ts,.vue"
   },
