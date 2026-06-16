@@ -1,0 +1,464 @@
+---
+import { Image } from 'astro:assets';
+import Base from '../layouts/Base.astro';
+import ex01 from '../assets/example01.jpeg';
+import ex02 from '../assets/example02.jpeg';
+import ex03 from '../assets/example03.jpeg';
+import ex04 from '../assets/example04.jpeg';
+import ex05 from '../assets/example05.jpeg';
+
+const repo = 'https://github.com/arthursoares/roon-now-playing';
+const hassRepo = 'https://github.com/arthursoares/roon-now-playing-hass';
+const forum =
+  'https://community.roonlabs.com/t/roon-now-playing-a-simple-always-on-display-extension/';
+
+const layouts = [
+  'detailed', 'minimal', 'fullscreen', 'ambient', 'cover',
+  'facts-columns', 'facts-overlay', 'facts-carousel', 'basic',
+];
+const backgrounds = [
+  'black', 'white', 'dominant', 'gradient-radial', 'gradient-linear',
+  'gradient-linear-multi', 'gradient-radial-corner', 'gradient-mesh',
+  'blur-subtle', 'blur-heavy', 'duotone', 'posterized', 'gradient-noise', 'blur-grain',
+];
+
+const features = [
+  { t: '9 display layouts', d: 'From a clean cover view to dense detail and AI-facts layouts — switch instantly with a tap or remotely from the admin panel.', i: 'layout' },
+  { t: '14 dynamic backgrounds', d: 'Colors and gradients extracted live from the album artwork — radial, linear, mesh, duotone, blurred, posterized and more.', i: 'palette' },
+  { t: 'AI-generated facts', d: 'Surface lesser-known facts about the playing track using Anthropic, OpenAI, OpenRouter, or a fully local model.', i: 'spark' },
+  { t: 'Multi-zone, multi-client', d: 'Run as many displays as you like, each on its own Roon zone, all updating in real time over WebSockets.', i: 'grid' },
+  { t: 'Roon-optional', d: 'Use it with Roon, or run external-sources-only via a simple HTTP API — push now-playing from anything.', i: 'plug' },
+  { t: 'Self-service onboarding', d: 'New screens auto-generate a friendly name and show a QR code that opens their own config page on your phone.', i: 'qr' },
+  { t: '17 font families', d: 'Pick the typeface that suits the room, from the system default to a curated set of display and text faces.', i: 'type' },
+  { t: 'Resolution-aware', d: 'Typography scales smoothly from a bedside tablet to a 4K living-room TV, so everything stays readable across the room.', i: 'expand' },
+];
+
+const useCases = [
+  { t: 'Wall-mounted display', d: 'A dedicated tablet or panel by the listening chair, showing exactly what’s spinning.' },
+  { t: '10-foot TV UI', d: 'Cast to the living-room TV — large type and ambient artwork backgrounds made to be read from the couch.' },
+  { t: 'Bedside tablet', d: 'An old tablet finds new life as a quiet, glanceable now-playing clock for the bedroom.' },
+  { t: 'Multi-room', d: 'One screen per zone across the house, each following its own room and updating instantly.' },
+];
+
+const providers = [
+  { t: 'Anthropic', d: 'Claude Haiku 4.5 (default), Sonnet 4.6, Opus 4.8.' },
+  { t: 'OpenAI', d: 'GPT-5 family (GPT-5 / mini / nano) plus GPT-4.1 and GPT-4o.' },
+  { t: 'OpenRouter', d: 'One API key, 200+ models — pick by cost or capability.' },
+  { t: 'Local (Ollama / LM Studio)', d: 'Run a model on your own hardware — no cloud, no API keys, no cost.' },
+];
+
+const icon: Record<string, string> = {
+  layout: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>',
+  palette: '<circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2a10 10 0 1 0 0 20c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1-.24-.27-.39-.62-.39-1 0-.83.67-1.5 1.5-1.5H16a6 6 0 0 0 6-6c0-4.97-4.48-9-10-9z"/>',
+  spark: '<path d="M12 3l1.9 4.8L18 9.7l-4.1 1.9L12 16l-1.9-4.4L6 9.7l4.1-1.9L12 3zM19 14l.9 2.1 2.1.9-2.1.9L19 20l-.9-2.1-2.1-.9 2.1-.9L19 14z"/>',
+  grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  plug: '<path d="M9 2v6M15 2v6M7 8h10v3a5 5 0 0 1-10 0V8zM12 16v6"/>',
+  qr: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v7M14 21h3"/>',
+  type: '<path d="M4 6V4h16v2M9 20h6M12 4v16"/>',
+  expand: '<path d="M3 8V3h5M21 8V3h-5M3 16v5h5M21 16v5h-5"/>',
+};
+---
+
+<Base>
+  <!-- ============ HERO ============ -->
+  <section class="hero">
+    <div class="aura"></div>
+    <div class="container hero__inner">
+      <div class="hero__copy">
+        <p class="eyebrow">Self-hosted · Open source · v1.9.0</p>
+        <h1 class="hero__title">
+          Your music, <span class="grad-text">beautifully</span> on screen.
+        </h1>
+        <p class="hero__sub">
+          An always-on now-playing display for Roon and other music sources.
+          Real-time album artwork and track metadata on any screen you have —
+          a TV, a spare tablet, a wall-mounted panel.
+        </p>
+        <div class="hero__cta">
+          <a class="btn btn--primary" href={repo} target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2A10 10 0 0 0 8.84 21.5c.5.09.66-.22.66-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.1-1.47-1.1-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85v2.74c0 .27.16.58.67.48A10 10 0 0 0 12 2z"></path></svg>
+            View on GitHub
+          </a>
+          <a class="btn btn--ghost" href={forum} target="_blank" rel="noopener">
+            Roon Community thread →
+          </a>
+        </div>
+        <div class="hero__stats token-list" aria-hidden="true">
+          <span class="chip">9 layouts</span>
+          <span class="chip">14 backgrounds</span>
+          <span class="chip">17 fonts</span>
+          <span class="chip">AI facts</span>
+        </div>
+      </div>
+
+      <div class="hero__media">
+        <div class="screen">
+          <Image src={ex01} alt="Roon Now Playing showing album artwork with a color-extracted gradient background" widths={[640, 960, 1280]} sizes="(min-width: 980px) 560px, 92vw" loading="eager" fetchpriority="high" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FEATURES ============ -->
+  <section class="section" id="features">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">What it does</p>
+        <h2>Everything a now-playing screen should be</h2>
+        <p>Built to look great from across the room and to disappear into the background until you glance at it.</p>
+      </div>
+      <div class="feature-grid">
+        {features.map((f) => (
+          <article class="card feature">
+            <span class="feature__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" set:html={icon[f.i]} />
+            </span>
+            <h3>{f.t}</h3>
+            <p class="text-muted">{f.d}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LAYOUTS / GALLERY ============ -->
+  <section class="section" id="layouts">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">Looks</p>
+        <h2>Nine layouts, fourteen backgrounds, one tap away</h2>
+        <p>Every layout pairs with every background style, and the colors come straight from the album art. Tap the screen to cycle, or push a look to any display from the admin panel.</p>
+      </div>
+
+      <div class="gallery">
+        <figure class="gallery__lead">
+          <Image src={ex02} alt="Detailed layout with a bright extracted background color" widths={[720, 1080, 1440]} sizes="(min-width: 880px) 60vw, 92vw" loading="lazy" />
+          <figcaption>Detailed layout · color extracted from the cover</figcaption>
+        </figure>
+        <figure>
+          <Image src={ex04} alt="Cover layout with a radial gradient background" widths={[480, 720]} sizes="(min-width: 880px) 36vw, 92vw" loading="lazy" />
+          <figcaption>Cover · radial gradient</figcaption>
+        </figure>
+        <figure>
+          <Image src={ex03} alt="Ambient layout with full track information" widths={[480, 720]} sizes="(min-width: 880px) 36vw, 92vw" loading="lazy" />
+          <figcaption>Ambient · 10-foot UI</figcaption>
+        </figure>
+        <figure class="gallery__wide">
+          <Image src={ex05} alt="Layout with warm extracted colors" widths={[720, 1080, 1440]} sizes="(min-width: 880px) 60vw, 92vw" loading="lazy" />
+          <figcaption>Warm dominant color · made to be read from the couch</figcaption>
+        </figure>
+      </div>
+
+      <div class="token-cols">
+        <div>
+          <h3 class="token-cols__h">Layouts</h3>
+          <div class="token-list">{layouts.map((l) => <span class="chip">{l}</span>)}</div>
+        </div>
+        <div>
+          <h3 class="token-cols__h">Backgrounds</h3>
+          <div class="token-list">{backgrounds.map((b) => <span class="chip">{b}</span>)}</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SETUP ============ -->
+  <section class="section section--alt" id="setup">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">Get started</p>
+        <h2>Running in a couple of minutes</h2>
+        <p>It’s a single self-hosted service. Point a browser at it and you’re live — then scan a QR code to configure each screen from your phone.</p>
+      </div>
+
+      <div class="setup-grid">
+        <div class="card setup">
+          <h3><span class="num">1</span> Run the server</h3>
+          <p class="text-muted">With Docker (recommended):</p>
+          <pre><code><span class="c"># start it</span>
+docker compose up -d
+
+<span class="c"># or pull the image directly</span>
+docker pull ghcr.io/arthursoares/roon-now-playing:<span class="t">latest</span></code></pre>
+          <p class="text-muted" style="margin-top:1rem">Or from source (Node 20+, pnpm):</p>
+          <pre><code>pnpm install
+pnpm build
+pnpm start</code></pre>
+        </div>
+
+        <div class="card setup">
+          <h3><span class="num">2</span> Open a display</h3>
+          <p class="text-muted">
+            Open <code>http://&lt;server&gt;:3000</code> on any screen. It generates a
+            friendly name and a QR code — scan it to open that screen’s config page,
+            or manage everything from <code>/admin</code>.
+          </p>
+          <p class="text-muted" style="margin-top:1rem">Or drive it straight from the URL:</p>
+          <table class="params">
+            <thead><tr><th>Param</th><th>Example</th></tr></thead>
+            <tbody>
+              <tr><td><code>zone</code></td><td>Living&nbsp;Room</td></tr>
+              <tr><td><code>layout</code></td><td>detailed</td></tr>
+              <tr><td><code>background</code></td><td>gradient-mesh</td></tr>
+              <tr><td><code>font</code></td><td>comfortaa</td></tr>
+            </tbody>
+          </table>
+          <pre style="margin-top:1rem"><code>?zone=Office&amp;layout=cover
+  &amp;background=gradient-mesh</code></pre>
+        </div>
+      </div>
+
+      <p class="setup-note text-muted">
+        Using Roon? Authorize the extension in <strong>Roon → Settings → Extensions</strong>.
+        No Roon? Set <code>ROON_ENABLED=false</code> and push now-playing from any source via the
+        external-sources HTTP API.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ USE CASES ============ -->
+  <section class="section" id="use-cases">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">Where it lives</p>
+        <h2>A screen for every room</h2>
+      </div>
+      <div class="usecase-grid">
+        {useCases.map((u) => (
+          <article class="card usecase">
+            <h3>{u.t}</h3>
+            <p class="text-muted">{u.d}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ AI FACTS ============ -->
+  <section class="section section--alt" id="facts">
+    <div class="container facts">
+      <div class="facts__copy">
+        <p class="eyebrow">AI facts</p>
+        <h2>The story behind the track</h2>
+        <p class="text-muted">
+          The facts layouts surface lesser-known details about whatever’s playing —
+          recording history, chart trivia, the people behind it. Bring your own
+          provider and key, or run a model entirely on your own hardware.
+        </p>
+        <ol class="facts__steps">
+          <li>Open <code>/admin</code> → <strong>AI Facts</strong>.</li>
+          <li>Choose a provider and model.</li>
+          <li>Paste an API key (or set it via an environment variable). Local models need no key.</li>
+          <li>Pick a <code>facts-*</code> layout on any screen.</li>
+        </ol>
+      </div>
+      <div class="facts__providers">
+        {providers.map((p) => (
+          <div class="card provider">
+            <h3>{p.t}</h3>
+            <p class="text-muted">{p.d}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ HOME ASSISTANT ============ -->
+  <section class="section" id="home-assistant">
+    <div class="container hass">
+      <div class="hass__copy">
+        <p class="eyebrow">Sister project</p>
+        <h2>Control it from Home Assistant</h2>
+        <p class="text-muted">
+          <a href={hassRepo} target="_blank" rel="noopener" class="ilink">roon-now-playing-hass</a>
+          is a HACS-installable Home Assistant integration that turns every named screen
+          into entities you can automate — switch to a minimal layout at night, change the
+          zone when you walk into a room, or surface connection status on a dashboard.
+        </p>
+        <ul class="hass__list">
+          <li>Auto-discovers your named screens — no manual setup per display.</li>
+          <li><code>select</code> entities for layout, font, background and zone.</li>
+          <li>A <code>binary_sensor</code> for each screen’s connection status.</li>
+          <li>Real-time over WebSockets — no polling.</li>
+        </ul>
+        <a class="btn btn--ghost" href={hassRepo} target="_blank" rel="noopener">
+          Home Assistant integration →
+        </a>
+      </div>
+      <div class="card hass__code">
+        <p class="eyebrow" style="margin-bottom:0.8rem">Example automation</p>
+        <pre><code><span class="c"># Switch to the minimal layout at night</span>
+automation:
+  trigger:
+    - platform: <span class="t">time</span>
+      at: <span class="t">"22:00:00"</span>
+  action:
+    - service: <span class="t">select.select_option</span>
+      target:
+        entity_id: <span class="t">select.living_room_layout</span>
+      data:
+        option: <span class="t">minimal</span></code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CLOSING CTA ============ -->
+  <section class="section--tight">
+    <div class="container cta-band">
+      <div class="aura" style="opacity:0.7"></div>
+      <h2>Give that spare screen a job.</h2>
+      <p class="text-muted">Self-hosted, open source, and yours to tinker with.</p>
+      <div class="hero__cta" style="justify-content:center">
+        <a class="btn btn--primary" href={repo} target="_blank" rel="noopener">Get it on GitHub</a>
+        <a class="btn btn--ghost" href={forum} target="_blank" rel="noopener">Ask on the Roon forum</a>
+      </div>
+    </div>
+  </section>
+
+  <style>
+    .grad-text {
+      background: linear-gradient(100deg, var(--grad-warm), var(--accent-hover) 40%, var(--grad-pink));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    /* Hero */
+    .hero { position: relative; padding-block: clamp(3rem, 8vw, 6rem) clamp(3rem, 7vw, 5rem); overflow: hidden; }
+    .hero__inner {
+      display: grid;
+      gap: clamp(2.5rem, 6vw, 4rem);
+      align-items: center;
+    }
+    @media (min-width: 980px) { .hero__inner { grid-template-columns: 1fr 1.05fr; } }
+    .hero__title { font-size: var(--step-5); font-weight: 700; letter-spacing: -0.035em; }
+    .hero__sub {
+      color: var(--text-secondary);
+      font-size: var(--step-1);
+      margin-top: 1.4rem;
+      max-width: 44ch;
+    }
+    .hero__cta { display: flex; flex-wrap: wrap; gap: 0.8rem; margin-top: 2rem; }
+    .hero__stats { margin-top: 1.8rem; }
+
+    .hero__media { perspective: 1400px; }
+    .screen {
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      border: 1px solid var(--border-strong);
+      box-shadow: var(--shadow-lg);
+      background: #000;
+      transform: rotateY(-7deg) rotateX(3deg);
+      transition: transform 0.5s var(--ease);
+    }
+    .screen :global(img) { display: block; width: 100%; }
+    @media (hover: hover) and (min-width: 980px) {
+      .screen:hover { transform: rotateY(0) rotateX(0); }
+    }
+    @media (prefers-reduced-motion: reduce) { .screen { transform: none; } }
+
+    /* Features */
+    .feature-grid {
+      display: grid;
+      gap: 1.1rem;
+      grid-template-columns: repeat(auto-fill, minmax(255px, 1fr));
+    }
+    .feature__icon {
+      display: inline-grid;
+      place-items: center;
+      width: 2.8rem; height: 2.8rem;
+      border-radius: 12px;
+      color: var(--accent);
+      background: radial-gradient(120% 120% at 30% 20%, rgba(245,158,11,0.18), rgba(245,158,11,0.04));
+      border: 1px solid rgba(245, 158, 11, 0.28);
+      margin-bottom: 1.1rem;
+    }
+    .feature__icon svg { width: 1.5rem; height: 1.5rem; }
+    .feature h3 { font-size: var(--step-1); margin-bottom: 0.5rem; }
+
+    /* Gallery */
+    .gallery {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: 1fr;
+      margin-bottom: 2.5rem;
+    }
+    @media (min-width: 880px) {
+      .gallery { grid-template-columns: repeat(2, 1fr); grid-auto-flow: dense; }
+      .gallery__lead, .gallery__wide { grid-column: span 2; }
+    }
+    .gallery figure { margin: 0; }
+    .gallery :global(img) {
+      width: 100%;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-md);
+    }
+    .gallery figcaption {
+      font-family: var(--font-mono);
+      font-size: var(--step--1);
+      color: var(--text-muted);
+      margin-top: 0.7rem;
+    }
+
+    .token-cols { display: grid; gap: 1.8rem; }
+    @media (min-width: 720px) { .token-cols { grid-template-columns: 1fr 1.4fr; } }
+    .token-cols__h {
+      font-family: var(--font-mono); font-size: 0.78rem; letter-spacing: 0.16em;
+      text-transform: uppercase; color: var(--text-muted); font-weight: 500; margin-bottom: 0.9rem;
+    }
+
+    /* Alt-tone sections */
+    .section--alt { background: var(--bg-elevated); border-block: 1px solid var(--border); }
+
+    /* Setup */
+    .setup-grid { display: grid; gap: 1.2rem; }
+    @media (min-width: 820px) { .setup-grid { grid-template-columns: 1fr 1fr; } }
+    .setup h3 { display: flex; align-items: center; gap: 0.7rem; font-size: var(--step-1); margin-bottom: 1rem; }
+    .num {
+      display: inline-grid; place-items: center;
+      width: 1.7rem; height: 1.7rem; border-radius: 999px;
+      background: var(--accent); color: var(--accent-ink);
+      font-size: 0.9rem; font-weight: 700; font-family: var(--font-mono);
+    }
+    .params { width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: var(--step--1); }
+    .params th { text-align: left; font-family: var(--font-mono); color: var(--text-muted); font-weight: 500; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border); }
+    .params td { padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--border); color: var(--text-secondary); }
+    .setup-note { margin-top: 1.6rem; text-align: center; max-width: 60ch; margin-inline: auto; }
+
+    /* Use cases */
+    .usecase-grid { display: grid; gap: 1.1rem; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+    .usecase h3 { font-size: var(--step-1); margin-bottom: 0.5rem; }
+
+    /* Facts */
+    .facts { display: grid; gap: clamp(2rem, 5vw, 3.5rem); align-items: start; }
+    @media (min-width: 920px) { .facts { grid-template-columns: 1fr 1fr; } }
+    .facts h2 { font-size: var(--step-3); }
+    .facts__copy p { font-size: var(--step-1); margin-top: 1rem; }
+    .facts__steps { margin: 1.6rem 0 0; padding-left: 1.2rem; color: var(--text-secondary); display: grid; gap: 0.6rem; }
+    .facts__providers { display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; }
+    @media (max-width: 480px) { .facts__providers { grid-template-columns: 1fr; } }
+    .provider h3 { font-size: var(--step-0); margin-bottom: 0.35rem; }
+
+    /* Home Assistant */
+    .hass { display: grid; gap: clamp(2rem, 5vw, 3.5rem); align-items: center; }
+    @media (min-width: 920px) { .hass { grid-template-columns: 1.05fr 1fr; } }
+    .hass h2 { font-size: var(--step-3); margin-bottom: 1rem; }
+    .hass__list { margin: 1.4rem 0; padding-left: 1.2rem; color: var(--text-secondary); display: grid; gap: 0.55rem; }
+    .ilink { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(245,158,11,0.4); }
+    .ilink:hover { color: var(--accent-hover); }
+
+    /* Closing CTA */
+    .cta-band {
+      position: relative; overflow: hidden;
+      text-align: center;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: clamp(2.5rem, 7vw, 4.5rem) var(--gutter);
+      background: var(--bg-elevated);
+    }
+    .cta-band h2 { font-size: var(--step-4); }
+    .cta-band p { margin-top: 0.8rem; font-size: var(--step-1); }
+    .cta-band .hero__cta { margin-top: 2rem; }
+  </style>
+</Base>

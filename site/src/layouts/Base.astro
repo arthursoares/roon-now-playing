@@ -1,0 +1,226 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = 'Roon Now Playing — always-on album art & track display',
+  description = 'A self-hosted, always-on now-playing display for Roon and other music sources. Real-time album artwork and metadata on any screen — TVs, tablets, wall-mounted displays.',
+} = Astro.props;
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const ogImage = new URL(`${base}/og.jpg`, Astro.site);
+
+const repo = 'https://github.com/arthursoares/roon-now-playing';
+const hassRepo = 'https://github.com/arthursoares/roon-now-playing-hass';
+const forum =
+  'https://community.roonlabs.com/t/roon-now-playing-a-simple-always-on-display-extension/';
+const author = 'https://arthur.earth';
+
+const nav = [
+  { href: '#features', label: 'Features' },
+  { href: '#layouts', label: 'Layouts' },
+  { href: '#setup', label: 'Setup' },
+  { href: '#facts', label: 'AI Facts' },
+  { href: '#home-assistant', label: 'Home Assistant' },
+];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+    <meta name="theme-color" content="#0a0a0b" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={ogImage} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="nav" id="top">
+      <div class="container nav__inner">
+        <a class="nav__brand" href="#top" aria-label="Roon Now Playing — home">
+          <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
+            <path
+              d="M20.5 7.5v11.2a3.6 3.6 0 1 1-2-3.23V10.4l-6 1.3v8.7a3.6 3.6 0 1 1-2-3.23V9.2l10-2.16z"
+              fill="#f59e0b"></path>
+          </svg>
+          <span>Roon Now Playing</span>
+        </a>
+
+        <nav class="nav__links" aria-label="Sections">
+          {nav.map((n) => <a href={n.href}>{n.label}</a>)}
+        </nav>
+
+        <a class="btn btn--ghost nav__cta" href={repo} target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 2A10 10 0 0 0 8.84 21.5c.5.09.66-.22.66-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.1-1.47-1.1-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85v2.74c0 .27.16.58.67.48A10 10 0 0 0 12 2z"></path>
+          </svg>
+          GitHub
+        </a>
+      </div>
+    </header>
+
+    <main id="main">
+      <slot />
+    </main>
+
+    <footer class="footer">
+      <div class="container footer__inner">
+        <div class="footer__brand">
+          <div class="nav__brand" style="margin-bottom:0.8rem">
+            <svg viewBox="0 0 32 32" width="24" height="24" aria-hidden="true">
+              <path
+                d="M20.5 7.5v11.2a3.6 3.6 0 1 1-2-3.23V10.4l-6 1.3v8.7a3.6 3.6 0 1 1-2-3.23V9.2l10-2.16z"
+                fill="#f59e0b"></path>
+            </svg>
+            <span>Roon Now Playing</span>
+          </div>
+          <p class="text-muted" style="max-width:32ch">
+            An always-on now-playing display for Roon and other music sources.
+            Self-hosted, open source.
+          </p>
+        </div>
+
+        <nav class="footer__col" aria-label="Project">
+          <h3>Project</h3>
+          <a href={repo} target="_blank" rel="noopener">GitHub repository</a>
+          <a href={hassRepo} target="_blank" rel="noopener">Home Assistant integration</a>
+          <a href={forum} target="_blank" rel="noopener">Roon Community thread</a>
+          <a href={`${repo}/blob/main/CHANGELOG.md`} target="_blank" rel="noopener">Changelog</a>
+        </nav>
+
+        <nav class="footer__col" aria-label="About">
+          <h3>About</h3>
+          <a href={author} target="_blank" rel="noopener">Made by Arthur · arthur.earth</a>
+          <a href={`${repo}/blob/main/LICENSE`} target="_blank" rel="noopener">License</a>
+          <a href={`${repo}/issues`} target="_blank" rel="noopener">Report an issue</a>
+        </nav>
+      </div>
+      <div class="container footer__base">
+        <span class="text-muted">Not affiliated with Roon Labs. Roon is a trademark of Roon Labs LLC.</span>
+      </div>
+    </footer>
+
+    <style>
+      .skip-link {
+        position: absolute;
+        left: -999px;
+        top: 0;
+        background: var(--accent);
+        color: var(--accent-ink);
+        padding: 0.6rem 1rem;
+        border-radius: 0 0 var(--radius-sm) 0;
+        z-index: 100;
+        font-weight: 600;
+      }
+      .skip-link:focus { left: 0; }
+
+      .nav {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: color-mix(in srgb, var(--bg) 78%, transparent);
+        backdrop-filter: saturate(180%) blur(14px);
+        border-bottom: 1px solid var(--border);
+      }
+      .nav__inner {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        height: 4.25rem;
+      }
+      .nav__brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-weight: 600;
+        text-decoration: none;
+        color: var(--text);
+        font-size: 1.05rem;
+        letter-spacing: -0.01em;
+      }
+      .nav__links {
+        display: none;
+        gap: 1.6rem;
+        margin-inline: auto;
+      }
+      .nav__links a {
+        color: var(--text-secondary);
+        text-decoration: none;
+        font-size: 0.95rem;
+        transition: color 0.16s var(--ease);
+      }
+      .nav__links a:hover { color: var(--text); }
+      .nav__cta { padding: 0.5em 1em; }
+      .nav__cta svg { width: 1.1em; height: 1.1em; }
+
+      @media (min-width: 880px) {
+        .nav__links { display: inline-flex; }
+      }
+      @media (max-width: 879px) {
+        .nav__cta span { display: none; }
+        .nav__inner { justify-content: space-between; }
+      }
+
+      .footer {
+        border-top: 1px solid var(--border);
+        background: var(--bg-elevated);
+        padding-block: clamp(2.5rem, 6vw, 4rem) 1.5rem;
+        margin-top: clamp(3rem, 8vw, 6rem);
+      }
+      .footer__inner {
+        display: grid;
+        gap: 2.5rem;
+        grid-template-columns: 1fr;
+      }
+      @media (min-width: 720px) {
+        .footer__inner { grid-template-columns: 1.5fr 1fr 1fr; }
+      }
+      .footer__col { display: flex; flex-direction: column; gap: 0.7rem; }
+      .footer__col h3 {
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        font-weight: 500;
+        margin-bottom: 0.2rem;
+      }
+      .footer__col a {
+        color: var(--text-secondary);
+        text-decoration: none;
+        transition: color 0.16s var(--ease);
+        width: fit-content;
+      }
+      .footer__col a:hover { color: var(--accent); }
+      .footer__base {
+        margin-top: 2.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--border);
+        font-size: 0.85rem;
+      }
+    </style>
+  </body>
+</html>
