@@ -355,18 +355,6 @@ export class WebSocketManager {
     }
     this.clientsById.set(message.clientId, clientState);
 
-    // Persist client settings
-    if (this.clientSettingsStore) {
-      this.clientSettingsStore.set(deviceId, {
-        layout: clientState.layout,
-        font: clientState.font,
-        background: clientState.background,
-        zoneId: clientState.subscribedZoneId,
-        zoneName: clientState.subscribedZoneName,
-        fontScaleOverride: clientState.fontScaleOverride ?? null,
-      });
-    }
-
     logger.info(
       `Client metadata: ${message.clientId} (${clientState.friendlyName || 'unnamed'}) - ` +
         `layout: ${message.layout}, zone: ${message.zoneName || 'none'}`
@@ -381,10 +369,18 @@ export class WebSocketManager {
       friendly_name: clientState.friendlyName ?? undefined,
     });
 
-    // On first connect, push server-stored settings if they differ from what client sent
-    if (isNewClient && this.clientSettingsStore) {
+    // Server-authoritative config — display clients only. Admin connections are
+    // skipped: they aren't displays and, if they share a device ID with the
+    // display page (same browser/origin), would clobber its stored settings.
+    if (this.clientSettingsStore && !clientState.isAdmin) {
+      // Read stored settings BEFORE persisting, so a (re)connecting client has
+      // its saved server-authoritative settings replayed rather than silently
+      // overwritten by whatever it just reported.
       const storedSettings = this.clientSettingsStore.get(deviceId);
-      if (storedSettings) {
+
+      // On first connect, push stored settings if they differ from what the
+      // client sent, and adopt them as the client's current state.
+      if (isNewClient && storedSettings) {
         const needsPush =
           storedSettings.layout !== clientState.layout ||
           storedSettings.font !== clientState.font ||
@@ -412,6 +408,16 @@ export class WebSocketManager {
           clientState.fontScaleOverride = storedSettings.fontScaleOverride;
         }
       }
+
+      // Persist the resulting authoritative state (after any replay above).
+      this.clientSettingsStore.set(deviceId, {
+        layout: clientState.layout,
+        font: clientState.font,
+        background: clientState.background,
+        zoneId: clientState.subscribedZoneId,
+        zoneName: clientState.subscribedZoneName,
+        fontScaleOverride: clientState.fontScaleOverride ?? null,
+      });
     }
 
     // Notify admins — only send client_connected if this device has no other connections
