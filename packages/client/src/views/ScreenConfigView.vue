@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import {
   LAYOUTS,
@@ -121,30 +121,11 @@ watch(error, (val) => {
   }
 });
 
-// Poll for screen data if not yet found via WebSocket
-const pollTimer = ref<ReturnType<typeof setInterval> | null>(null);
-
-onMounted(() => {
-  // Poll API as fallback if screen not in WS client list
-  pollTimer.value = setInterval(async () => {
-    if (screen.value) {
-      if (pollTimer.value) {
-        clearInterval(pollTimer.value);
-        pollTimer.value = null;
-      }
-      return;
-    }
-    try {
-      await fetch(`/api/admin/screens/${encodeURIComponent(friendlyName.value)}`);
-    } catch {
-      // ignore — screen may not be connected yet
-    }
-  }, 3000);
-});
-
-onUnmounted(() => {
-  if (pollTimer.value) clearInterval(pollTimer.value);
-});
+// Screen data arrives reactively over the admin WebSocket (`screen` is derived
+// from `wsState.clients`), so no polling is needed: when the display connects,
+// the client list updates and the view switches out of the offline state.
+// (The previous setInterval fetched /api/admin/screens/:name, discarded the
+// result, and never stopped while offline — spamming 404s.)
 </script>
 
 <template>
