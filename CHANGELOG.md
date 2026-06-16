@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.9.0] - 2026-06-17
+
+### Added
+
+- **Resolution-aware fluid typography**: The type scale now scales continuously with the display (`clamp` + container-query units) instead of capping around 1400px, so text stays correctly proportioned from tablets up to 1080p and 4K. Composes with artwork scaling and adaptive contrast.
+- **GPT-5 family** support for AI facts (`gpt-5`, `gpt-5-mini`, `gpt-5-nano`); the OpenAI provider now uses `max_completion_tokens` (required by GPT-5 / o-series models).
+- **Visual approval matrix**: `pnpm test:e2e:matrix` renders every layout × background at the approved review resolutions (iPad-landscape, TV-1080p, TV-4K); `pnpm run review:gallery` (interactive flag-for-review gallery) and `pnpm run review:pack` (contact sheets). A "Visual Approval Matrix" GitHub Actions workflow uploads them as artifacts on every PR.
+
+### Changed
+
+- **Refreshed LLM models**: Anthropic IDs updated to the current generation (`claude-haiku-4-5` default, `claude-sonnet-4-6`, `claude-opus-4-8`); refreshed OpenAI and OpenRouter options. The retired `claude-sonnet-4-20250514` default was removed.
+- **Facts Carousel** redesigned: the rotating fact is now large type directly on the blurred background (no small card) with a compact now-playing chip, sized for legibility on TVs.
+- **Basic layout** album artwork now scales with the viewport on large displays (previously capped at ~500px), while still honoring the per-screen artwork-scale override.
+
+### Fixed
+
+- Server runtime state in `DATA_DIR` (including `roonstate.json` pairing tokens) is no longer tracked in git; `*.example.json` templates are provided instead.
+- Removed a dead poll on the per-screen config page that spammed `404`s for offline screens.
+
 ## [1.8.0] - 2026-04-07
 
 ### Added
