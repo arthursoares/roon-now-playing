@@ -60,7 +60,7 @@ vi.mock('openai', () => {
 describe('LLM Providers', () => {
   const baseConfig: FactsConfig = {
     provider: 'anthropic',
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-haiku-4-5',
     apiKey: 'test-key',
     factsCount: 5,
     rotationInterval: 25,

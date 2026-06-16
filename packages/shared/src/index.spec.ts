@@ -220,10 +220,12 @@ describe('Facts Types', () => {
     });
 
     it('should export LLM_MODELS for each provider', () => {
-      expect(LLM_MODELS.anthropic).toContain('claude-sonnet-4-20250514');
-      expect(LLM_MODELS.anthropic).toContain('claude-haiku-4-20250514');
+      expect(LLM_MODELS.anthropic).toContain('claude-haiku-4-5');
+      expect(LLM_MODELS.anthropic).toContain('claude-sonnet-4-6');
+      expect(LLM_MODELS.anthropic).toContain('claude-opus-4-8');
+      expect(LLM_MODELS.openai).toContain('gpt-5');
+      expect(LLM_MODELS.openai).toContain('gpt-5-mini');
       expect(LLM_MODELS.openai).toContain('gpt-4o');
-      expect(LLM_MODELS.openai).toContain('gpt-4o-mini');
     });
   });
 
@@ -241,7 +243,7 @@ describe('Facts Types', () => {
     });
 
     it('should have openrouter models including custom option', () => {
-      expect(LLM_MODELS.openrouter).toContain('meta-llama/llama-3.1-70b-instruct');
+      expect(LLM_MODELS.openrouter).toContain('deepseek/deepseek-chat');
       expect(LLM_MODELS.openrouter).toContain('custom');
     });
 
