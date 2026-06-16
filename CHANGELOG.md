@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.7.2] - 2026-06-16
+
+### Changed
+
+- **Refreshed LLM models and providers**. Updated Anthropic model IDs to the current generation (`claude-haiku-4-5`, `claude-sonnet-4-6`, `claude-opus-4-8`) — the previous default `claude-sonnet-4-20250514` had been retired. The default facts model is now `claude-haiku-4-5`.
+- **Added the OpenAI GPT-5 family** (`gpt-5`, `gpt-5-mini`, `gpt-5-nano`) alongside refreshed GPT-4.x options. The OpenAI provider now sends `max_completion_tokens` instead of the deprecated `max_tokens`, which is required by GPT-5 / o-series reasoning models and accepted by GPT-4.x.
+- **Refreshed OpenRouter curated model hints** (Claude Sonnet 4.5, GPT-4.1, Gemini 2.5 Flash, Llama 3.3, DeepSeek). Custom model entry is unchanged.
+- **Roon extension display version** updated from `1.7.1` to `1.7.2`.
+
+### Fixed
+
+- **Runtime config and secrets are no longer tracked in git**. The server's `DATA_DIR` runtime state — `roonstate.json` (Roon pairing tokens), `display-settings.json`, and `client-names.json` — is now gitignored, and the previously committed `facts-config.json` / `external-zones.json` (which carried personal config) are untracked. Added `*.example.json` templates so fresh installs have a reference. Removed a stray screenshot from the repo root.
+
 ## [1.7.1] - 2026-02-10
 
 ### Fixed
