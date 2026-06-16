@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Server-authoritative per-screen config**: Each display's settings (layout, font, background, zone, font/artwork scale, enabled layouts) are stored per device on the server and pushed to the display on connect, so configuration persists across reloads and stays consistent across reconnects. Includes a remote "reset" that clears a screen and reloads it.
 - **Resolution-aware fluid typography**: The type scale now scales continuously with the display (`clamp` + container-query units) instead of capping around 1400px, so text stays correctly proportioned from tablets up to 1080p and 4K. Composes with artwork scaling and adaptive contrast.
 - **GPT-5 family** support for AI facts (`gpt-5`, `gpt-5-mini`, `gpt-5-nano`); the OpenAI provider now uses `max_completion_tokens` (required by GPT-5 / o-series models).
 - **Visual approval matrix**: `pnpm test:e2e:matrix` renders every layout × background at the approved review resolutions (iPad-landscape, TV-1080p, TV-4K); `pnpm run review:gallery` (interactive flag-for-review gallery) and `pnpm run review:pack` (contact sheets). A "Visual Approval Matrix" GitHub Actions workflow uploads them as artifacts on every PR.
@@ -18,6 +19,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Reconnecting displays no longer lose their saved settings (stored config was overwritten before it could be re-applied), and admin connections no longer overwrite a display's stored settings.
 - Server runtime state in `DATA_DIR` (including `roonstate.json` pairing tokens) is no longer tracked in git; `*.example.json` templates are provided instead.
 - Removed a dead poll on the per-screen config page that spammed `404`s for offline screens.
 
