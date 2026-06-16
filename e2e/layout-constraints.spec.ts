@@ -529,3 +529,86 @@ test.describe('Screenshot Capture for PR Validation', () => {
     }
   });
 });
+
+/**
+ * Approval Matrix — every cover style × every background type.
+ *
+ * This is the per-PR visual approval surface. It renders the full cross-product
+ * of layouts and backgrounds and attaches each frame to the Playwright HTML
+ * report. Run only at the approved review resolutions:
+ *   - iPad-landscape (1194×834)
+ *   - TV-1080p (1920×1080)
+ *   - TV-4K (3840×2160)
+ *
+ * Run locally:   pnpm test:e2e:matrix   →   npx playwright show-report
+ * In CI:         the "Visual Approval Matrix" workflow uploads the report as a
+ *                downloadable artifact on every pull request.
+ */
+test.describe('Matrix', () => {
+  const layouts = [
+    'detailed',
+    'minimal',
+    'fullscreen',
+    'ambient',
+    'cover',
+    'facts-columns',
+    'facts-overlay',
+    'facts-carousel',
+    'basic',
+  ];
+
+  // Keep in sync with BACKGROUNDS in packages/shared/src/index.ts
+  const backgrounds = [
+    'black',
+    'white',
+    'dominant',
+    'gradient-radial',
+    'gradient-linear',
+    'gradient-linear-multi',
+    'gradient-radial-corner',
+    'gradient-mesh',
+    'blur-subtle',
+    'blur-heavy',
+    'duotone',
+    'posterized',
+    'gradient-noise',
+    'blur-grain',
+  ];
+
+  for (const layout of layouts) {
+    for (const background of backgrounds) {
+      test(`Matrix: ${layout} / ${background}`, async ({ page, viewport }, testInfo) => {
+        const projectName = testInfo.project.name;
+
+        await setupMockArtwork(page);
+        await pushMockPlayback(page);
+        if (layout.startsWith('facts-')) {
+          await setupMockFactsApi(page);
+        }
+
+        await page.goto(`/?layout=${layout}&background=${background}`);
+        await selectZoneIfNeeded(page);
+        await page.waitForSelector('[class*="layout"]', { timeout: 10000 });
+
+        if (layout.startsWith('facts-')) {
+          await page.waitForSelector('.fact-text', { timeout: 5000 }).catch(() => {
+            // Facts may not always render; capture the frame regardless.
+          });
+        }
+        await page.waitForTimeout(600); // let gradients + animations settle
+
+        const dir = path.join(SCREENSHOT_DIR, 'matrix', projectName);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        const file = path.join(dir, `${layout}__${background}.png`);
+
+        await page.screenshot({ path: file, fullPage: false });
+        await testInfo.attach(`${layout} / ${background} [${projectName}]`, {
+          path: file,
+          contentType: 'image/png',
+        });
+      });
+    }
+  }
+});

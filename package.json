@@ -17,7 +17,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:screenshots": "playwright test --grep 'Screenshot' --project=TV-1080p --project=TV-4K --project=iPad-landscape --project=Monitor-16x10-WQXGA",
+    "test:e2e:screenshots": "playwright test --grep 'Screenshot' --project=iPad-landscape --project=TV-1080p --project=TV-4K",
+    "test:e2e:matrix": "playwright test --grep 'Matrix' --project=iPad-landscape --project=TV-1080p --project=TV-4K",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint packages --ext .ts,.vue"
   },
