@@ -100,6 +100,26 @@ const secondaryTextColor = computed(() => {
 </template>
 
 <style scoped>
+/*
+ * Legacy fallback. BasicLayout targets old browsers (iOS 9/12, etc.) that don't
+ * support clamp()/container-query units. The shared --text-* tokens are fluid
+ * (clamp + cqi), which those browsers can't resolve — leaving font-size invalid.
+ * Restore the fixed scale here so titles/artist/timestamps stay sized.
+ */
+@supports not (font-size: clamp(1rem, 1cqi, 2rem)) {
+  .basic-layout {
+    --text-xs: 0.64rem;
+    --text-sm: 0.8rem;
+    --text-base: 1rem;
+    --text-lg: 1.25rem;
+    --text-xl: 1.563rem;
+    --text-2xl: 1.953rem;
+    --text-3xl: 2.441rem;
+    --text-4xl: 3.052rem;
+    --text-5xl: 3.815rem;
+  }
+}
+
 /* Base layout - no CSS gap, no aspect-ratio, no clamp() */
 .basic-layout {
   width: 100%;

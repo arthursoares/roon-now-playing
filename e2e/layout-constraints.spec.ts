@@ -78,6 +78,13 @@ async function setupMockArtwork(page: Page): Promise<void> {
  * Push mock playback data to the test zone with artwork
  */
 async function pushMockPlayback(page: Page): Promise<void> {
+  // Embed the bundled cover as a data: URL so the SERVER can resolve it without
+  // needing an HTTP route. The server's cacheExternalArtwork does fetch(url) and
+  // returns null on failure; in CI there is no /test-artwork.jpg route, so an
+  // http:// URL would 404 → artwork_key null → the client (which only renders
+  // /api/artwork/<key>) shows a placeholder. A data: URL fetch succeeds and
+  // caches the real bytes, giving a non-null key and real artwork in the matrix.
+  const artworkDataUrl = `data:image/jpeg;base64,${fs.readFileSync(TEST_ARTWORK_PATH).toString('base64')}`;
   await page.request.post('http://localhost:3000/api/sources/test-spotify/now-playing', {
     data: {
       zone_name: 'Test Spotify Player',
@@ -87,7 +94,7 @@ async function pushMockPlayback(page: Page): Promise<void> {
       album: 'In Rainbows',
       duration_seconds: 237,
       seek_position: 45,
-      artwork_url: 'http://localhost:3000/test-artwork.jpg',
+      artwork_url: artworkDataUrl,
     },
   });
   // Wait for WebSocket to propagate the update
