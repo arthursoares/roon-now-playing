@@ -100,7 +100,7 @@ Example: `http://localhost:3000/?zone=Office&layout=detailed&background=gradient
 | `cover` | Clean album cover centered with subtle shadow. Artwork crossfades on track changes. |
 | `facts-columns` | Two-column layout with artwork and AI-generated facts about the music. |
 | `facts-overlay` | Full artwork background with facts overlaid at the bottom. |
-| `facts-carousel` | Blurred artwork background with facts displayed in a centered card. |
+| `facts-carousel` | Blurred artwork background with the rotating fact shown as large type, plus a compact now-playing chip. Sized for legibility on TVs. |
 | `basic` | Legacy-compatible layout for older browsers (iOS 12+). Artwork with title, artist, album, and progress bar. Auto-adapts to portrait/landscape. |
 
 **Note:** Facts layouts require an LLM provider configured in the Admin panel. Supported providers: Anthropic, OpenAI, OpenRouter, or Local LLM (Ollama/LM Studio).
@@ -239,9 +239,10 @@ The facts feature supports multiple LLM providers for generating music facts:
 - Best for: High-quality, nuanced facts
 
 ### OpenAI
-- Models: GPT-4o-mini, GPT-4o, GPT-4.1-mini, GPT-4.1
+- Models: GPT-5, GPT-5-mini, GPT-5-nano, GPT-4.1, GPT-4o, GPT-4o-mini
 - Requires: `OPENAI_API_KEY` or API key in Admin panel
 - Best for: Fast, reliable generation
+- Note: GPT-5 / o-series reasoning models are sent `max_completion_tokens` (not the legacy `max_tokens`)
 
 ### OpenRouter
 - Access 200+ models through a unified API
