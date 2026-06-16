@@ -31,8 +31,10 @@ for (const res of readdirSync(MATRIX_DIR)) {
     const m = f.match(/^(.+?)__(.+)\.png$/);
     if (!m) continue;
     const [, layout, bg] = m;
+    // cache-bust on file mtime so a browser refresh always shows the latest render
+    const v = Math.round(statSync(join(resDir, f)).mtimeMs);
     (data[res] ??= {});
-    (data[res][layout] ??= []).push({ bg, file: `${res}/${f}` });
+    (data[res][layout] ??= []).push({ bg, file: `${res}/${f}?v=${v}` });
   }
 }
 
