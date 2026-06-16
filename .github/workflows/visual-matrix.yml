@@ -41,6 +41,10 @@ jobs:
       - name: Render visual approval matrix
         run: pnpm run test:e2e:matrix
 
+      - name: Build interactive review gallery
+        if: ${{ !cancelled() }}
+        run: pnpm run review:gallery
+
       - name: Build review pack (contact sheets)
         if: ${{ !cancelled() }}
         run: |
