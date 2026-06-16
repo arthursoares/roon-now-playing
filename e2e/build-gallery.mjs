@@ -2,7 +2,7 @@
 /*
  * Build an interactive review gallery from the approval-matrix screenshots.
  *
- * Scans e2e/screenshots/matrix/<resolution>/<layout>__<background>.png and writes
+ * Scans e2e/screenshots/matrix/<resolution>/<layout>__<background>.jpg and writes
  * a self-contained e2e/screenshots/matrix/gallery.html. Open it in a browser to
  * browse every frame, click the ones that need review to flag them, and copy the
  * exported list (layout / background @ resolution [+ note]) to hand back for fixes.
@@ -28,7 +28,7 @@ for (const res of readdirSync(MATRIX_DIR)) {
   const resDir = join(MATRIX_DIR, res);
   if (res === '_review' || !statSync(resDir).isDirectory()) continue;
   for (const f of readdirSync(resDir)) {
-    const m = f.match(/^(.+?)__(.+)\.png$/);
+    const m = f.match(/^(.+?)__(.+)\.jpg$/);
     if (!m) continue;
     const [, layout, bg] = m;
     // cache-bust on file mtime so a browser refresh always shows the latest render

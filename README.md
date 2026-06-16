@@ -467,42 +467,44 @@ resolutions** are the only ones that need sign-off:
 | TV 4K | 3840 × 2160 |
 
 ```bash
-# Per-layout screenshots (one background) at the approved resolutions
-pnpm test:e2e:screenshots
-
-# Full approval matrix: every layout × every background type
+# Approval matrix: every layout × every background type (JPEG frames).
+# Scope to specific layouts with MATRIX_LAYOUTS (CI does this automatically):
 pnpm test:e2e:matrix
-npx playwright show-report   # browse the matrix for visual approval
+MATRIX_LAYOUTS=detailed,basic pnpm test:e2e:matrix
 
-# Interactive gallery: browse every frame, click to flag the ones that need
-# review, copy the exported list
+# Contact sheets: one image per layout showing all 14 backgrounds (needs ImageMagick).
+# This is the lightweight review surface that CI uploads / posts back.
+pnpm run review:pack         # → e2e/screenshots/matrix/_review/<res>/<layout>.jpg
+
+# Interactive gallery: browse every frame, click to flag ones that need review,
+# copy the exported list.
 pnpm run review:gallery      # → e2e/screenshots/matrix/gallery.html (open in a browser)
-
-# Review pack: labelled contact sheets (one layout × all backgrounds) for a
-# model-driven consistency audit (requires ImageMagick)
-pnpm run review:pack         # → e2e/screenshots/matrix/_review/<res>/<layout>.png
 ```
 
-**Manual triage — `gallery.html`** is the main review surface: it tiles all 378
-frames by resolution and layout, you click any that need attention (with an
-optional note), and the export drawer gives you a copy-paste list like
-`facts-carousel / white @ TV-1080p — text unreadable`. Selections persist in the
-browser.
+**Manual triage — `gallery.html`** tiles the rendered frames by resolution and
+layout; click any that need attention (with an optional note) and the export
+drawer gives you a copy-paste list like `facts-carousel / white @ TV-1080p — text
+unreadable`. Selections persist in the browser.
 
-**Model-assisted audit** — for an automated pass, hand the contact sheets in
+**Model-assisted audit** — hand the contact sheets in
 `e2e/screenshots/matrix/_review/` plus [`e2e/visual-review-prompt.md`](e2e/visual-review-prompt.md)
 to a vision-capable model for a ranked findings table.
 
-On every PR, CI uploads both the gallery (inside `visual-approval-matrix-screenshots`)
-and the contact-sheet `visual-review-pack` as artifacts.
+#### CI: selective by default, full on demand
 
-The matrix renders the full cross-product of all 9 layouts × all 14 background
-types at each approved resolution and attaches every frame to the Playwright
-HTML report. **On every pull request, the `Visual Approval Matrix` workflow runs
-this automatically and uploads the report as a downloadable artifact** — review
-it before approving any UI change. Mock playback uses the bundled
-`assets/artwork_radiohead-in_rainbows.jpg` cover so palette-extracted gradients
-render true to production.
+The `Visual Approval Matrix` workflow is intentionally **not** run on every PR:
+
+- **On PRs** it triggers only when UI-affecting paths change, and renders **only
+  the layouts the PR touched** (global changes — design tokens, shared types,
+  background/color composables — render the full set). It uploads the small
+  contact-sheet `visual-review-pack` artifact and posts a sticky PR comment.
+- **Full run on demand:** Actions → *Visual Approval Matrix* → *Run workflow*
+  (optionally scope to specific layouts).
+
+Frames are JPEG and only the montages are uploaded (not raw frames or the HTML
+report), so the artifact stays in the low-MB range. Mock playback uses the
+bundled `assets/artwork_radiohead-in_rainbows.jpg` cover so palette-extracted
+gradients render true to production.
 
 ## Project Structure
 

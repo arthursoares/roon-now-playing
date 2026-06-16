@@ -552,7 +552,7 @@ test.describe('Screenshot Capture for PR Validation', () => {
  *                downloadable artifact on every pull request.
  */
 test.describe('Matrix', () => {
-  const layouts = [
+  const ALL_LAYOUTS = [
     'detailed',
     'minimal',
     'fullscreen',
@@ -563,6 +563,16 @@ test.describe('Matrix', () => {
     'facts-carousel',
     'basic',
   ];
+
+  // Selective runs: set MATRIX_LAYOUTS=detailed,basic to render only those layouts
+  // (CI derives this from the layouts a PR actually changed). Empty → full matrix.
+  const requested = (process.env.MATRIX_LAYOUTS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const layouts = requested.length
+    ? ALL_LAYOUTS.filter((l) => requested.includes(l))
+    : ALL_LAYOUTS;
 
   // Keep in sync with BACKGROUNDS in packages/shared/src/index.ts
   const backgrounds = [
@@ -584,7 +594,7 @@ test.describe('Matrix', () => {
 
   for (const layout of layouts) {
     for (const background of backgrounds) {
-      test(`Matrix: ${layout} / ${background}`, async ({ page, viewport }, testInfo) => {
+      test(`Matrix: ${layout} / ${background}`, async ({ page }, testInfo) => {
         const projectName = testInfo.project.name;
 
         await setupMockArtwork(page);
@@ -608,13 +618,12 @@ test.describe('Matrix', () => {
         if (!fs.existsSync(dir)) {
           fs.mkdirSync(dir, { recursive: true });
         }
-        const file = path.join(dir, `${layout}__${background}.png`);
-
-        await page.screenshot({ path: file, fullPage: false });
-        await testInfo.attach(`${layout} / ${background} [${projectName}]`, {
-          path: file,
-          contentType: 'image/png',
-        });
+        // JPEG (not PNG) keeps the artifact ~10x smaller for photographic
+        // artwork/gradients. Frames are not attached to the HTML report (the
+        // contact-sheet montages / gallery are the review surface) to avoid
+        // duplicating every image into a multi-hundred-MB report.
+        const file = path.join(dir, `${layout}__${background}.jpg`);
+        await page.screenshot({ path: file, type: 'jpeg', quality: 80, fullPage: false });
       });
     }
   }
