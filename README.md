@@ -234,18 +234,18 @@ Environment variables (or `.env` file):
 The facts feature supports multiple LLM providers for generating music facts:
 
 ### Anthropic (Default)
-- Models: Claude Sonnet 4, Claude Haiku 4
+- Models: Claude Haiku 4.5 (default), Claude Sonnet 4.6, Claude Opus 4.8
 - Requires: `ANTHROPIC_API_KEY` or API key in Admin panel
 - Best for: High-quality, nuanced facts
 
 ### OpenAI
-- Models: GPT-4o, GPT-4o-mini
+- Models: GPT-4o-mini, GPT-4o, GPT-4.1-mini, GPT-4.1
 - Requires: `OPENAI_API_KEY` or API key in Admin panel
 - Best for: Fast, reliable generation
 
 ### OpenRouter
 - Access 200+ models through a unified API
-- Curated models: Llama 3.1, Mistral, Gemini, DeepSeek
+- Curated models: Claude Sonnet 4.5, GPT-4.1, Gemini 2.5 Flash, Llama 3.3, DeepSeek
 - Custom model support: Enter any OpenRouter model ID
 - Requires: `OPENROUTER_API_KEY` or API key in Admin panel
 - Best for: Model variety, cost optimization

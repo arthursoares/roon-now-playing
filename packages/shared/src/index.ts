@@ -129,15 +129,13 @@ export type LLMProvider = (typeof LLM_PROVIDERS)[number];
 
 // Model options per provider
 export const LLM_MODELS = {
-  anthropic: ['claude-sonnet-4-20250514', 'claude-haiku-4-20250514'] as const,
-  openai: ['gpt-4o', 'gpt-4o-mini'] as const,
+  anthropic: ['claude-haiku-4-5', 'claude-sonnet-4-6', 'claude-opus-4-8'] as const,
+  openai: ['gpt-5-mini', 'gpt-5', 'gpt-5-nano', 'gpt-4.1', 'gpt-4o', 'gpt-4o-mini'] as const,
   openrouter: [
-    'meta-llama/llama-3.1-70b-instruct',
-    'meta-llama/llama-3.1-8b-instruct',
-    'mistralai/mistral-large',
-    'mistralai/mistral-small',
-    'google/gemini-pro-1.5',
-    'google/gemini-flash-1.5',
+    'anthropic/claude-sonnet-4.5',
+    'openai/gpt-4.1',
+    'google/gemini-2.5-flash',
+    'meta-llama/llama-3.3-70b-instruct',
     'deepseek/deepseek-chat',
     'custom',
   ] as const,

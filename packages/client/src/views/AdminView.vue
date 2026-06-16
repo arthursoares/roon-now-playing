@@ -29,7 +29,7 @@ const pushing = ref<Record<string, boolean>>({});
 // Facts configuration state
 const factsConfig = ref<FactsConfig>({
   provider: 'anthropic',
-  model: 'claude-sonnet-4-20250514',
+  model: 'claude-haiku-4-5',
   apiKey: '',
   factsCount: 5,
   rotationInterval: 25,
@@ -315,7 +315,7 @@ async function saveFactsConfig(): Promise<void> {
 function resetFactsConfig(): void {
   factsConfig.value = {
     provider: 'anthropic',
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-haiku-4-5',
     apiKey: '',
     factsCount: 5,
     rotationInterval: 25,
