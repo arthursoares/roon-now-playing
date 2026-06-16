@@ -280,14 +280,17 @@ const secondaryTextColor = computed(() => {
     -webkit-box-align: center;
     -webkit-align-items: center;
     align-items: center;
-    max-width: 1200px;
+    /* scale the whole row with the viewport so it fills 1440p/4K instead of
+       sitting in a fixed 1200px island */
+    max-width: 90vw;
   }
 
   .artwork-wrapper {
     width: 40%;
     max-width: none;
     height: 80%;
-    max-height: 500px;
+    /* scale the album with viewport height instead of a fixed 500px cap */
+    max-height: 80vh;
   }
 
   .artwork-inner {
