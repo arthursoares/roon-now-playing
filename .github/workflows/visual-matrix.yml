@@ -1,0 +1,58 @@
+name: Visual Approval Matrix
+
+# Renders every cover style × every background type at the approved review
+# resolutions (iPad-landscape, TV-1080p, TV-4K) and uploads the Playwright HTML
+# report as a downloadable artifact for visual approval on each pull request.
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    env:
+      # No Roon core in CI — run in external-sources-only mode. Mock playback is
+      # pushed to the test source by the e2e harness.
+      ROON_ENABLED: 'false'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm run build:shared
+
+      - name: Install Playwright (Chromium)
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Render visual approval matrix
+        run: pnpm run test:e2e:matrix
+
+      - name: Upload approval matrix (HTML report)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-approval-matrix-report
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Upload approval matrix (raw screenshots)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-approval-matrix-screenshots
+          path: e2e/screenshots/matrix/
+          retention-days: 14

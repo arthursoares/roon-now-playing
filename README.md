@@ -454,6 +454,34 @@ pnpm build
 docker compose -f docker-compose.dev.yml up --build
 ```
 
+### Visual testing & approval matrix
+
+UI work is reviewed against screenshots, not just code. The **approved review
+resolutions** are the only ones that need sign-off:
+
+| Scenario | Resolution |
+|----------|-----------|
+| iPad (landscape) | 1194 × 834 |
+| TV 1080p | 1920 × 1080 |
+| TV 4K | 3840 × 2160 |
+
+```bash
+# Per-layout screenshots (one background) at the approved resolutions
+pnpm test:e2e:screenshots
+
+# Full approval matrix: every layout × every background type
+pnpm test:e2e:matrix
+npx playwright show-report   # browse the matrix for visual approval
+```
+
+The matrix renders the full cross-product of all 9 layouts × all 14 background
+types at each approved resolution and attaches every frame to the Playwright
+HTML report. **On every pull request, the `Visual Approval Matrix` workflow runs
+this automatically and uploads the report as a downloadable artifact** — review
+it before approving any UI change. Mock playback uses the bundled
+`assets/artwork_radiohead-in_rainbows.jpg` cover so palette-extracted gradients
+render true to production.
+
 ## Project Structure
 
 ```
@@ -498,7 +526,9 @@ roon-now-playing/
 │               ├── useFacts.ts
 │               └── colorUtils.ts
 ├── .github/workflows/
-│   └── docker-publish.yml
+│   ├── docker-publish.yml
+│   └── visual-matrix.yml    # PR visual approval matrix
+├── e2e/                     # Playwright visual tests (matrix + constraints)
 ├── Dockerfile
 ├── docker-compose.yml
 └── README.md
