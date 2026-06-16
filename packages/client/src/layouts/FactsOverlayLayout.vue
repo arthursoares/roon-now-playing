@@ -204,7 +204,7 @@ watch(
 }
 
 .fact-text {
-  font-size: calc(var(--text-lg) * var(--font-scale, 1));
+  font-size: calc(var(--fluid-fact) * var(--font-scale, 1));
   font-weight: var(--font-normal);
   line-height: var(--leading-snug);
   margin: 0;
@@ -214,44 +214,14 @@ watch(
   animation: fadeIn 0.5s ease-out;
 }
 
-@container layout (min-width: 500px) {
-  .fact-text {
-    font-size: calc(var(--text-xl) * var(--font-scale, 1));
-  }
-}
-
-@container layout (min-width: 700px) {
-  .fact-text {
-    font-size: calc(var(--text-2xl) * var(--font-scale, 1));
-  }
-}
-
-@container layout (min-width: 1000px) {
-  .fact-text {
-    font-size: calc(var(--text-3xl) * var(--font-scale, 1));
-  }
-}
-
-@container layout (min-width: 1400px) {
-  .fact-text {
-    font-size: calc(var(--text-4xl) * var(--font-scale, 1));
-  }
-}
-
 .loading-hint {
-  font-size: calc(var(--text-base) * var(--font-scale, 1));
+  font-size: calc(var(--fluid-caption) * var(--font-scale, 1));
   color: rgba(255, 255, 255, 0.6);
   margin: 0;
 }
 
-@container layout (min-width: 700px) {
-  .loading-hint {
-    font-size: calc(var(--text-lg) * var(--font-scale, 1));
-  }
-}
-
 .error-hint {
-  font-size: calc(var(--text-sm) * var(--font-scale, 1));
+  font-size: calc(var(--fluid-caption) * var(--font-scale, 1));
   color: rgba(255, 255, 255, 0.5);
   margin: 0;
 }
@@ -285,7 +255,7 @@ watch(
 }
 
 .metadata .title {
-  font-size: calc(var(--text-lg) * var(--font-scale, 1));
+  font-size: calc(var(--fluid-title) * var(--font-scale, 1));
   font-weight: var(--font-semibold);
   line-height: var(--leading-tight);
   margin: 0 0 0.2em 0;
@@ -296,20 +266,8 @@ watch(
   white-space: nowrap;
 }
 
-@container layout (min-width: 700px) {
-  .metadata .title {
-    font-size: calc(var(--text-xl) * var(--font-scale, 1));
-  }
-}
-
-@container layout (min-width: 1000px) {
-  .metadata .title {
-    font-size: calc(var(--text-2xl) * var(--font-scale, 1));
-  }
-}
-
 .metadata .artist-album {
-  font-size: calc(var(--text-base) * var(--font-scale, 1));
+  font-size: calc(var(--fluid-subtitle) * var(--font-scale, 1));
   font-weight: var(--font-normal);
   line-height: var(--leading-snug);
   margin: 0;
@@ -320,37 +278,13 @@ watch(
   white-space: nowrap;
 }
 
-@container layout (min-width: 700px) {
-  .metadata .artist-album {
-    font-size: calc(var(--text-lg) * var(--font-scale, 1));
-  }
-}
-
-@container layout (min-width: 1000px) {
-  .metadata .artist-album {
-    font-size: calc(var(--text-xl) * var(--font-scale, 1));
-  }
-}
-
 .no-playback {
   color: rgba(255, 255, 255, 0.6);
 }
 
 .no-playback-text {
-  font-size: calc(var(--text-xl) * var(--font-scale, 1));
+  font-size: calc(var(--fluid-hero) * var(--font-scale, 1));
   margin: 0;
-}
-
-@container layout (min-width: 700px) {
-  .no-playback-text {
-    font-size: calc(var(--text-2xl) * var(--font-scale, 1));
-  }
-}
-
-@container layout (min-width: 1000px) {
-  .no-playback-text {
-    font-size: calc(var(--text-3xl) * var(--font-scale, 1));
-  }
 }
 
 .zone-hint {

@@ -68,53 +68,45 @@ watch(
     <!-- Content -->
     <div class="content">
       <div class="safe-zone">
-        <!-- Fact card -->
-        <div class="fact-card">
-          <!-- Facts area (main content) -->
-          <div class="facts-area">
-            <div v-if="!track" class="no-playback">
-              <p class="no-playback-text">No playback</p>
-              <p class="zone-hint">{{ zoneName }}</p>
+        <!-- Fact (hero) — big type, no card -->
+        <div class="facts-area">
+          <div v-if="!track" class="no-playback">
+            <p class="no-playback-text">No playback</p>
+            <p class="zone-hint">{{ zoneName }}</p>
+          </div>
+
+          <template v-else>
+            <p v-if="isLoading" class="loading-hint">Loading facts…</p>
+            <p v-else-if="currentFact" class="fact-text">{{ currentFact }}</p>
+            <p v-else-if="error && error.type === 'no-key'" class="error-hint">
+              Configure API key in <a href="/admin">Admin</a>
+            </p>
+
+            <!-- Dot indicators -->
+            <div v-if="facts.length > 1" class="fact-dots">
+              <span
+                v-for="(_, index) in facts"
+                :key="index"
+                class="dot"
+                :class="{ active: index === currentFactIndex }"
+              />
             </div>
-
-            <template v-else>
-              <p v-if="isLoading" class="loading-hint">Loading facts...</p>
-              <p v-else-if="currentFact" class="fact-text">{{ currentFact }}</p>
-              <p v-else-if="error && error.type === 'no-key'" class="error-hint">
-                Configure API key in <a href="/admin">Admin</a>
-              </p>
-
-              <!-- Dot indicators -->
-              <div v-if="facts.length > 1" class="fact-dots">
-                <span
-                  v-for="(_, index) in facts"
-                  :key="index"
-                  class="dot"
-                  :class="{ active: index === currentFactIndex }"
-                />
-              </div>
-            </template>
-          </div>
-
-          <!-- Metadata (always visible inside card) -->
-          <div v-if="track" class="metadata">
-            <p class="title">{{ track.title }}</p>
-            <p class="artist-album">{{ track.artist }} · {{ track.album }}</p>
-          </div>
+          </template>
         </div>
 
-        <!-- Bottom info (progress) -->
-        <div class="bottom-info">
-          <div v-if="track" class="progress-line">
+        <!-- Now-playing chip (bottom) -->
+        <div v-if="track" class="now-playing">
+          <div class="np-line">
+            <span class="np-title">{{ track.title }}</span>
+            <span class="np-sep">·</span>
+            <span class="np-artist">{{ track.artist }}</span>
+          </div>
+          <div class="progress-line">
             <div class="progress-fill" :style="{ width: `${progress}%` }" />
           </div>
-          <div class="time-row">
+          <div class="np-meta">
             <span class="zone-name">{{ zoneName }}</span>
-            <div v-if="track" class="time-info">
-              <span>{{ currentTime }}</span>
-              <span class="separator">/</span>
-              <span>{{ duration }}</span>
-            </div>
+            <span class="time-info">{{ currentTime }} / {{ duration }}</span>
           </div>
         </div>
       </div>
@@ -193,263 +185,140 @@ watch(
   position: relative;
   width: 100%;
   height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
 }
 
 .safe-zone {
   width: 100%;
   height: 100%;
-  padding: 5%;
+  padding: 6% 8%;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
 }
 
-.fact-card {
-  container-type: inline-size;
-  container-name: card;
-
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px);
-  border-radius: 16px;
-  padding: clamp(28px, 5vw, 56px);
-  max-width: 75%;
-  min-width: 300px;
-  text-align: center;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  display: flex;
-  flex-direction: column;
-}
-
-/* Facts area - main content */
+/* Fact (hero) — big type directly on the background, no card */
 .facts-area {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  min-height: 120px;
+  text-align: center;
 }
 
 .fact-text {
-  font-size: calc(var(--text-lg) * var(--font-scale, 1));
-  font-weight: var(--font-normal);
-  line-height: var(--leading-normal);
+  font-size: calc(var(--fluid-fact) * var(--font-scale, 1));
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-snug);
   margin: 0;
+  max-width: 18em;
   color: #fff;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.55);
   animation: fadeIn 0.5s ease-out;
-  width: 100%;
-  box-sizing: border-box;
 }
 
-@container card (min-width: 300px) {
-  .fact-text {
-    font-size: calc(var(--text-xl) * var(--font-scale, 1));
-  }
-}
-
-@container card (min-width: 400px) {
-  .fact-text {
-    font-size: calc(var(--text-2xl) * var(--font-scale, 1));
-  }
-}
-
-@container card (min-width: 600px) {
-  .fact-text {
-    font-size: calc(var(--text-3xl) * var(--font-scale, 1));
-  }
-}
-
-@container card (min-width: 800px) {
-  .fact-text {
-    font-size: calc(var(--text-4xl) * var(--font-scale, 1));
-  }
-}
-
-.loading-hint {
-  font-size: calc(var(--text-base) * var(--font-scale, 1));
-  color: rgba(255, 255, 255, 0.5);
-  margin: 0;
-  width: 100%;
-}
-
-@container card (min-width: 400px) {
-  .loading-hint {
-    font-size: calc(var(--text-lg) * var(--font-scale, 1));
-  }
-}
-
+.loading-hint,
 .error-hint {
-  font-size: calc(var(--text-sm) * var(--font-scale, 1));
-  color: rgba(255, 255, 255, 0.5);
+  font-size: calc(var(--fluid-caption) * var(--font-scale, 1));
+  color: rgba(255, 255, 255, 0.7);
   margin: 0;
-  width: 100%;
-}
-
-@container card (min-width: 400px) {
-  .error-hint {
-    font-size: calc(var(--text-base) * var(--font-scale, 1));
-  }
 }
 
 .error-hint a {
-  color: rgba(255, 255, 255, 0.7);
+  color: #fff;
 }
 
 .fact-dots {
   display: flex;
   justify-content: center;
-  gap: 8px;
-  margin-top: 1.5rem;
+  gap: clamp(10px, 1cqi, 22px);
+  margin-top: clamp(1.5rem, 3cqi, 3.5rem);
 }
 
 .dot {
-  width: 8px;
-  height: 8px;
+  width: clamp(8px, 0.9cqi, 20px);
+  height: clamp(8px, 0.9cqi, 20px);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.4);
   transition: background 0.3s, transform 0.3s;
 }
 
 .dot.active {
   background: #fff;
-  transform: scale(1.2);
-}
-
-/* Metadata - always visible, secondary */
-.metadata {
-  margin-top: 1.5rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.metadata .title {
-  font-size: calc(var(--text-base) * var(--font-scale, 1));
-  font-weight: var(--font-semibold);
-  line-height: var(--leading-tight);
-  margin: 0 0 0.2em 0;
-  color: #fff;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-@container card (min-width: 300px) {
-  .metadata .title {
-    font-size: calc(var(--text-lg) * var(--font-scale, 1));
-  }
-}
-
-@container card (min-width: 500px) {
-  .metadata .title {
-    font-size: calc(var(--text-xl) * var(--font-scale, 1));
-  }
-}
-
-.metadata .artist-album {
-  font-size: calc(var(--text-sm) * var(--font-scale, 1));
-  font-weight: var(--font-normal);
-  line-height: var(--leading-snug);
-  margin: 0;
-  color: rgba(255, 255, 255, 0.7);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-@container card (min-width: 300px) {
-  .metadata .artist-album {
-    font-size: calc(var(--text-base) * var(--font-scale, 1));
-  }
-}
-
-@container card (min-width: 500px) {
-  .metadata .artist-album {
-    font-size: calc(var(--text-lg) * var(--font-scale, 1));
-  }
+  transform: scale(1.25);
 }
 
 .no-playback {
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.75);
 }
 
 .no-playback-text {
-  font-size: calc(var(--text-xl) * var(--font-scale, 1));
+  font-size: calc(var(--fluid-hero) * var(--font-scale, 1));
+  font-weight: var(--font-semibold);
   margin: 0;
-  width: 100%;
-}
-
-@container card (min-width: 400px) {
-  .no-playback-text {
-    font-size: calc(var(--text-2xl) * var(--font-scale, 1));
-  }
-}
-
-@container card (min-width: 600px) {
-  .no-playback-text {
-    font-size: calc(var(--text-3xl) * var(--font-scale, 1));
-  }
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.55);
 }
 
 .zone-hint {
-  font-size: calc(var(--text-base) * var(--font-scale, 1));
-  margin: 0.5em 0 0 0;
-  opacity: 0.7;
-  width: 100%;
+  font-size: calc(var(--fluid-caption) * var(--font-scale, 1));
+  margin: 0.6em 0 0 0;
+  opacity: 0.75;
 }
 
-@container card (min-width: 400px) {
-  .zone-hint {
-    font-size: calc(var(--text-lg) * var(--font-scale, 1));
-  }
+/* Now-playing chip (bottom) */
+.now-playing {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.5);
 }
 
-/* Bottom info - fixed position */
-.bottom-info {
-  position: absolute;
-  bottom: 5%;
-  left: 5%;
-  right: 5%;
-  color: rgba(255, 255, 255, 0.6);
-  font-size: calc(var(--text-xs) * var(--font-scale, 1));
+.np-line {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0.4em;
+  font-size: calc(var(--fluid-subtitle) * var(--font-scale, 1));
+  white-space: nowrap;
+  overflow: hidden;
 }
 
-@container layout (min-width: 500px) {
-  .bottom-info {
-    font-size: calc(var(--text-sm) * var(--font-scale, 1));
-  }
+.np-title {
+  font-weight: var(--font-semibold);
+  color: #fff;
 }
 
-@container layout (min-width: 1000px) {
-  .bottom-info {
-    font-size: calc(var(--text-base) * var(--font-scale, 1));
-  }
+.np-sep {
+  opacity: 0.5;
+}
+
+.np-artist {
+  color: rgba(255, 255, 255, 0.8);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .progress-line {
-  height: 3px;
+  height: clamp(3px, 0.35cqi, 8px);
   background: rgba(255, 255, 255, 0.2);
-  border-radius: 1.5px;
+  border-radius: 999px;
   overflow: hidden;
-  margin-bottom: 0.75rem;
 }
 
 .progress-fill {
   height: 100%;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.92);
   transition: width 0.1s linear;
 }
 
-.time-row {
+.np-meta {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  font-size: calc(var(--fluid-caption) * var(--font-scale, 1));
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .zone-name {
@@ -462,16 +331,6 @@ watch(
 .time-info {
   display: flex;
   gap: 0.3em;
-}
-
-.separator {
-  opacity: 0.5;
-}
-
-@media (max-width: 899px) {
-  .fact-card {
-    max-width: 90%;
-    min-width: unset;
-  }
+  font-variant-numeric: tabular-nums;
 }
 </style>
