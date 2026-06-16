@@ -10,7 +10,7 @@ const DEFAULT_LOCAL_BASE_URL = 'http://localhost:11434/v1';
 
 export const DEFAULT_CONFIG: FactsConfig = {
   provider: 'anthropic' as LLMProvider,
-  model: 'claude-sonnet-4-20250514',
+  model: 'claude-haiku-4-5',
   apiKey: '',
   factsCount: 5,
   rotationInterval: 25,

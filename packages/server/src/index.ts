@@ -58,8 +58,10 @@ async function main(): Promise<void> {
   // Connect external source manager to WebSocket
   wsManager.setExternalSourceManager(externalSourceManager);
 
-  // API routes
-  app.use(express.json());
+  // API routes. Raise the body limit above the 100kb default so external-source
+  // pushers can include embedded artwork (base64 / data: URLs) in now-playing
+  // payloads without hitting PayloadTooLargeError.
+  app.use(express.json({ limit: '5mb' }));
   app.use('/api', createArtworkRouter(roonClient));
   app.use('/api/admin', createAdminRouter(wsManager));
   app.use('/api', createFactsRouter());

@@ -8,16 +8,26 @@
   /* Font Scale Multiplier - adjusted via admin UI */
   --font-scale: 1;
 
-  /* Typography Scale */
-  --text-xs: 0.64rem;      /* 10px - zone hints, timestamps */
-  --text-sm: 0.8rem;       /* 13px - secondary info */
-  --text-base: 1rem;       /* 16px - body text */
-  --text-lg: 1.25rem;      /* 20px - artist/album */
-  --text-xl: 1.563rem;     /* 25px - titles */
-  --text-2xl: 1.953rem;    /* 31px - facts (tablet) */
-  --text-3xl: 2.441rem;    /* 39px - facts (desktop) */
-  --text-4xl: 3.052rem;    /* 49px - facts (TV) */
-  --text-5xl: 3.815rem;    /* 61px - facts (4K) */
+  /*
+   * Typography Scale — FLUID & resolution-aware.
+   * Every step is clamp(min, <cqi> , max): the middle term scales with the
+   * container's inline size (cqi), so type keeps growing from 1080p into
+   * 1440p/4K instead of capping at a fixed px size. All 9 layouts set
+   * `container-type: inline-size`, so cqi resolves against the layout/column.
+   * - min  ≈ the old fixed rem (protects phones / narrow columns)
+   * - cqi  drives the scaling (≈ old size at ~1080p, ~2× at 4K)
+   * - max  set near the 4K value so the cap only bites on ultrawide
+   * Multiply by --font-scale at the call site (layouts already do).
+   */
+  --text-xs: clamp(0.64rem, 0.75cqi, 1.9rem);   /* zone hints, timestamps */
+  --text-sm: clamp(0.8rem, 0.95cqi, 2.4rem);    /* secondary info */
+  --text-base: clamp(1rem, 1.2cqi, 3rem);       /* body text */
+  --text-lg: clamp(1.25rem, 1.6cqi, 4rem);      /* artist/album */
+  --text-xl: clamp(1.563rem, 2.1cqi, 5rem);     /* titles */
+  --text-2xl: clamp(1.953rem, 2.7cqi, 6.5rem);  /* facts (tablet) */
+  --text-3xl: clamp(2.441rem, 3.4cqi, 8.5rem);  /* facts (desktop) */
+  --text-4xl: clamp(3.052rem, 4.3cqi, 10.5rem); /* facts (TV) */
+  --text-5xl: clamp(3.815rem, 5.4cqi, 13rem);   /* facts (4K) */
 
   /* Line Heights */
   --leading-tight: 1.1;
@@ -35,4 +45,21 @@
   /* lg: 700-999px */
   /* xl: 1000-1399px */
   /* 2xl: >= 1400px */
+
+  /*
+   * Fluid display type — resolution-aware.
+   * Sizes scale continuously with the container's inline size (cqi), so they
+   * keep growing past 1080p into 1440p/4K instead of capping at a fixed step.
+   * Use inside any element whose layout sets `container-type: inline-size`.
+   * `clamp(min, fluid, max)`: min protects phones/narrow columns, max prevents
+   * runaway size on ultrawide. Multiply by --font-scale at the call site.
+   */
+  /* Maxes are set near the 4K (3840px) cqi value so the fluid term governs all
+     the way through 4K — the cap only bites on ultrawide beyond that. This keeps
+     the text-to-screen ratio constant across 1080p/1440p/4K. */
+  --fluid-hero: clamp(2rem, 7cqi, 18rem);       /* full-bleed hero / no-playback */
+  --fluid-fact: clamp(1.5rem, 4.2cqi, 11rem);   /* rotating fact text */
+  --fluid-title: clamp(1.25rem, 2.8cqi, 7.5rem); /* track title */
+  --fluid-subtitle: clamp(1rem, 1.9cqi, 5rem);   /* artist / album */
+  --fluid-caption: clamp(0.8rem, 1.25cqi, 3.25rem); /* hints, zone, times */
 }

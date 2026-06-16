@@ -114,7 +114,9 @@ export class OpenAIProvider implements LLMProvider {
       const response = await this.client.chat.completions.create({
         model: this.config.model,
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 1024,
+        // max_completion_tokens replaces the deprecated max_tokens and is required
+        // by reasoning models (gpt-5 family, o-series); accepted by gpt-4.x too.
+        max_completion_tokens: 1024,
       });
 
       const content = response.choices[0]?.message?.content;

@@ -101,7 +101,7 @@ describe('FactsConfigStore', () => {
 
   it('should export DEFAULT_CONFIG with correct defaults', () => {
     expect(DEFAULT_CONFIG.provider).toBe('anthropic');
-    expect(DEFAULT_CONFIG.model).toBe('claude-sonnet-4-20250514');
+    expect(DEFAULT_CONFIG.model).toBe('claude-haiku-4-5');
     expect(DEFAULT_CONFIG.apiKey).toBe('');
     expect(DEFAULT_CONFIG.factsCount).toBe(5);
     expect(DEFAULT_CONFIG.rotationInterval).toBe(25);

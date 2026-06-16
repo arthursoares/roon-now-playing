@@ -13,8 +13,8 @@ export default defineConfig({
   reporter: 'html',
 
   use: {
-    // Base URL for local dev server
-    baseURL: 'http://localhost:5174',
+    // Base URL for local dev server (Vite serves on 5173 — see packages/client/vite.config.ts)
+    baseURL: 'http://localhost:5173',
 
     // Collect trace on failure
     trace: 'on-first-retry',
@@ -104,7 +104,7 @@ export default defineConfig({
   // Run local dev server before tests
   webServer: {
     command: 'pnpm run dev',
-    url: 'http://localhost:5174',
+    url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
   },

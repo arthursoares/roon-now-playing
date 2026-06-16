@@ -100,7 +100,7 @@ Example: `http://localhost:3000/?zone=Office&layout=detailed&background=gradient
 | `cover` | Clean album cover centered with subtle shadow. Artwork crossfades on track changes. |
 | `facts-columns` | Two-column layout with artwork and AI-generated facts about the music. |
 | `facts-overlay` | Full artwork background with facts overlaid at the bottom. |
-| `facts-carousel` | Blurred artwork background with facts displayed in a centered card. |
+| `facts-carousel` | Blurred artwork background with the rotating fact shown as large type, plus a compact now-playing chip. Sized for legibility on TVs. |
 | `basic` | Legacy-compatible layout for older browsers (iOS 12+). Artwork with title, artist, album, and progress bar. Auto-adapts to portrait/landscape. |
 
 **Note:** Facts layouts require an LLM provider configured in the Admin panel. Supported providers: Anthropic, OpenAI, OpenRouter, or Local LLM (Ollama/LM Studio).
@@ -234,18 +234,19 @@ Environment variables (or `.env` file):
 The facts feature supports multiple LLM providers for generating music facts:
 
 ### Anthropic (Default)
-- Models: Claude Sonnet 4, Claude Haiku 4
+- Models: Claude Haiku 4.5 (default), Claude Sonnet 4.6, Claude Opus 4.8
 - Requires: `ANTHROPIC_API_KEY` or API key in Admin panel
 - Best for: High-quality, nuanced facts
 
 ### OpenAI
-- Models: GPT-4o, GPT-4o-mini
+- Models: GPT-5, GPT-5-mini, GPT-5-nano, GPT-4.1, GPT-4o, GPT-4o-mini
 - Requires: `OPENAI_API_KEY` or API key in Admin panel
 - Best for: Fast, reliable generation
+- Note: GPT-5 / o-series reasoning models are sent `max_completion_tokens` (not the legacy `max_tokens`)
 
 ### OpenRouter
 - Access 200+ models through a unified API
-- Curated models: Llama 3.1, Mistral, Gemini, DeepSeek
+- Curated models: Claude Sonnet 4.5, GPT-4.1, Gemini 2.5 Flash, Llama 3.3, DeepSeek
 - Custom model support: Enter any OpenRouter model ID
 - Requires: `OPENROUTER_API_KEY` or API key in Admin panel
 - Best for: Model variety, cost optimization
@@ -454,6 +455,57 @@ pnpm build
 docker compose -f docker-compose.dev.yml up --build
 ```
 
+### Visual testing & approval matrix
+
+UI work is reviewed against screenshots, not just code. The **approved review
+resolutions** are the only ones that need sign-off:
+
+| Scenario | Resolution |
+|----------|-----------|
+| iPad (landscape) | 1194 × 834 |
+| TV 1080p | 1920 × 1080 |
+| TV 4K | 3840 × 2160 |
+
+```bash
+# Approval matrix: every layout × every background type (JPEG frames).
+# Scope to specific layouts with MATRIX_LAYOUTS (CI does this automatically):
+pnpm test:e2e:matrix
+MATRIX_LAYOUTS=detailed,basic pnpm test:e2e:matrix
+
+# Contact sheets: one image per layout showing all 14 backgrounds (needs ImageMagick).
+# This is the lightweight review surface that CI uploads / posts back.
+pnpm run review:pack         # → e2e/screenshots/matrix/_review/<res>/<layout>.jpg
+
+# Interactive gallery: browse every frame, click to flag ones that need review,
+# copy the exported list.
+pnpm run review:gallery      # → e2e/screenshots/matrix/gallery.html (open in a browser)
+```
+
+**Manual triage — `gallery.html`** tiles the rendered frames by resolution and
+layout; click any that need attention (with an optional note) and the export
+drawer gives you a copy-paste list like `facts-carousel / white @ TV-1080p — text
+unreadable`. Selections persist in the browser.
+
+**Model-assisted audit** — hand the contact sheets in
+`e2e/screenshots/matrix/_review/` plus [`e2e/visual-review-prompt.md`](e2e/visual-review-prompt.md)
+to a vision-capable model for a ranked findings table.
+
+#### CI: selective by default, full on demand
+
+The `Visual Approval Matrix` workflow is intentionally **not** run on every PR:
+
+- **On PRs** it triggers only when UI-affecting paths change, and renders **only
+  the layouts the PR touched** (global changes — design tokens, shared types,
+  background/color composables — render the full set). It uploads the small
+  contact-sheet `visual-review-pack` artifact and posts a sticky PR comment.
+- **Full run on demand:** Actions → *Visual Approval Matrix* → *Run workflow*
+  (optionally scope to specific layouts).
+
+Frames are JPEG and only the montages are uploaded (not raw frames or the HTML
+report), so the artifact stays in the low-MB range. Mock playback uses the
+bundled `assets/artwork_radiohead-in_rainbows.jpg` cover so palette-extracted
+gradients render true to production.
+
 ## Project Structure
 
 ```
@@ -498,7 +550,9 @@ roon-now-playing/
 │               ├── useFacts.ts
 │               └── colorUtils.ts
 ├── .github/workflows/
-│   └── docker-publish.yml
+│   ├── docker-publish.yml
+│   └── visual-matrix.yml    # PR visual approval matrix
+├── e2e/                     # Playwright visual tests (matrix + constraints)
 ├── Dockerfile
 ├── docker-compose.yml
 └── README.md

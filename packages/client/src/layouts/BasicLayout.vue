@@ -100,6 +100,26 @@ const secondaryTextColor = computed(() => {
 </template>
 
 <style scoped>
+/*
+ * Legacy fallback. BasicLayout targets old browsers (iOS 9/12, etc.) that don't
+ * support clamp()/container-query units. The shared --text-* tokens are fluid
+ * (clamp + cqi), which those browsers can't resolve — leaving font-size invalid.
+ * Restore the fixed scale here so titles/artist/timestamps stay sized.
+ */
+@supports not (font-size: clamp(1rem, 1cqi, 2rem)) {
+  .basic-layout {
+    --text-xs: 0.64rem;
+    --text-sm: 0.8rem;
+    --text-base: 1rem;
+    --text-lg: 1.25rem;
+    --text-xl: 1.563rem;
+    --text-2xl: 1.953rem;
+    --text-3xl: 2.441rem;
+    --text-4xl: 3.052rem;
+    --text-5xl: 3.815rem;
+  }
+}
+
 /* Base layout - no CSS gap, no aspect-ratio, no clamp() */
 .basic-layout {
   width: 100%;
@@ -282,14 +302,17 @@ const secondaryTextColor = computed(() => {
     -webkit-box-align: center;
     -webkit-align-items: center;
     align-items: center;
-    max-width: 1200px;
+    /* scale the whole row with the viewport so it fills 1440p/4K instead of
+       sitting in a fixed 1200px island */
+    max-width: 90vw;
   }
 
   .artwork-wrapper {
     width: calc(40% * var(--artwork-scale, 1));
     max-width: 40%;
     height: 80%;
-    max-height: 500px;
+    /* scale the album with viewport height instead of a fixed 500px cap */
+    max-height: 80vh;
   }
 
   .artwork-inner {

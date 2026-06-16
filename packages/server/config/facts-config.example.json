@@ -1,0 +1,8 @@
+{
+  "provider": "anthropic",
+  "model": "claude-haiku-4-5",
+  "apiKey": "",
+  "factsCount": 5,
+  "rotationInterval": 25,
+  "localBaseUrl": "http://localhost:11434/v1"
+}

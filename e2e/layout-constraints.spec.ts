@@ -78,6 +78,13 @@ async function setupMockArtwork(page: Page): Promise<void> {
  * Push mock playback data to the test zone with artwork
  */
 async function pushMockPlayback(page: Page): Promise<void> {
+  // Embed the bundled cover as a data: URL so the SERVER can resolve it without
+  // needing an HTTP route. The server's cacheExternalArtwork does fetch(url) and
+  // returns null on failure; in CI there is no /test-artwork.jpg route, so an
+  // http:// URL would 404 → artwork_key null → the client (which only renders
+  // /api/artwork/<key>) shows a placeholder. A data: URL fetch succeeds and
+  // caches the real bytes, giving a non-null key and real artwork in the matrix.
+  const artworkDataUrl = `data:image/jpeg;base64,${fs.readFileSync(TEST_ARTWORK_PATH).toString('base64')}`;
   await page.request.post('http://localhost:3000/api/sources/test-spotify/now-playing', {
     data: {
       zone_name: 'Test Spotify Player',
@@ -87,7 +94,7 @@ async function pushMockPlayback(page: Page): Promise<void> {
       album: 'In Rainbows',
       duration_seconds: 237,
       seek_position: 45,
-      artwork_url: 'http://localhost:3000/test-artwork.jpg',
+      artwork_url: artworkDataUrl,
     },
   });
   // Wait for WebSocket to propagate the update
@@ -528,4 +535,96 @@ test.describe('Screenshot Capture for PR Validation', () => {
       }
     }
   });
+});
+
+/**
+ * Approval Matrix — every cover style × every background type.
+ *
+ * This is the per-PR visual approval surface. It renders the full cross-product
+ * of layouts and backgrounds and attaches each frame to the Playwright HTML
+ * report. Run only at the approved review resolutions:
+ *   - iPad-landscape (1194×834)
+ *   - TV-1080p (1920×1080)
+ *   - TV-4K (3840×2160)
+ *
+ * Run locally:   pnpm test:e2e:matrix   →   npx playwright show-report
+ * In CI:         the "Visual Approval Matrix" workflow uploads the report as a
+ *                downloadable artifact on every pull request.
+ */
+test.describe('Matrix', () => {
+  const ALL_LAYOUTS = [
+    'detailed',
+    'minimal',
+    'fullscreen',
+    'ambient',
+    'cover',
+    'facts-columns',
+    'facts-overlay',
+    'facts-carousel',
+    'basic',
+  ];
+
+  // Selective runs: set MATRIX_LAYOUTS=detailed,basic to render only those layouts
+  // (CI derives this from the layouts a PR actually changed). Empty → full matrix.
+  const requested = (process.env.MATRIX_LAYOUTS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const layouts = requested.length
+    ? ALL_LAYOUTS.filter((l) => requested.includes(l))
+    : ALL_LAYOUTS;
+
+  // Keep in sync with BACKGROUNDS in packages/shared/src/index.ts
+  const backgrounds = [
+    'black',
+    'white',
+    'dominant',
+    'gradient-radial',
+    'gradient-linear',
+    'gradient-linear-multi',
+    'gradient-radial-corner',
+    'gradient-mesh',
+    'blur-subtle',
+    'blur-heavy',
+    'duotone',
+    'posterized',
+    'gradient-noise',
+    'blur-grain',
+  ];
+
+  for (const layout of layouts) {
+    for (const background of backgrounds) {
+      test(`Matrix: ${layout} / ${background}`, async ({ page }, testInfo) => {
+        const projectName = testInfo.project.name;
+
+        await setupMockArtwork(page);
+        await pushMockPlayback(page);
+        if (layout.startsWith('facts-')) {
+          await setupMockFactsApi(page);
+        }
+
+        await page.goto(`/?layout=${layout}&background=${background}`);
+        await selectZoneIfNeeded(page);
+        await page.waitForSelector('[class*="layout"]', { timeout: 10000 });
+
+        if (layout.startsWith('facts-')) {
+          await page.waitForSelector('.fact-text', { timeout: 5000 }).catch(() => {
+            // Facts may not always render; capture the frame regardless.
+          });
+        }
+        await page.waitForTimeout(600); // let gradients + animations settle
+
+        const dir = path.join(SCREENSHOT_DIR, 'matrix', projectName);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        // JPEG (not PNG) keeps the artifact ~10x smaller for photographic
+        // artwork/gradients. Frames are not attached to the HTML report (the
+        // contact-sheet montages / gallery are the review surface) to avoid
+        // duplicating every image into a multi-hundred-MB report.
+        const file = path.join(dir, `${layout}__${background}.jpg`);
+        await page.screenshot({ path: file, type: 'jpeg', quality: 80, fullPage: false });
+      });
+    }
+  }
 });

@@ -1,0 +1,147 @@
+name: Visual Approval Matrix
+
+# Renders layout × background screenshots at the approved review resolutions
+# (iPad-landscape, TV-1080p, TV-4K) and uploads lightweight contact-sheet
+# montages for visual review.
+#
+# - On PRs it only runs when UI-affecting paths change (see `paths` below), and
+#   it renders ONLY the layouts the PR actually touched (global changes — design
+#   tokens, shared types, background/color composables — render the full set).
+# - Run the full matrix on demand via the "Run workflow" button (workflow_dispatch),
+#   optionally scoping to specific layouts.
+#
+# Output is JPEG (not PNG) and only the montages are uploaded (not raw frames or
+# the Playwright HTML report), keeping the artifact in the low-MB range instead
+# of ~1GB.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'packages/client/src/layouts/**'
+      - 'packages/client/src/styles/**'
+      - 'packages/client/src/components/**'
+      - 'packages/client/src/composables/useBackgroundStyle.ts'
+      - 'packages/client/src/composables/useColorExtraction.ts'
+      - 'packages/client/src/composables/colorUtils.ts'
+      - 'packages/client/src/composables/useNowPlaying.ts'
+      - 'packages/client/src/views/NowPlayingView.vue'
+      - 'packages/shared/src/index.ts'
+      - 'e2e/**'
+  workflow_dispatch:
+    inputs:
+      layouts:
+        description: 'Comma-separated layouts to render (empty = full matrix)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  visual-matrix:
+    runs-on: ubuntu-latest
+    env:
+      # No Roon core in CI — external-sources-only mode; mock playback is pushed
+      # to the test source by the e2e harness.
+      ROON_ENABLED: 'false'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need history to diff against the PR base
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm run build:shared
+
+      - name: Install Playwright (Chromium)
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Install ImageMagick (for montages)
+        run: sudo apt-get update && sudo apt-get install -y imagemagick fonts-dejavu-core
+
+      - name: Determine layouts to render
+        id: scope
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            SCOPE="${{ github.event.inputs.layouts }}"
+            REASON="manual dispatch"
+          else
+            CHANGED="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
+            # Global-impact files affect every layout → render the full matrix.
+            if echo "$CHANGED" | grep -qE 'src/styles/|shared/src/index\.ts|useBackgroundStyle|useColorExtraction|colorUtils|useNowPlaying|NowPlayingView|DynamicBackground|ProgressBar|components/NowPlaying|e2e/'; then
+              SCOPE=""
+              REASON="global change (design tokens / shared / backgrounds / harness)"
+            else
+              SCOPE="$(echo "$CHANGED" \
+                | grep -oE 'layouts/[A-Za-z]+Layout\.vue' \
+                | sed -E 's#.*/##; s/Layout\.vue//; s/([a-z0-9])([A-Z])/\1-\2/g' \
+                | tr '[:upper:]' '[:lower:]' \
+                | sort -u | paste -sd, -)"
+              REASON="changed layouts"
+            fi
+          fi
+          echo "layouts=$SCOPE" >> "$GITHUB_OUTPUT"
+          echo "reason=$REASON" >> "$GITHUB_OUTPUT"
+          echo "Scope: '${SCOPE:-<full matrix>}' ($REASON)"
+
+      - name: Render matrix
+        env:
+          MATRIX_LAYOUTS: ${{ steps.scope.outputs.layouts }}
+        run: pnpm run test:e2e:matrix
+
+      - name: Build review pack (contact sheets)
+        if: ${{ !cancelled() }}
+        run: pnpm run review:pack
+
+      - name: Upload review pack (montages + prompt)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-review-pack
+          path: e2e/screenshots/matrix/_review/
+          retention-days: 14
+
+      - name: Comment on PR
+        if: ${{ github.event_name == 'pull_request' && !cancelled() }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const scope = `${{ steps.scope.outputs.layouts }}`.trim();
+            const reason = `${{ steps.scope.outputs.reason }}`;
+            const rendered = scope ? scope.split(',').map(s => `\`${s}\``).join(', ') : '**all layouts**';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const marker = '<!-- visual-matrix-comment -->';
+            const body = [
+              marker,
+              '### 🖼️ Visual approval matrix',
+              '',
+              `Rendered: ${rendered} _(${reason})_ at iPad-landscape / TV-1080p / TV-4K.`,
+              '',
+              `Download the **\`visual-review-pack\`** artifact (labelled contact sheets, one image per layout × all backgrounds) from the [workflow run](${runUrl}) to review.`,
+              '',
+              '_Full matrix on demand: Actions → Visual Approval Matrix → Run workflow._',
+            ].join('\n');
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body });
+            }

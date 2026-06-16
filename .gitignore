@@ -45,8 +45,12 @@ e2e/screenshots/
 # Roon
 config.json
 
-# Runtime config (server-generated)
-packages/server/config/
+# Server runtime state (DATA_DIR) — see *.example.json for templates
+packages/server/config/*.json
+!packages/server/config/*.example.json
+
+# Stray screenshots
+/*.png
 
 # Claude
 .claude/settings.local.json
