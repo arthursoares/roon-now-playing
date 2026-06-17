@@ -1,0 +1,232 @@
+/* ============================================================
+   Roon Now Playing — site design system
+   Reuses the app identity: dark surfaces, amber accent,
+   DM Sans (display/body) + JetBrains Mono (eyebrows/labels/code),
+   and the album-art "color-extracted gradient" motif.
+   ============================================================ */
+
+:root {
+  /* Surfaces */
+  --bg: #0a0a0b;
+  --bg-elevated: #111113;
+  --surface: #161619;
+  --surface-2: #1c1c20;
+  --border: #27272a;
+  --border-strong: #3f3f46;
+
+  /* Text */
+  --text: #fafafa;
+  --text-secondary: #c4c4cc;
+  --text-muted: #8b8b94;
+
+  /* Accent (app amber) + extracted-gradient palette */
+  --accent: #f59e0b;
+  --accent-hover: #fbbf24;
+  --accent-ink: #1a1206;
+  --grad-warm: #f97316;
+  --grad-pink: #ec4899;
+  --grad-violet: #8b5cf6;
+  --grad-cyan: #22d3ee;
+  --grad-green: #34d399;
+
+  /* Type */
+  --font-display: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, Consolas, monospace;
+
+  --step--1: clamp(0.83rem, 0.8rem + 0.15vw, 0.9rem);
+  --step-0: clamp(1rem, 0.96rem + 0.2vw, 1.1rem);
+  --step-1: clamp(1.2rem, 1.12rem + 0.4vw, 1.4rem);
+  --step-2: clamp(1.5rem, 1.36rem + 0.7vw, 1.95rem);
+  --step-3: clamp(1.95rem, 1.7rem + 1.25vw, 2.8rem);
+  --step-4: clamp(2.5rem, 2rem + 2.5vw, 4rem);
+  --step-5: clamp(3rem, 2.2rem + 4vw, 5.5rem);
+
+  /* Radii / shadow / motion */
+  --radius-sm: 8px;
+  --radius: 14px;
+  --radius-lg: 22px;
+  --shadow-md: 0 4px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 24px 70px -20px rgba(0, 0, 0, 0.7);
+  --ring: 0 0 0 3px rgba(245, 158, 11, 0.45);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Layout */
+  --container: 1120px;
+  --gutter: clamp(1.1rem, 4vw, 2.5rem);
+}
+
+* { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: var(--step-0);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin: 0;
+  font-weight: 600;
+}
+
+p { margin: 0; }
+a { color: inherit; }
+
+img { max-width: 100%; height: auto; display: block; }
+
+::selection { background: var(--accent); color: var(--accent-ink); }
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+  border-radius: var(--radius-sm);
+}
+
+/* ---- Layout helpers ---- */
+.container {
+  width: 100%;
+  max-width: var(--container);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.section { padding-block: clamp(3.5rem, 9vw, 7rem); }
+.section--tight { padding-block: clamp(2.5rem, 6vw, 4.5rem); }
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.section-head { max-width: 46rem; margin-bottom: clamp(2rem, 5vw, 3.25rem); }
+.section-head h2 { font-size: var(--step-3); }
+.section-head p {
+  color: var(--text-secondary);
+  font-size: var(--step-1);
+  margin-top: 1rem;
+}
+
+.text-muted { color: var(--text-muted); }
+
+/* ---- Buttons ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--step-0);
+  padding: 0.78em 1.4em;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.18s var(--ease), background 0.18s var(--ease),
+    border-color 0.18s var(--ease), color 0.18s var(--ease);
+  white-space: nowrap;
+}
+.btn:hover { transform: translateY(-2px); }
+.btn--primary { background: var(--accent); color: var(--accent-ink); }
+.btn--primary:hover { background: var(--accent-hover); }
+.btn--ghost {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.btn--ghost:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); }
+.btn svg { width: 1.15em; height: 1.15em; }
+
+/* ---- Cards / chips ---- */
+.card {
+  background: linear-gradient(180deg, var(--surface), var(--bg-elevated));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: clamp(1.3rem, 3vw, 1.8rem);
+  transition: border-color 0.2s var(--ease), transform 0.2s var(--ease);
+}
+.card:hover { border-color: var(--border-strong); transform: translateY(-3px); }
+
+.chip {
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  color: var(--text-secondary);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.35em 0.8em;
+  display: inline-block;
+}
+
+/* Pill list of tokens (layouts, fonts, backgrounds) */
+.token-list { display: flex; flex-wrap: wrap; gap: 0.55rem; }
+
+/* Code block */
+pre {
+  margin: 0;
+  background: #0d0d10;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.25rem;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  line-height: 1.7;
+  color: #e4e4e7;
+}
+pre .c { color: var(--text-muted); }
+pre .t { color: var(--accent); }
+code { font-family: var(--font-mono); font-size: 0.92em; }
+:not(pre) > code {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 0.12em 0.4em;
+  border-radius: 6px;
+  color: var(--text-secondary);
+}
+
+/* The recurring "color-extracted gradient" motif */
+.aura {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(40% 55% at 18% 12%, rgba(249, 115, 22, 0.22), transparent 70%),
+    radial-gradient(38% 50% at 82% 8%, rgba(236, 72, 153, 0.18), transparent 70%),
+    radial-gradient(45% 60% at 75% 75%, rgba(34, 211, 238, 0.16), transparent 70%),
+    radial-gradient(40% 55% at 15% 85%, rgba(139, 92, 246, 0.16), transparent 70%);
+  filter: saturate(1.1);
+}
+
+.divider { height: 1px; background: var(--border); border: 0; margin: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .btn:hover, .card:hover { transform: none; }
+}
