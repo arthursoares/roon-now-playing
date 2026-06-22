@@ -13,6 +13,7 @@ export interface ClientSettings {
   zoneId: string | null;
   zoneName: string | null;
   fontScaleOverride: number | null;
+  lockInteractions?: boolean; // optional for backward compat with older stored files
 }
 
 export class ClientSettingsStore {

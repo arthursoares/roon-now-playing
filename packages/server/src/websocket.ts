@@ -389,7 +389,8 @@ export class WebSocketManager {
           storedSettings.font !== clientState.font ||
           storedSettings.background !== clientState.background ||
           storedSettings.zoneId !== clientState.subscribedZoneId ||
-          storedSettings.fontScaleOverride !== (clientState.fontScaleOverride ?? null);
+          storedSettings.fontScaleOverride !== (clientState.fontScaleOverride ?? null) ||
+          (storedSettings.lockInteractions ?? false) !== (clientState.lockInteractions ?? false);
 
         if (needsPush) {
           this.sendToClient(clientState.ws, {
@@ -400,6 +401,7 @@ export class WebSocketManager {
             zoneId: storedSettings.zoneId ?? undefined,
             zoneName: storedSettings.zoneName ?? undefined,
             fontScaleOverride: storedSettings.fontScaleOverride,
+            lockInteractions: storedSettings.lockInteractions ?? false,
           } as ServerRemoteSettingsMessage);
 
           // Update local state to match
@@ -409,6 +411,7 @@ export class WebSocketManager {
           clientState.subscribedZoneId = storedSettings.zoneId;
           clientState.subscribedZoneName = storedSettings.zoneName;
           clientState.fontScaleOverride = storedSettings.fontScaleOverride;
+          clientState.lockInteractions = storedSettings.lockInteractions ?? false;
         }
       }
 
@@ -420,6 +423,7 @@ export class WebSocketManager {
         zoneId: clientState.subscribedZoneId,
         zoneName: clientState.subscribedZoneName,
         fontScaleOverride: clientState.fontScaleOverride ?? null,
+        lockInteractions: clientState.lockInteractions ?? false,
       });
     }
 
@@ -677,6 +681,7 @@ export class WebSocketManager {
         zoneId: clientState.subscribedZoneId,
         zoneName: clientState.subscribedZoneName,
         fontScaleOverride: clientState.fontScaleOverride ?? null,
+        lockInteractions: clientState.lockInteractions ?? false,
       });
     }
 

@@ -28,6 +28,22 @@ describe('ClientSettingsStore', () => {
     expect(store.get('device-1')).toEqual(settings);
   });
 
+  it('should persist lockInteractions across a reload', () => {
+    const store1 = new ClientSettingsStore(TEST_FILE);
+    store1.set('device-1', {
+      layout: 'detailed' as const,
+      font: 'system' as const,
+      background: 'black' as const,
+      zoneId: null,
+      zoneName: null,
+      fontScaleOverride: null,
+      lockInteractions: true,
+    });
+
+    const store2 = new ClientSettingsStore(TEST_FILE);
+    expect(store2.get('device-1')!.lockInteractions).toBe(true);
+  });
+
   it('should load from disk on construction', () => {
     const store1 = new ClientSettingsStore(TEST_FILE);
     store1.set('device-1', {
