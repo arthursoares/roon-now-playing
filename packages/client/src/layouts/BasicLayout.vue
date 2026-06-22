@@ -224,7 +224,7 @@ const secondaryTextColor = computed(() => {
 }
 
 .title {
-  font-size: var(--text-xl);
+  font-size: calc(var(--text-xl) * var(--font-scale, 1));
   font-weight: var(--font-semibold);
   margin: 0;
   overflow: hidden;
@@ -233,7 +233,7 @@ const secondaryTextColor = computed(() => {
 }
 
 .artist {
-  font-size: var(--text-lg);
+  font-size: calc(var(--text-lg) * var(--font-scale, 1));
   margin: 0;
   margin-top: 0.25rem;
   color: var(--text-secondary);
@@ -243,7 +243,7 @@ const secondaryTextColor = computed(() => {
 }
 
 .album {
-  font-size: var(--text-base);
+  font-size: calc(var(--text-base) * var(--font-scale, 1));
   margin: 0;
   margin-top: 0.25rem;
   color: var(--text-secondary);
@@ -254,7 +254,7 @@ const secondaryTextColor = computed(() => {
 }
 
 .no-playback {
-  font-size: var(--text-lg);
+  font-size: calc(var(--text-lg) * var(--font-scale, 1));
   opacity: 0.6;
 }
 
@@ -267,7 +267,7 @@ const secondaryTextColor = computed(() => {
 }
 
 .zone-hint {
-  font-size: var(--text-base);
+  font-size: calc(var(--text-base) * var(--font-scale, 1));
   opacity: 0.8;
 }
 
@@ -287,7 +287,7 @@ const secondaryTextColor = computed(() => {
   -webkit-box-pack: justify;
   -webkit-justify-content: space-between;
   justify-content: space-between;
-  font-size: var(--text-sm);
+  font-size: calc(var(--text-sm) * var(--font-scale, 1));
   color: var(--text-secondary);
   margin-top: 0.5rem;
 }
@@ -349,15 +349,15 @@ const secondaryTextColor = computed(() => {
   }
 
   .title {
-    font-size: var(--text-2xl);
+    font-size: calc(var(--text-2xl) * var(--font-scale, 1));
   }
 
   .artist {
-    font-size: var(--text-lg);
+    font-size: calc(var(--text-lg) * var(--font-scale, 1));
   }
 
   .album {
-    font-size: var(--text-lg);
+    font-size: calc(var(--text-lg) * var(--font-scale, 1));
   }
 }
 
@@ -368,30 +368,30 @@ const secondaryTextColor = computed(() => {
   }
 
   .title {
-    font-size: var(--text-lg);
+    font-size: calc(var(--text-lg) * var(--font-scale, 1));
   }
 
   .artist {
-    font-size: var(--text-base);
+    font-size: calc(var(--text-base) * var(--font-scale, 1));
   }
 
   .album {
-    font-size: var(--text-sm);
+    font-size: calc(var(--text-sm) * var(--font-scale, 1));
   }
 }
 
 /* Large screens */
 @media (min-width: 1200px) and (orientation: landscape) {
   .title {
-    font-size: var(--text-3xl);
+    font-size: calc(var(--text-3xl) * var(--font-scale, 1));
   }
 
   .artist {
-    font-size: var(--text-xl);
+    font-size: calc(var(--text-xl) * var(--font-scale, 1));
   }
 
   .album {
-    font-size: var(--text-lg);
+    font-size: calc(var(--text-lg) * var(--font-scale, 1));
   }
 }
 </style>
