@@ -77,7 +77,7 @@ async function saveName(): Promise<void> {
 }
 
 async function pushSetting(
-  setting: { layout?: LayoutType; font?: FontType; background?: BackgroundType; zoneId?: string; fontScaleOverride?: number | null; artworkScaleOverride?: number | null; enabledLayouts?: LayoutType[] | null }
+  setting: { layout?: LayoutType; font?: FontType; background?: BackgroundType; zoneId?: string; fontScaleOverride?: number | null; artworkScaleOverride?: number | null; enabledLayouts?: LayoutType[] | null; lockInteractions?: boolean }
 ): Promise<void> {
   if (!screen.value) return;
   saving.value = true;
@@ -117,6 +117,11 @@ function onFontScaleOverrideChange(event: Event): void {
 function toggleArtworkScaleOverride(event: Event): void {
   const useGlobal = (event.target as HTMLInputElement).checked;
   pushSetting({ artworkScaleOverride: useGlobal ? null : 100 });
+}
+
+function toggleLockInteractions(event: Event): void {
+  const checked = (event.target as HTMLInputElement).checked;
+  pushSetting({ lockInteractions: checked });
 }
 
 let artworkScaleTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -342,6 +347,22 @@ onUnmounted(() => {
               @input="onArtworkScaleOverrideChange"
             />
             <span class="slider-value">{{ screen.artworkScaleOverride ?? 100 }}%</span>
+          </div>
+        </section>
+
+        <!-- Disable Tap Controls -->
+        <section class="config-section">
+          <label class="config-label">Tap controls</label>
+          <p class="config-hint">Stops tap-to-cycle layout and double-tap-to-change-zone on this display.</p>
+          <div class="override-toggle">
+            <label class="checkbox-label">
+              <input
+                type="checkbox"
+                :checked="screen.lockInteractions === true"
+                @change="toggleLockInteractions"
+              />
+              Disable tap controls
+            </label>
           </div>
         </section>
 

@@ -56,7 +56,7 @@ export function createAdminRouter(wsManager: WebSocketManager): Router {
   // Push settings to client
   router.post('/clients/:clientId/push', (req, res) => {
     const { clientId } = req.params;
-    const { layout, font, background, zoneId, fontScaleOverride, artworkScaleOverride, enabledLayouts } = req.body as {
+    const { layout, font, background, zoneId, fontScaleOverride, artworkScaleOverride, enabledLayouts, lockInteractions } = req.body as {
       layout?: LayoutType;
       font?: FontType;
       background?: BackgroundType;
@@ -64,6 +64,7 @@ export function createAdminRouter(wsManager: WebSocketManager): Router {
       fontScaleOverride?: number | null;
       artworkScaleOverride?: number | null;
       enabledLayouts?: LayoutType[] | null;
+      lockInteractions?: boolean;
     };
 
     // Validate layout
@@ -114,16 +115,22 @@ export function createAdminRouter(wsManager: WebSocketManager): Router {
       }
     }
 
+    // Validate lockInteractions
+    if (lockInteractions !== undefined && typeof lockInteractions !== 'boolean') {
+      res.status(400).json({ error: 'lockInteractions must be a boolean' });
+      return;
+    }
+
     // Check if any settings provided
-    if (layout === undefined && font === undefined && background === undefined && zoneId === undefined && fontScaleOverride === undefined && artworkScaleOverride === undefined && enabledLayouts === undefined) {
+    if (layout === undefined && font === undefined && background === undefined && zoneId === undefined && fontScaleOverride === undefined && artworkScaleOverride === undefined && enabledLayouts === undefined && lockInteractions === undefined) {
       res.status(400).json({ error: 'At least one setting is required' });
       return;
     }
 
-    const success = wsManager.pushSettingsToClient(clientId, { layout, font, background, zoneId, fontScaleOverride, artworkScaleOverride, enabledLayouts });
+    const success = wsManager.pushSettingsToClient(clientId, { layout, font, background, zoneId, fontScaleOverride, artworkScaleOverride, enabledLayouts, lockInteractions });
     if (success) {
       logger.info(
-        `Pushed settings to ${clientId}: layout=${layout}, font=${font}, background=${background}, zoneId=${zoneId}, fontScaleOverride=${fontScaleOverride}, artworkScaleOverride=${artworkScaleOverride}, enabledLayouts=${enabledLayouts}`
+        `Pushed settings to ${clientId}: layout=${layout}, font=${font}, background=${background}, zoneId=${zoneId}, fontScaleOverride=${fontScaleOverride}, artworkScaleOverride=${artworkScaleOverride}, enabledLayouts=${enabledLayouts}, lockInteractions=${lockInteractions}`
       );
       res.json({ success: true });
     } else {

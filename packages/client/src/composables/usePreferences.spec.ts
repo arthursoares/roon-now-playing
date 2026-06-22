@@ -17,15 +17,46 @@
  *   Then localStorage should be updated
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { usePreferences } from './usePreferences';
+
+// jsdom in this setup does not provide a functional `localStorage` (its
+// methods are undefined), so back it with a Map-based Storage implementation.
+// `length` is a live getter over the backing store, not a stale snapshot.
+function createLocalStorageMock(): Storage {
+  const store = new Map<string, string>();
+  return {
+    get length(): number {
+      return store.size;
+    },
+    clear(): void {
+      store.clear();
+    },
+    getItem(key: string): string | null {
+      return store.has(key) ? (store.get(key) as string) : null;
+    },
+    key(index: number): string | null {
+      return Array.from(store.keys())[index] ?? null;
+    },
+    removeItem(key: string): void {
+      store.delete(key);
+    },
+    setItem(key: string, value: string): void {
+      store.set(key, String(value));
+    },
+  };
+}
 
 describe('usePreferences', () => {
   beforeEach(() => {
-    // Clear localStorage before each test
-    localStorage.clear();
+    // Fresh localStorage per test
+    vi.stubGlobal('localStorage', createLocalStorageMock());
     // Reset URL
     window.history.replaceState({}, '', '/');
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('should initialize with default layout', () => {
@@ -157,5 +188,31 @@ describe('usePreferences', () => {
 
     expect(background.value).toBe('gradient-noise');
     expect(localStorage.getItem('roon-screen-cover:background')).toBe('gradient-noise');
+  });
+
+  it('should default lockInteractions to false', () => {
+    const { lockInteractions } = usePreferences();
+    expect(lockInteractions.value).toBe(false);
+  });
+
+  it('should load lockInteractions from localStorage', () => {
+    localStorage.setItem('roon-screen-cover:lock-interactions', 'true');
+    const { lockInteractions, loadPreferences } = usePreferences();
+    loadPreferences();
+    expect(lockInteractions.value).toBe(true);
+  });
+
+  it('should persist lockInteractions when saved', () => {
+    const { lockInteractions, saveLockInteractionsPreference } = usePreferences();
+    saveLockInteractionsPreference(true);
+    expect(lockInteractions.value).toBe(true);
+    expect(localStorage.getItem('roon-screen-cover:lock-interactions')).toBe('true');
+  });
+
+  it('should clear lockInteractions storage when saved false', () => {
+    localStorage.setItem('roon-screen-cover:lock-interactions', 'true');
+    const { saveLockInteractionsPreference } = usePreferences();
+    saveLockInteractionsPreference(false);
+    expect(localStorage.getItem('roon-screen-cover:lock-interactions')).toBeNull();
   });
 });

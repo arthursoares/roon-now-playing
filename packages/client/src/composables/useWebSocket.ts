@@ -34,6 +34,7 @@ export interface RemoteSettingsHandler {
     fontScaleOverride?: number | null;
     artworkScaleOverride?: number | null;
     enabledLayouts?: LayoutType[] | null;
+    lockInteractions?: boolean;
     zoneId?: string;
     zoneName?: string;
   }) => void;
@@ -55,6 +56,7 @@ export interface UseWebSocketOptions {
     fontScaleOverride?: number | null;
     artworkScaleOverride?: number | null;
     enabledLayouts?: LayoutType[] | null;
+    lockInteractions?: boolean;
     zoneId?: string;
     zoneName?: string;
   }) => void;
@@ -224,6 +226,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
               fontScaleOverride: message.fontScaleOverride,
               artworkScaleOverride: message.artworkScaleOverride,
               enabledLayouts: message.enabledLayouts,
+              lockInteractions: message.lockInteractions,
               zoneId: message.zoneId,
               zoneName: message.zoneName,
             });

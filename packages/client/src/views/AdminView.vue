@@ -190,7 +190,7 @@ async function saveName(clientId: string): Promise<void> {
 
 async function pushSetting(
   clientId: string,
-  setting: { layout?: LayoutType; font?: FontType; background?: BackgroundType; zoneId?: string; fontScaleOverride?: number | null; artworkScaleOverride?: number | null }
+  setting: { layout?: LayoutType; font?: FontType; background?: BackgroundType; zoneId?: string; fontScaleOverride?: number | null; artworkScaleOverride?: number | null; lockInteractions?: boolean }
 ): Promise<void> {
   pushing.value[clientId] = true;
   try {
@@ -246,6 +246,11 @@ function onClientArtworkScaleChange(clientId: string, event: Event): void {
 function toggleClientArtworkScale(clientId: string, client: ClientMetadata): void {
   const useGlobal = client.artworkScaleOverride !== null && client.artworkScaleOverride !== undefined;
   pushSetting(clientId, { artworkScaleOverride: useGlobal ? null : 100 });
+}
+
+function toggleClientLockInteractions(clientId: string, event: Event): void {
+  const checked = (event.target as HTMLInputElement).checked;
+  pushSetting(clientId, { lockInteractions: checked });
 }
 
 // Facts configuration functions
@@ -803,6 +808,17 @@ onMounted(() => {
                   <span class="override-value">{{ client.artworkScaleOverride }}%</span>
                 </div>
                 <span v-else class="override-global">Global</span>
+              </div>
+
+              <div class="override-row">
+                <label class="override-label">
+                  <input
+                    type="checkbox"
+                    :checked="client.lockInteractions === true"
+                    @change="(e) => toggleClientLockInteractions(client.clientId, e)"
+                  />
+                  Disable tap controls
+                </label>
               </div>
             </div>
 

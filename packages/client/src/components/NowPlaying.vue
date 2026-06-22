@@ -17,6 +17,7 @@ const props = defineProps<{
   zone: Zone;
   layout: LayoutType;
   background: BackgroundType;
+  lockInteractions?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -58,10 +59,12 @@ const layoutComponent = computed(() => {
 });
 
 function handleClick(): void {
+  if (props.lockInteractions) return;
   emit('cycle-layout');
 }
 
 function handleDoubleClick(): void {
+  if (props.lockInteractions) return;
   emit('change-zone');
 }
 </script>
