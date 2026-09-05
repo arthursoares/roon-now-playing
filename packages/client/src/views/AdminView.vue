@@ -210,7 +210,7 @@ async function pushSetting(
 }
 
 function getLayoutDisplayName(layout: LayoutType): string {
-  return layout.charAt(0).toUpperCase() + layout.slice(1);
+  return layout.charAt(0).toUpperCase() + layout.slice(1).replace(/-/g, ' ');
 }
 
 function getFontDisplayName(font: FontType): string {

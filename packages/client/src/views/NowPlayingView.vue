@@ -27,6 +27,7 @@ const selectedZoneId = ref<string | null>(null);
 const selectedZoneName = ref<string | null>(null);
 const currentFontScaleOverride = ref<number | null>(null);
 const currentArtworkScaleOverride = ref<number | null>(null);
+const urlZonePreference = new URLSearchParams(window.location.search).get('zone');
 
 // Handle remote settings from admin
 function handleRemoteSettings(settings: {
@@ -58,13 +59,18 @@ function handleRemoteSettings(settings: {
     saveEnabledLayoutsPreference(settings.enabledLayouts);
   }
   if (settings.zoneId) {
-    selectedZoneId.value = settings.zoneId;
-    selectedZoneName.value = settings.zoneName || null;
-    if (settings.zoneName) {
-      saveZonePreference(settings.zoneName);
+    const urlZone = findZoneByPreference(wsState.value.zones, urlZonePreference);
+    if (urlZone) {
+      selectZone(urlZone);
+    } else if (!urlZonePreference || wsState.value.zones.length > 0) {
+      selectedZoneId.value = settings.zoneId;
+      selectedZoneName.value = settings.zoneName || null;
+      if (settings.zoneName) {
+        saveZonePreference(settings.zoneName);
+      }
+      subscribeToZone(settings.zoneId, settings.zoneName);
+      showZonePicker.value = false;
     }
-    subscribeToZone(settings.zoneId, settings.zoneName);
-    showZonePicker.value = false;
   }
 
   // URL params always win — re-apply after server push
@@ -241,6 +247,7 @@ onMounted(() => {
     <NowPlaying
       v-else-if="selectedZone && connectionStatus === 'connected'"
       :now-playing="wsState.nowPlaying"
+      :album-history="wsState.albumHistory"
       :zone="selectedZone"
       :layout="layout"
       :background="background"

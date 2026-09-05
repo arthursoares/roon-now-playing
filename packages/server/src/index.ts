@@ -14,6 +14,7 @@ import { ExternalSourceManager } from './externalSources.js';
 import { SourcesConfigStore } from './sourcesConfig.js';
 import { createSourcesRouter } from './routes/sources.js';
 import { cacheBase64Artwork, cacheExternalArtwork } from './artwork.js';
+import { AlbumHistoryStore } from './albumHistory.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -55,6 +56,7 @@ async function main(): Promise<void> {
 
   // Wire client settings store for persistence
   wsManager.setClientSettingsStore(clientSettingsStore);
+  wsManager.setAlbumHistoryStore(new AlbumHistoryStore());
 
   // Connect external source manager to WebSocket
   wsManager.setExternalSourceManager(externalSourceManager);

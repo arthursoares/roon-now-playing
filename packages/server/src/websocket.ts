@@ -27,6 +27,7 @@ import { generateFriendlyName } from './nameGenerator.js';
 import { logger } from './logger.js';
 import { loadDisplaySettings } from './display-settings.js';
 import type { ClientSettingsStore } from './clientSettings.js';
+import type { AlbumHistoryStore } from './albumHistory.js';
 
 interface ClientState {
   ws: WebSocket;
@@ -59,6 +60,7 @@ export class WebSocketManager {
   private roonClient: RoonClient | null;
   private externalSourceManager: ExternalSourceManager | null = null;
   private clientSettingsStore: ClientSettingsStore | null = null;
+  private albumHistoryStore: AlbumHistoryStore | null = null;
   private friendlyNames: Map<string, string> = new Map();
   private onFriendlyNameChange?: (clientId: string, name: string | null) => void;
 
@@ -79,6 +81,10 @@ export class WebSocketManager {
 
   setClientSettingsStore(store: ClientSettingsStore): void {
     this.clientSettingsStore = store;
+  }
+
+  setAlbumHistoryStore(store: AlbumHistoryStore): void {
+    this.albumHistoryStore = store;
   }
 
   setFriendlyNameChangeCallback(callback: (clientId: string, name: string | null) => void): void {
@@ -213,6 +219,7 @@ export class WebSocketManager {
     });
 
     this.roonClient!.on('now_playing', (nowPlaying: NowPlaying) => {
+      this.recordAlbumHistory(nowPlaying);
       const message: ServerNowPlayingMessage = {
         type: 'now_playing',
         zone_id: nowPlaying.zone_id,
@@ -245,6 +252,7 @@ export class WebSocketManager {
     });
 
     this.externalSourceManager.on('now_playing', (nowPlaying: NowPlaying) => {
+      this.recordAlbumHistory(nowPlaying);
       const message: ServerNowPlayingMessage = {
         type: 'now_playing',
         zone_id: nowPlaying.zone_id,
@@ -269,6 +277,16 @@ export class WebSocketManager {
     const roonZones = this.roonClient?.getZones() ?? [];
     const externalZones = this.externalSourceManager?.getZones() || [];
     return [...roonZones, ...externalZones];
+  }
+
+  private recordAlbumHistory(nowPlaying: NowPlaying): void {
+    if (this.albumHistoryStore?.record(nowPlaying)) {
+      this.broadcastToZoneSubscribers(nowPlaying.zone_id, {
+        type: 'album_history',
+        zone_id: nowPlaying.zone_id,
+        albums: this.albumHistoryStore.get(nowPlaying.zone_id),
+      });
+    }
   }
 
   private handleClientMessage(ws: WebSocket, data: Buffer): void {
@@ -452,6 +470,7 @@ export class WebSocketManager {
       nowPlaying = this.externalSourceManager.getNowPlaying(zoneId);
     }
     if (nowPlaying) {
+      this.recordAlbumHistory(nowPlaying);
       this.sendToClient(clientState.ws, {
         type: 'now_playing',
         zone_id: nowPlaying.zone_id,
@@ -460,6 +479,12 @@ export class WebSocketManager {
         seek_position: nowPlaying.seek_position,
       });
     }
+
+    this.sendToClient(clientState.ws, {
+      type: 'album_history',
+      zone_id: zoneId,
+      albums: this.albumHistoryStore?.get(zoneId) ?? [],
+    });
 
     // Notify admins about the update
     if (clientState.clientId) {

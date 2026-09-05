@@ -35,6 +35,8 @@ export const LAYOUTS = [
   'facts-overlay',
   'facts-carousel',
   'basic',
+  'album-wall',
+  'album-gallery',
 ] as const;
 export type LayoutType = (typeof LAYOUTS)[number];
 
@@ -237,6 +239,26 @@ export interface ServerSeekMessage {
   seek_position: number;
 }
 
+export interface RecentAlbum {
+  id: string;
+  artist: string;
+  album: string;
+  artwork_key: string | null;
+  last_played_at: number;
+}
+
+export const ALBUM_HISTORY_LIMIT = 12;
+
+export function getAlbumId(artist: string, album: string): string {
+  return JSON.stringify([artist.trim().toLowerCase(), album.trim().toLowerCase()]);
+}
+
+export interface ServerAlbumHistoryMessage {
+  type: 'album_history';
+  zone_id: string;
+  albums: RecentAlbum[];
+}
+
 export interface ServerErrorMessage {
   type: 'error';
   message: string;
@@ -392,6 +414,7 @@ export type ServerMessage =
   | ServerZonesMessage
   | ServerNowPlayingMessage
   | ServerSeekMessage
+  | ServerAlbumHistoryMessage
   | ServerErrorMessage
   | ServerConnectionMessage
   | ServerClientsListMessage
