@@ -52,15 +52,17 @@ describe('FactsConfigStore', () => {
     expect(config.provider).toBe('anthropic');
     expect(config.factsCount).toBe(5);
     expect(config.rotationInterval).toBe(25);
+    expect(config.maxOutputTokens).toBe(1024);
   });
 
   it('should save and load config', () => {
-    store.update({ factsCount: 7 });
+    store.update({ factsCount: 7, maxOutputTokens: 4096 });
 
     // Create new instance to verify persistence
     const store2 = new FactsConfigStore(TEST_CONFIG_PATH);
     const config = store2.get();
     expect(config.factsCount).toBe(7);
+    expect(config.maxOutputTokens).toBe(4096);
   });
 
   it('should merge partial updates', () => {
@@ -106,6 +108,43 @@ describe('FactsConfigStore', () => {
     expect(DEFAULT_CONFIG.factsCount).toBe(5);
     expect(DEFAULT_CONFIG.rotationInterval).toBe(25);
     expect(DEFAULT_CONFIG.prompt).toContain('Generate');
+    expect(DEFAULT_CONFIG.maxOutputTokens).toBe(1024);
+  });
+
+  it.each([0, 65537, 1.5, Number.NaN])(
+    'should reject invalid maxOutputTokens updates without changing or persisting state: %s',
+    (maxOutputTokens) => {
+      expect(() => store.update({ maxOutputTokens })).toThrow(RangeError);
+      expect(store.get().maxOutputTokens).toBe(1024);
+      expect(fs.existsSync(TEST_CONFIG_PATH)).toBe(false);
+    },
+  );
+
+  it.each([1, 65536])('should accept maxOutputTokens boundary value %s', (maxOutputTokens) => {
+    store.update({ maxOutputTokens });
+
+    expect(store.get().maxOutputTokens).toBe(maxOutputTokens);
+  });
+
+  it('should normalize invalid stored maxOutputTokens to the default', () => {
+    fs.writeFileSync(TEST_CONFIG_PATH, JSON.stringify({
+      ...DEFAULT_CONFIG,
+      maxOutputTokens: 70000,
+    }));
+
+    const store2 = new FactsConfigStore(TEST_CONFIG_PATH);
+
+    expect(store2.get().maxOutputTokens).toBe(1024);
+  });
+
+  it('should add the default when loading legacy config without maxOutputTokens', () => {
+    const legacyConfig = { ...DEFAULT_CONFIG };
+    delete legacyConfig.maxOutputTokens;
+    fs.writeFileSync(TEST_CONFIG_PATH, JSON.stringify(legacyConfig));
+
+    const store2 = new FactsConfigStore(TEST_CONFIG_PATH);
+
+    expect(store2.get().maxOutputTokens).toBe(1024);
   });
 
   it('should reject API key updates containing non-ASCII characters', () => {

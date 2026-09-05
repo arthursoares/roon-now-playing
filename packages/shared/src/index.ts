@@ -152,8 +152,13 @@ export interface FactsConfig {
   factsCount: number;
   rotationInterval: number;
   prompt: string;
+  maxOutputTokens?: number;
   localBaseUrl?: string; // Only used for 'local' provider
 }
+
+export const DEFAULT_MAX_OUTPUT_TOKENS = 1024;
+export const MIN_OUTPUT_TOKENS = 1;
+export const MAX_OUTPUT_TOKENS = 65536;
 
 // Facts API types
 export interface FactsRequest {

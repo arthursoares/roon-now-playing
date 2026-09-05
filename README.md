@@ -237,6 +237,7 @@ Configure AI-powered facts generation for the facts layouts:
 - Set API key (or use environment variables)
 - Configure local LLM base URL for Ollama/LM Studio
 - Configure facts count per track (1-10)
+- Set maximum output tokens in Advanced Settings (1–65,536; default 1,024). Provider and model limits still apply.
 - Customize rotation interval
 - Test configuration with sample track data
 
