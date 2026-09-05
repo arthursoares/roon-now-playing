@@ -119,4 +119,74 @@ describe('Admin source authentication', () => {
       body: JSON.stringify({ requireApiKey: true }),
     })));
   });
+
+  it('offers opt-in Smart Idle controls and saves their global settings', async () => {
+    button('Display').click();
+    await nextTick();
+    const mode = container.querySelector<HTMLSelectElement>('#idleMode');
+    expect(mode).not.toBeNull();
+    expect(mode!.value).toBe('off');
+    expect(container.textContent).toContain('does not control the device screen or power');
+
+    mode!.value = 'layout';
+    mode!.dispatchEvent(new Event('change', { bubbles: true }));
+    await nextTick();
+    expect([...container.querySelectorAll<HTMLOptionElement>('#idleLayout option')].map((option) => option.value))
+      .toContain('cover');
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/admin/display-settings', expect.objectContaining({
+      method: 'POST',
+      body: expect.stringContaining('"idleMode":"layout"'),
+    })));
+  });
+
+  it('shows strict validation errors and preserves the rejected edit', async () => {
+    button('Display').click();
+    await nextTick();
+    const mode = container.querySelector<HTMLSelectElement>('#idleMode')!;
+    mode.value = 'clock';
+    mode.dispatchEvent(new Event('change', { bubbles: true }));
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/admin/display-settings', expect.anything()));
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: 'idleDelayMinutes must be an integer between 1 and 60' }),
+    });
+    const delay = container.querySelector<HTMLInputElement>('#idleDelayMinutes')!;
+    delay.value = '0';
+    delay.dispatchEvent(new Event('input', { bubbles: true }));
+    delay.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent)
+      .toContain('idleDelayMinutes must be an integer between 1 and 60'));
+    expect(delay.value).toBe('0');
+  });
+
+  it('shows only the loading state until display settings finish loading', async () => {
+    app.unmount();
+    let resolveDisplay!: (response: { ok: boolean; json: () => Promise<unknown> }) => void;
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/admin/display-settings') {
+        return new Promise((resolve) => { resolveDisplay = resolve; });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => url === '/api/sources/config'
+          ? { requireApiKey: true, hasApiKey: true, apiKey: 'masked...' }
+          : url === '/api/sources'
+            ? { zones: [] }
+            : { provider: 'anthropic', model: 'claude-haiku-4-5' },
+      });
+    });
+    app = createApp(AdminView);
+    app.mount(container);
+    button('Display').click();
+    await nextTick();
+
+    expect(container.textContent).toContain('Loading settings...');
+    expect(container.querySelector('#idleMode')).toBeNull();
+    resolveDisplay({ ok: true, json: async () => ({ fontScale: 1, artworkScale: 100 }) });
+    await vi.waitFor(() => expect(container.querySelector('#idleMode')).not.toBeNull());
+    expect(container.textContent).not.toContain('Loading settings...');
+  });
 });

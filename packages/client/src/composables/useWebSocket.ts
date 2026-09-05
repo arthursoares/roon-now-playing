@@ -1,4 +1,5 @@
 import { ref, onMounted, onUnmounted, type Ref } from 'vue';
+import { DEFAULT_DISPLAY_SETTINGS } from '@roon-screen-cover/shared';
 import type {
   ServerMessage,
   ClientMessage,
@@ -71,7 +72,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     zones: [],
     nowPlaying: null,
     clients: [],
-    displaySettings: { fontScale: 1, artworkScale: 100 },
+    displaySettings: { ...DEFAULT_DISPLAY_SETTINGS },
   });
 
   let ws: WebSocket | null = null;

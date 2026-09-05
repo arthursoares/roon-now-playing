@@ -200,6 +200,12 @@ A mobile-friendly page for configuring a single display:
 - Auto-generated friendly names (admin can rename anytime)
 - Real-time updates when clients connect/disconnect
 
+### Smart Idle and Night Dimming
+
+Global Display Settings can show a clock, black screen, or chosen display layout after the selected zone has been paused or stopped for 1–60 minutes. Smart Idle is off by default, wakes temporarily on touch or key input, and returns to the user's normal layout as soon as playback resumes. The temporary idle layout does not change the display's saved layout preference.
+
+Optional night dimming reduces the brightness of the web page during a schedule evaluated in each display's local time, including schedules that cross midnight. It adds a dark page overlay; it does not change physical screen brightness or device power.
+
 ### Facts Configuration
 Configure AI-powered facts generation for the facts layouts:
 - Choose from four providers: Anthropic, OpenAI, OpenRouter, or Local LLM
@@ -296,6 +302,8 @@ ollama pull llama3.1
 | `POST` | `/api/admin/clients/:id/name` | Set client friendly name |
 | `POST` | `/api/admin/clients/:id/push` | Push settings to client (layout, font, background, zoneId) |
 | `GET` | `/api/admin/screens/:name` | Get screen by friendly name |
+| `GET` | `/api/admin/display-settings` | Get global display and Smart Idle settings |
+| `POST` | `/api/admin/display-settings` | Partially update global display and Smart Idle settings |
 
 ### Facts API
 

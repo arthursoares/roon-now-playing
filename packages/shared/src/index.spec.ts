@@ -9,6 +9,7 @@ import {
   LAYOUTS,
   LLM_MODELS,
   LLM_PROVIDERS,
+  IDLE_MODES,
 } from './index';
 
 describe('shared configuration registries', () => {
@@ -66,6 +67,16 @@ describe('shared configuration registries', () => {
     expect(DEFAULT_DISPLAY_SETTINGS.fontScale).toBeGreaterThan(0);
     expect(DEFAULT_DISPLAY_SETTINGS.artworkScale).toBeGreaterThan(0);
     expect(DEFAULT_DISPLAY_SETTINGS.artworkScale).toBeLessThanOrEqual(100);
+    expect(IDLE_MODES).toEqual(['off', 'clock', 'black', 'layout']);
+    expect(DEFAULT_DISPLAY_SETTINGS).toMatchObject({
+      idleMode: 'off',
+      idleLayout: 'cover',
+      idleDelayMinutes: 5,
+      nightDimmingEnabled: false,
+      nightDimmingStart: '22:00',
+      nightDimmingEnd: '07:00',
+      nightBrightness: 30,
+    });
 
     for (const placeholder of ['{factsCount}', '{artist}', '{album}', '{title}']) {
       expect(DEFAULT_FACTS_PROMPT).toContain(placeholder);

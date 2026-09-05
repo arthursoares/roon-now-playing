@@ -7,6 +7,7 @@ import { WebSocket } from 'ws';
 import { WebSocketManager } from './websocket.js';
 import { ClientSettingsStore } from './clientSettings.js';
 import fs from 'fs';
+import { DEFAULT_DISPLAY_SETTINGS } from '@roon-screen-cover/shared';
 
 const TEST_FILE = './test-websocket-client-settings.json';
 
@@ -28,6 +29,14 @@ describe('WebSocketManager settings replay', () => {
     const port = (server.address() as AddressInfo).port;
 
     const first = await connect(`ws://127.0.0.1:${port}/ws`, sockets);
+    await vi.waitFor(() => expect(first.messages).toContainEqual({
+      type: 'display_settings_update',
+      settings: expect.objectContaining({
+        idleMode: DEFAULT_DISPLAY_SETTINGS.idleMode,
+        idleDelayMinutes: DEFAULT_DISPLAY_SETTINGS.idleDelayMinutes,
+        nightDimmingEnabled: DEFAULT_DISPLAY_SETTINGS.nightDimmingEnabled,
+      }),
+    }));
     first.socket.send(JSON.stringify(metadata('screen:one')));
     await vi.waitFor(() => expect(manager.getClientById('screen:one')).toBeDefined());
 
@@ -48,6 +57,13 @@ describe('WebSocketManager settings replay', () => {
         enabledLayouts: ['ambient', 'cover'],
       }));
     });
+
+    const updatedSettings = { ...DEFAULT_DISPLAY_SETTINGS, idleMode: 'black' as const, idleDelayMinutes: 9 };
+    manager.broadcastDisplaySettings(updatedSettings);
+    await vi.waitFor(() => expect(second.messages).toContainEqual({
+      type: 'display_settings_update',
+      settings: updatedSettings,
+    }));
   });
 
   it('replays authoritative null overrides on first registration', async () => {
