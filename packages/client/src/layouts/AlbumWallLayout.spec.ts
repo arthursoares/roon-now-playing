@@ -171,7 +171,7 @@ describe('AlbumWallLayout', () => {
     app.unmount();
   });
 
-  it('renders all twelve albums with the current tile marked and no hero', () => {
+  it('renders all twelve covers with accessible current and album metadata but no visible copy', () => {
     const host = document.createElement('div');
     const app = createApp({
       render: () => h(AlbumWallLayout, {
@@ -184,7 +184,12 @@ describe('AlbumWallLayout', () => {
         artworkUrl: '/api/artwork/hero-key',
         zoneName: 'Living Room',
         background: 'black',
-        albumHistory: galleryHistory,
+        albumHistory: [
+          galleryHistory[0],
+          galleryHistory[1],
+          galleryHistory[1],
+          ...galleryHistory.slice(2),
+        ],
         galleryOnly: true,
       }),
     });
@@ -194,16 +199,20 @@ describe('AlbumWallLayout', () => {
     expect(host.querySelector('.album-gallery-layout')).not.toBeNull();
     expect(host.querySelector('.hero')).toBeNull();
     expect(host.querySelectorAll('.gallery-card')).toHaveLength(12);
-    expect(host.querySelector('.current-marker')?.textContent).toBe('Now playing');
+    expect(new Set([...host.querySelectorAll<HTMLElement>('.gallery-card')].map((card) => card.title)).size).toBe(12);
+    expect(host.querySelector('.gallery-card img[src="/api/artwork/gallery-11"]')).not.toBeNull();
+    expect(host.querySelector('.gallery-card[aria-current="true"]')).not.toBeNull();
+    expect(host.querySelector('.gallery-track')).toBeNull();
+    expect(host.querySelector('.album-name')).toBeNull();
     const longLabelCard = [...host.querySelectorAll<HTMLElement>('.gallery-card')]
       .find((card) => card.title.startsWith('An Album Name Long Enough'));
-    expect(longLabelCard?.querySelector('.album-name')?.textContent).toContain('Without Losing Its Accessible Name');
+    expect(longLabelCard?.getAttribute('aria-label')).toContain('Without Losing Its Accessible Name');
     expect(longLabelCard?.querySelector('img')?.alt).toContain('Without Losing Its Accessible Name');
 
     app.unmount();
   });
 
-  it('uses the current track as a paused gallery tile before history arrives', () => {
+  it('uses the current track as the only accessible cover before history arrives', () => {
     const host = document.createElement('div');
     const app = createApp({
       render: () => h(AlbumWallLayout, {
@@ -223,8 +232,9 @@ describe('AlbumWallLayout', () => {
     app.mount(host);
 
     expect(host.querySelectorAll('.gallery-card')).toHaveLength(1);
-    expect(host.querySelector('.album-name')?.textContent).toBe(track.album);
-    expect(host.querySelector('.current-marker')?.textContent).toBe('Paused');
+    expect(host.querySelector('.gallery-card')?.getAttribute('aria-label')).toContain(track.album.trim());
+    expect(host.querySelector('.gallery-card')?.getAttribute('aria-current')).toBe('true');
+    expect(host.querySelector('.album-name')).toBeNull();
     expect(host.querySelector('.hero')).toBeNull();
 
     app.unmount();

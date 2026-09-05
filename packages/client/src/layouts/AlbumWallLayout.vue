@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import type {
   BackgroundType,
   PlaybackState,
@@ -12,6 +12,7 @@ import ProgressBar from '../components/ProgressBar.vue';
 import { useBackgroundStyle } from '../composables/useBackgroundStyle';
 import { useColorExtraction } from '../composables/useColorExtraction';
 import { isDynamicBackground } from '../utils/backgrounds';
+import { calculateAlbumGalleryGeometry } from '../utils/albumGallery';
 
 const props = withDefaults(defineProps<{
   track: Track | null;
@@ -31,10 +32,10 @@ const props = withDefaults(defineProps<{
 });
 
 const backgroundRef = computed(() => props.background);
-const artworkUrlRef = computed(() => props.artworkUrl);
+const artworkUrlRef = computed(() => props.galleryOnly ? null : props.artworkUrl);
 const { colors, vibrantGradient, palette } = useColorExtraction(artworkUrlRef);
 const { style: backgroundStyle } = useBackgroundStyle(backgroundRef, colors, vibrantGradient);
-const usesDynamicBackground = computed(() => isDynamicBackground(props.background));
+const usesDynamicBackground = computed(() => !props.galleryOnly && isDynamicBackground(props.background));
 const rootComponent = computed(() => usesDynamicBackground.value ? DynamicBackground : 'div');
 const rootBindings = computed(() => usesDynamicBackground.value
   ? {
@@ -66,7 +67,12 @@ const previousAlbums = computed(() => props.albumHistory.filter((album) =>
   album.id !== currentAlbumId.value
 ));
 const galleryAlbums = computed<RecentAlbum[]>(() => {
-  const albums = [...props.albumHistory];
+  const seenAlbumIds = new Set<string>();
+  const albums = props.albumHistory.filter((album) => {
+    if (seenAlbumIds.has(album.id)) return false;
+    seenAlbumIds.add(album.id);
+    return true;
+  });
   if (props.track && currentAlbumId.value && !albums.some((album) => album.id === currentAlbumId.value)) {
     albums.unshift({
       id: currentAlbumId.value,
@@ -78,10 +84,61 @@ const galleryAlbums = computed<RecentAlbum[]>(() => {
   }
   return albums.slice(0, ALBUM_HISTORY_LIMIT);
 });
-const currentTileLabel = computed(() => {
-  if (props.isPlaying) return 'Now playing';
-  if (props.state === 'paused') return 'Paused';
-  return null;
+const galleryViewportRef = ref<HTMLElement | null>(null);
+const galleryViewportSize = ref({
+  width: typeof window === 'undefined' ? 1 : Math.max(1, window.innerWidth),
+  height: typeof window === 'undefined' ? 1 : Math.max(1, window.innerHeight),
+});
+const galleryGeometry = computed(() => calculateAlbumGalleryGeometry(
+  galleryAlbums.value.length,
+  galleryViewportSize.value.width,
+  galleryViewportSize.value.height
+));
+const galleryRows = computed(() => {
+  let offset = 0;
+  return galleryGeometry.value.rowLengths.map((length) => {
+    const row = galleryAlbums.value.slice(offset, offset + length);
+    offset += length;
+    return row;
+  });
+});
+const galleryCanvasStyle = computed(() => ({
+  width: `${galleryGeometry.value.canvasWidth}px`,
+  height: `${galleryGeometry.value.canvasHeight}px`,
+}));
+
+let galleryResizeObserver: ResizeObserver | null = null;
+
+function updateGalleryViewportSize(): void {
+  const viewport = galleryViewportRef.value;
+  if (!viewport) return;
+  galleryViewportSize.value = {
+    width: Math.max(1, viewport.clientWidth || window.innerWidth),
+    height: Math.max(1, viewport.clientHeight || window.innerHeight),
+  };
+}
+
+watch(galleryViewportRef, (viewport) => {
+  galleryResizeObserver?.disconnect();
+  galleryResizeObserver = null;
+  if (!viewport) return;
+  updateGalleryViewportSize();
+  if (typeof ResizeObserver !== 'undefined') {
+    galleryResizeObserver = new ResizeObserver(updateGalleryViewportSize);
+    galleryResizeObserver.observe(viewport);
+  }
+}, { flush: 'post' });
+
+onMounted(() => {
+  if (typeof ResizeObserver === 'undefined') {
+    window.addEventListener('resize', updateGalleryViewportSize);
+  }
+});
+
+onUnmounted(() => {
+  galleryResizeObserver?.disconnect();
+  galleryResizeObserver = null;
+  window.removeEventListener('resize', updateGalleryViewportSize);
 });
 
 const failedArtworkKeys = ref<Map<string, string | null>>(new Map());
@@ -107,35 +164,30 @@ function markArtworkFailed(album: RecentAlbum): void {
     :class="galleryOnly ? 'album-gallery-layout' : 'album-wall-layout'"
   >
     <main
+      ref="galleryViewportRef"
       class="album-wall-content"
       :class="{
-        'dynamic-contrast': usesDynamicBackground,
+        'dynamic-contrast': usesDynamicBackground && (!galleryOnly || galleryAlbums.length === 0),
         'album-gallery-content': galleryOnly,
       }"
       :style="contentContrastStyle"
     >
       <template v-if="galleryOnly">
-        <header class="gallery-header">
-          <div class="gallery-heading">
-            <p class="eyebrow">Album gallery</p>
-            <h1 v-if="track" class="gallery-track" :title="track.title">{{ track.title }}</h1>
-            <h1 v-else class="gallery-track">No music playing</h1>
-          </div>
-          <p v-if="track" class="gallery-context" :title="`${track.artist} — ${track.album}`">
-            {{ track.artist }} <span aria-hidden="true">·</span> {{ track.album }}
-          </p>
-          <p class="gallery-zone">{{ zoneName }}</p>
-        </header>
-
-        <section v-if="galleryAlbums.length" class="gallery-grid" aria-label="Album gallery">
-          <article
-            v-for="album in galleryAlbums"
-            :key="album.id"
-            class="gallery-card"
-            :class="{ 'current-album': album.id === currentAlbumId }"
-            :title="`${album.album} — ${album.artist}`"
-          >
-            <div class="gallery-artwork-slot">
+        <section
+          v-if="galleryAlbums.length"
+          class="gallery-canvas"
+          :style="galleryCanvasStyle"
+          aria-label="Album gallery"
+        >
+          <div v-for="(row, rowIndex) in galleryRows" :key="rowIndex" class="gallery-row">
+            <article
+              v-for="album in row"
+              :key="album.id"
+              class="gallery-card"
+              :title="`${album.album} — ${album.artist}`"
+              :aria-label="`${album.album} by ${album.artist}`"
+              :aria-current="album.id === currentAlbumId ? 'true' : undefined"
+            >
               <div class="album-cover-frame">
                 <img
                   v-if="recentArtworkUrl(album) && failedArtworkKeys.get(album.id) !== album.artwork_key"
@@ -146,17 +198,9 @@ function markArtworkFailed(album: RecentAlbum): void {
                   @error="markArtworkFailed(album)"
                 />
                 <div v-else class="cover-placeholder" aria-hidden="true"><span>♪</span></div>
-                <span
-                  v-if="album.id === currentAlbumId && currentTileLabel"
-                  class="current-marker"
-                >{{ currentTileLabel }}</span>
               </div>
-            </div>
-            <div class="album-copy">
-              <p class="album-name">{{ album.album }}</p>
-              <p class="album-artist">{{ album.artist }}</p>
-            </div>
-          </article>
+            </article>
+          </div>
         </section>
 
         <section v-else class="empty-history gallery-empty" aria-label="Album gallery">
@@ -266,118 +310,52 @@ function markArtworkFailed(album: RecentAlbum): void {
 }
 
 .album-gallery-content {
+  position: relative;
+  display: block;
+  padding: 0;
+  overflow: hidden;
+}
+
+.gallery-canvas {
+  position: absolute;
+  left: 50%;
+  top: 50%;
   display: flex;
   flex-direction: column;
-  padding: clamp(1.1rem, 2vw, 3rem);
-  gap: clamp(0.75rem, 1.2vh, 1.5rem);
+  transform: translate(-50%, -50%);
 }
 
-.gallery-header {
+.gallery-row {
+  width: 100%;
+  display: flex;
   flex: 0 0 auto;
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto;
-  align-items: end;
-  gap: clamp(1rem, 2vw, 3rem);
-}
-
-.gallery-heading,
-.gallery-context {
-  min-width: 0;
-}
-
-.gallery-track {
-  margin-top: 0.25rem;
-  font-size: calc(clamp(1.15rem, 1.5vw, 2.6rem) * var(--font-scale, 1));
-  line-height: 1.05;
-  letter-spacing: -0.025em;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  display: block;
-}
-
-.gallery-context,
-.gallery-zone {
-  margin: 0;
-  color: var(--text-secondary, rgba(255, 255, 255, 0.9));
-  font-size: calc(clamp(0.72rem, 0.75vw, 1.25rem) * var(--font-scale, 1));
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.gallery-zone {
-  color: var(--text-tertiary, rgba(255, 255, 255, 0.88));
-}
-
-.gallery-grid {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  grid-template-rows: repeat(2, minmax(0, 1fr));
-  gap: clamp(0.6rem, 1.15vw, 1.75rem);
 }
 
 .gallery-card {
   min-width: 0;
-  min-height: 0;
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-}
-
-.gallery-artwork-slot {
-  min-height: 0;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  container-type: size;
-}
-
-.gallery-card .album-cover-frame {
-  width: min(100cqw, 100cqh);
-  height: min(100cqw, 100cqh);
+  flex: 1 1 0;
   aspect-ratio: 1;
 }
 
-.gallery-card .album-copy {
-  min-height: 0;
-  box-sizing: border-box;
+.gallery-card .album-cover-frame {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1;
+  border-radius: 0;
+  box-shadow: none;
 }
 
-.gallery-card .album-name {
-  font-size: calc(clamp(0.7rem, 0.72vw, 1.65rem) * var(--font-scale, 1));
-  line-height: 1.12;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.gallery-card .album-artist {
-  font-size: calc(clamp(0.62rem, 0.58vw, 1.25rem) * var(--font-scale, 1));
-  line-height: 1.15;
-  white-space: nowrap;
-}
-
-.current-marker {
-  position: absolute;
-  left: clamp(0.35rem, 0.55vw, 0.8rem);
-  bottom: clamp(0.35rem, 0.55vw, 0.8rem);
-  padding: 0.28em 0.55em;
-  border-radius: 999px;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.78);
-  font-size: calc(clamp(0.58rem, 0.5vw, 0.82rem) * var(--font-scale, 1));
-  font-weight: 650;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.gallery-card .album-cover {
+  object-fit: contain;
+  background: #000;
 }
 
 .gallery-empty {
-  flex: 1 1 auto;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
 }
 
 .hero {
@@ -587,7 +565,7 @@ h1 {
 }
 
 @media (max-width: 1050px), (max-aspect-ratio: 6/5) {
-  .album-wall-content {
+  .album-wall-content:not(.album-gallery-content) {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1.18fr) minmax(0, 0.82fr);
     row-gap: clamp(1.5rem, 3vh, 3rem);
@@ -606,15 +584,8 @@ h1 {
   .album-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
-@media (max-aspect-ratio: 5/3) {
-  .gallery-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    grid-template-rows: repeat(3, minmax(0, 1fr));
-  }
-}
-
 @media (max-aspect-ratio: 6/5) {
-  .album-wall-content {
+  .album-wall-content:not(.album-gallery-content) {
     grid-template-rows: minmax(0, 27vh) minmax(0, 1fr);
     row-gap: clamp(1rem, 2vh, 1.5rem);
     overflow: hidden;
@@ -640,27 +611,10 @@ h1 {
     padding-top: clamp(0.3rem, 0.5vh, 0.5rem);
   }
 
-  .album-gallery-content {
-    padding: clamp(1rem, 2vw, 1.5rem);
-  }
-
-  .gallery-header {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .gallery-context {
-    display: none;
-  }
-
-  .gallery-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-template-rows: repeat(4, minmax(0, 1fr));
-    gap: clamp(0.45rem, 1.2vw, 0.75rem);
-  }
 }
 
 @media (max-width: 620px) {
-  .album-wall-content {
+  .album-wall-content:not(.album-gallery-content) {
     display: block;
     padding: 1.25rem;
   }
@@ -680,10 +634,6 @@ h1 {
   .history { margin-top: 2.5rem; }
   .album-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
-  .album-gallery-content {
-    display: flex;
-    padding: 0.75rem;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

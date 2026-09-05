@@ -103,7 +103,7 @@ Example: `http://localhost:3000/?zone=Office&layout=detailed&background=gradient
 | `facts-carousel` | Blurred artwork background with the rotating fact shown as large type, plus a compact now-playing chip. Sized for legibility on TVs. |
 | `basic` | Legacy-compatible layout for older browsers (iOS 12+). Artwork with title, artist, album, and progress bar. Auto-adapts to portrait/landscape. |
 | `album-wall` | A prominent current album with a gallery of recent albums from the selected zone. History persists across restarts and supports Roon and external sources. |
-| `album-gallery` | Full-screen gallery of up to 12 recent album covers, including the current album, with compact labels and a playback marker. |
+| `album-gallery` | Covers-only mosaic of up to 12 recent albums. Square artwork fills the screen; the viewport clips the outer tiles. |
 
 **Note:** Facts layouts require an LLM provider configured in the Admin panel. Supported providers: Anthropic, OpenAI, OpenRouter, or Local LLM (Ollama/LM Studio).
 
@@ -119,12 +119,17 @@ front. History gathers as the server observes playback, including when no displa
 is connected. Paused/stopped updates and tracks without album metadata do not add
 entries. Missing or unavailable covers show placeholders.
 
-Choose **Album gallery** or `/?layout=album-gallery` for the full-screen cover
-grid. Both layouts support artwork-derived backgrounds. Dynamic backgrounds
-receive a dark content layer to keep labels readable. Wall track titles stop at
-three lines; gallery album names wrap to two lines, while artist names and the
-compact track header use ellipsis. Full metadata remains in accessible text and
-hover titles; there is no automatic scrolling text.
+Choose **Album gallery** or `/?layout=album-gallery` for a covers-only mosaic,
+without a header, captions, or badges. Each image stays intact within its square
+tile; the centered mosaic extends beyond the viewport so only the screen edges
+clip the outer covers. The arrangement adapts to screen size and shorter
+histories without repeating albums or leaving empty cells. Metadata remains in
+accessible labels and hover titles.
+
+Album Wall retains its artwork-derived backgrounds and metadata. Its track
+titles stop at three lines, with ellipsis for artist and album labels. Dynamic
+backgrounds receive a dark content layer to keep that text readable; there is
+no automatic scrolling text.
 
 ### Screenshots
 
