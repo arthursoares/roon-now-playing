@@ -10,11 +10,13 @@ import {
   LLM_PROVIDERS,
   LLM_MODELS,
   DEFAULT_FACTS_PROMPT,
+  DEFAULT_DISPLAY_SETTINGS,
   type LayoutType,
   type FontType,
   type BackgroundType,
   type ClientMetadata,
   type FactsConfig,
+  type DisplaySettings,
 } from '@roon-screen-cover/shared';
 
 const { state: wsState } = useWebSocket({ isAdmin: true });
@@ -83,16 +85,18 @@ const generatedSourceKey = ref('');
 const sourcesError = ref<string | null>(null);
 
 // Display settings state
-const displaySettings = ref<{ fontScale: number; artworkScale: number }>({ fontScale: 1, artworkScale: 100 });
+const displaySettings = ref<DisplaySettings>({ ...DEFAULT_DISPLAY_SETTINGS });
 const displaySettingsLoading = ref(true);
 const displaySettingsSaving = ref(false);
+const displaySettingsError = ref<string | null>(null);
+let displaySettingsSaveRequest = 0;
 
 async function loadDisplaySettings(): Promise<void> {
   try {
     displaySettingsLoading.value = true;
     const response = await fetch('/api/admin/display-settings');
     if (response.ok) {
-      displaySettings.value = await response.json();
+      displaySettings.value = { ...DEFAULT_DISPLAY_SETTINGS, ...await response.json() };
     }
   } catch (error) {
     console.error('Failed to load display settings:', error);
@@ -120,18 +124,39 @@ function onArtworkScaleChange(event: Event): void {
   saveTimeout = setTimeout(() => saveDisplaySettings(), 300);
 }
 
+function onDisplaySettingChange(): void {
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => saveDisplaySettings(), 300);
+}
+
 async function saveDisplaySettings(): Promise<void> {
+  const requestId = ++displaySettingsSaveRequest;
+  const submitted = { ...displaySettings.value };
   displaySettingsSaving.value = true;
+  displaySettingsError.value = null;
   try {
-    await fetch('/api/admin/display-settings', {
+    const response = await fetch('/api/admin/display-settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(displaySettings.value),
+      body: JSON.stringify(submitted),
     });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || data.message || 'Failed to save display settings');
+    }
+    const unchangedSinceSubmit = Object.entries(submitted).every(
+      ([key, value]) => displaySettings.value[key as keyof DisplaySettings] === value,
+    );
+    if (requestId === displaySettingsSaveRequest && unchangedSinceSubmit) {
+      displaySettings.value = { ...DEFAULT_DISPLAY_SETTINGS, ...data };
+    }
   } catch (error) {
     console.error('Failed to save display settings:', error);
+    if (requestId === displaySettingsSaveRequest) {
+      displaySettingsError.value = error instanceof Error ? error.message : 'Failed to save display settings';
+    }
   } finally {
-    displaySettingsSaving.value = false;
+    if (requestId === displaySettingsSaveRequest) displaySettingsSaving.value = false;
   }
 }
 
@@ -1304,7 +1329,12 @@ onMounted(() => {
           <span>Loading settings...</span>
         </div>
 
-        <div v-else class="config-card">
+        <template v-else>
+          <p v-if="displaySettingsError" role="alert" class="message-card error">
+            {{ displaySettingsError }}
+          </p>
+
+        <div class="config-card">
           <h2 class="card-title">Font Scale</h2>
           <p class="card-desc">Adjust the global font size multiplier. Individual screens can override this setting.</p>
 
@@ -1366,6 +1396,85 @@ onMounted(() => {
             Saving...
           </div>
         </div>
+
+        <div class="config-card">
+          <h2 class="card-title">Smart Idle</h2>
+          <p class="card-desc">Show an idle presentation after the selected zone has been paused or stopped. Playback returns immediately when music resumes.</p>
+
+          <div class="form-grid idle-settings-grid">
+            <div class="form-field">
+              <label for="idleMode">Idle presentation</label>
+              <select id="idleMode" v-model="displaySettings.idleMode" @change="onDisplaySettingChange">
+                <option value="off">Off</option>
+                <option value="clock">Clock</option>
+                <option value="black">Black screen</option>
+                <option value="layout">Selected layout</option>
+              </select>
+            </div>
+            <div v-if="displaySettings.idleMode === 'layout'" class="form-field">
+              <label for="idleLayout">Idle layout</label>
+              <select id="idleLayout" v-model="displaySettings.idleLayout" @change="onDisplaySettingChange">
+                <option v-for="layoutOption in LAYOUTS" :key="layoutOption" :value="layoutOption">
+                  {{ getLayoutDisplayName(layoutOption) }}
+                </option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="idleDelayMinutes">Delay (minutes)</label>
+              <input
+                id="idleDelayMinutes"
+                v-model.number="displaySettings.idleDelayMinutes"
+                type="number"
+                min="1"
+                max="60"
+                step="1"
+                :disabled="displaySettings.idleMode === 'off'"
+                @change="onDisplaySettingChange"
+              />
+            </div>
+          </div>
+
+          <div class="toggle-setting">
+            <div class="toggle-info">
+              <label class="toggle-label">Night dimming</label>
+              <p class="toggle-desc">Dim this display page during a local-time schedule. This does not control the device screen or power.</p>
+            </div>
+            <button
+              type="button"
+              class="toggle-switch"
+              :class="{ active: displaySettings.nightDimmingEnabled }"
+              :aria-pressed="displaySettings.nightDimmingEnabled"
+              @click="displaySettings.nightDimmingEnabled = !displaySettings.nightDimmingEnabled; onDisplaySettingChange()"
+            ><span class="toggle-knob"></span></button>
+          </div>
+
+          <div v-if="displaySettings.nightDimmingEnabled" class="form-grid idle-settings-grid">
+            <div class="form-field">
+              <label for="nightDimmingStart">Starts</label>
+              <input id="nightDimmingStart" v-model="displaySettings.nightDimmingStart" type="time" @change="onDisplaySettingChange" />
+            </div>
+            <div class="form-field">
+              <label for="nightDimmingEnd">Ends</label>
+              <input id="nightDimmingEnd" v-model="displaySettings.nightDimmingEnd" type="time" @change="onDisplaySettingChange" />
+            </div>
+            <div class="form-field full-width">
+              <label for="nightBrightness">Page brightness: {{ displaySettings.nightBrightness }}%</label>
+              <input
+                id="nightBrightness"
+                v-model.number="displaySettings.nightBrightness"
+                type="range"
+                min="1"
+                max="100"
+                step="1"
+                class="slider-input"
+                @input="onDisplaySettingChange"
+              />
+            </div>
+          </div>
+
+          <div v-if="displaySettingsSaving" class="saving-indicator">Saving...</div>
+        </div>
+        </template>
       </section>
     </main>
   </div>
@@ -2756,6 +2865,11 @@ onMounted(() => {
 
 .slider-field {
   max-width: 400px;
+}
+
+.idle-settings-grid {
+  max-width: 640px;
+  margin-bottom: 12px;
 }
 
 .slider-header {

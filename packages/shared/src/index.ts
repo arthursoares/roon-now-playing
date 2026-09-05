@@ -352,11 +352,28 @@ export interface ServerClientResetMessage {
 export interface DisplaySettings {
   fontScale: number;
   artworkScale: number;
+  idleMode: IdleMode;
+  idleLayout: LayoutType;
+  idleDelayMinutes: number;
+  nightDimmingEnabled: boolean;
+  nightDimmingStart: string;
+  nightDimmingEnd: string;
+  nightBrightness: number;
 }
+
+export const IDLE_MODES = ['off', 'clock', 'black', 'layout'] as const;
+export type IdleMode = (typeof IDLE_MODES)[number];
 
 export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
   fontScale: 1.0,
   artworkScale: 100,
+  idleMode: 'off',
+  idleLayout: 'cover',
+  idleDelayMinutes: 5,
+  nightDimmingEnabled: false,
+  nightDimmingStart: '22:00',
+  nightDimmingEnd: '07:00',
+  nightBrightness: 30,
 };
 
 export interface DisplaySettingsUpdateMessage {

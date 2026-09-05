@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { LAYOUTS, type Zone, type LayoutType, type FontType, type BackgroundType } from '@roon-screen-cover/shared';
 import QRCode from 'qrcode';
 import { useWebSocket } from '../composables/useWebSocket';
@@ -7,6 +7,8 @@ import { usePreferences } from '../composables/usePreferences';
 import { useFontLoader } from '../composables/useFontLoader';
 import ZonePicker from '../components/ZonePicker.vue';
 import NowPlaying from '../components/NowPlaying.vue';
+import SmartIdleOverlay from '../components/SmartIdleOverlay.vue';
+import { useSmartIdle } from '../composables/useSmartIdle';
 
 const {
   preferredZone,
@@ -96,6 +98,57 @@ const selectedZone = computed(() => {
   if (!selectedZoneId.value) return null;
   return wsState.value.zones.find((z) => z.id === selectedZoneId.value) ?? null;
 });
+
+const smartIdleEnabled = computed(() =>
+  wsState.value.connected && Boolean(selectedZone.value) && !showZonePicker.value
+);
+const { isIdle, wake, dimOpacity } = useSmartIdle(
+  () => wsState.value.nowPlaying?.zone_id === selectedZoneId.value ? wsState.value.nowPlaying : null,
+  () => wsState.value.displaySettings,
+  () => smartIdleEnabled.value,
+);
+const activeLayout = computed<LayoutType>(() =>
+  isIdle.value && wsState.value.displaySettings.idleMode === 'layout'
+    ? wsState.value.displaySettings.idleLayout
+    : layout.value
+);
+let suppressWakeGesture = false;
+let suppressClickTimer: ReturnType<typeof setTimeout> | null = null;
+const WAKE_GESTURE_FALLBACK_MS = 30_000;
+
+function handleDisplayPointerDown(event: PointerEvent): void {
+  if (wake()) {
+    suppressWakeGesture = true;
+    if (suppressClickTimer) clearTimeout(suppressClickTimer);
+    // Keep suppression bounded if a browser or device drops the end event.
+    suppressClickTimer = setTimeout(() => { suppressWakeGesture = false; }, WAKE_GESTURE_FALLBACK_MS);
+    event.preventDefault();
+    event.stopPropagation();
+  }
+}
+
+function handleDisplayPointerEnd(event: PointerEvent): void {
+  if (!suppressWakeGesture) return;
+  if (suppressClickTimer) clearTimeout(suppressClickTimer);
+  suppressClickTimer = setTimeout(() => { suppressWakeGesture = false; }, 750);
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+function handleDisplayActivation(event: MouseEvent): void {
+  if (!suppressWakeGesture && wake()) {
+    suppressWakeGesture = true;
+    if (suppressClickTimer) clearTimeout(suppressClickTimer);
+    suppressClickTimer = setTimeout(() => { suppressWakeGesture = false; }, 750);
+  }
+  if (!suppressWakeGesture) return;
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+function handleKeyDown(): void {
+  wake();
+}
 
 const connectionStatus = computed(() => {
   if (!wsState.value.connected) return 'connecting';
@@ -213,11 +266,24 @@ watch(
 // Load preferences on mount
 onMounted(() => {
   loadPreferences();
+  window.addEventListener('keydown', handleKeyDown);
+});
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown);
+  if (suppressClickTimer) clearTimeout(suppressClickTimer);
 });
 </script>
 
 <template>
-  <div class="now-playing-view" :style="{ fontFamily }">
+  <div
+    class="now-playing-view"
+    :style="{ fontFamily }"
+    @pointerdown.capture="handleDisplayPointerDown"
+    @pointerup.capture="handleDisplayPointerEnd"
+    @pointercancel.capture="handleDisplayPointerEnd"
+    @click.capture="handleDisplayActivation"
+    @dblclick.capture="handleDisplayActivation"
+  >
     <!-- Connecting spinner -->
     <div v-if="connectionStatus === 'connecting'" class="connection-overlay">
       <div class="connection-status">
@@ -249,7 +315,7 @@ onMounted(() => {
       :now-playing="wsState.nowPlaying"
       :album-history="wsState.albumHistory"
       :zone="selectedZone"
-      :layout="layout"
+      :layout="activeLayout"
       :background="background"
       @change-zone="changeZone"
       @cycle-layout="cycleLayout"
@@ -260,6 +326,17 @@ onMounted(() => {
       <p>No zone selected</p>
       <button @click="showZonePicker = true">Select Zone</button>
     </div>
+
+    <SmartIdleOverlay
+      v-if="isIdle && connectionStatus === 'connected' && wsState.displaySettings.idleMode !== 'layout'"
+      :mode="wsState.displaySettings.idleMode"
+    />
+    <div
+      v-if="dimOpacity > 0 && connectionStatus === 'connected'"
+      class="night-dimming-overlay"
+      :style="{ opacity: dimOpacity }"
+      aria-hidden="true"
+    ></div>
   </div>
 </template>
 
@@ -269,6 +346,17 @@ onMounted(() => {
   height: 100%;
   background: #000;
   color: #fff;
+}
+
+.night-dimming-overlay {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 950;
+  background: #000;
+  pointer-events: none;
 }
 
 .connection-overlay {
