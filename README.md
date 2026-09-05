@@ -610,7 +610,7 @@ Pre-built images are available from GitHub Container Registry:
 docker pull ghcr.io/arthursoares/roon-now-playing:latest
 
 # Specific version
-docker pull ghcr.io/arthursoares/roon-now-playing:1.3.0
+docker pull ghcr.io/arthursoares/roon-now-playing:1.10.0
 ```
 
 Supported platforms:

@@ -14,7 +14,7 @@ const forum =
 
 const layouts = [
   'detailed', 'minimal', 'fullscreen', 'ambient', 'cover',
-  'facts-columns', 'facts-overlay', 'facts-carousel', 'basic',
+  'facts-columns', 'facts-overlay', 'facts-carousel', 'basic', 'album-wall', 'album-gallery',
 ];
 const backgrounds = [
   'black', 'white', 'dominant', 'gradient-radial', 'gradient-linear',
@@ -23,13 +23,15 @@ const backgrounds = [
 ];
 
 const features = [
-  { t: '9 display layouts', d: 'From a clean cover view to dense detail and AI-facts layouts — switch instantly with a tap or remotely from the admin panel.', i: 'layout' },
+  { t: '11 display layouts', d: 'Show the current album, recent listening history, an edge-to-edge cover gallery, or AI facts — choose a layout from the display or admin panel.', i: 'layout' },
   { t: '14 dynamic backgrounds', d: 'Colors and gradients extracted live from the album artwork — radial, linear, mesh, duotone, blurred, posterized and more.', i: 'palette' },
   { t: 'AI-generated facts', d: 'Surface lesser-known facts about the playing track using Anthropic, OpenAI, OpenRouter, or a fully local model.', i: 'spark' },
   { t: 'Multi-zone, multi-client', d: 'Run as many displays as you like, each on its own Roon zone, all updating in real time over WebSockets.', i: 'grid' },
   { t: 'Roon-optional', d: 'Use it with Roon, or run external-sources-only via a simple HTTP API — push now-playing from anything.', i: 'plug' },
   { t: 'Self-service onboarding', d: 'New screens auto-generate a friendly name and show a QR code that opens their own config page on your phone.', i: 'qr' },
   { t: '17 font families', d: 'Pick the typeface that suits the room, from the system default to a curated set of display and text faces.', i: 'type' },
+  { t: 'Smart Idle', d: 'Show a clock, black screen, or another layout when music pauses. Optional night dimming changes the page brightness without controlling device power.', i: 'expand' },
+  { t: 'Kiosk tap controls', d: 'Lock layout and zone taps on a fixed display while keeping Smart Idle wake gestures available.', i: 'layout' },
   { t: 'Resolution-aware', d: 'Typography scales smoothly from a bedside tablet to a 4K living-room TV, so everything stays readable across the room.', i: 'expand' },
 ];
 
@@ -65,7 +67,7 @@ const icon: Record<string, string> = {
     <div class="aura"></div>
     <div class="container hero__inner">
       <div class="hero__copy">
-        <p class="eyebrow">Self-hosted · Open source · v1.9.0</p>
+        <p class="eyebrow">Self-hosted · Open source · v1.10.0</p>
         <h1 class="hero__title">
           Your music, <span class="grad-text">beautifully</span> on screen.
         </h1>
@@ -84,7 +86,7 @@ const icon: Record<string, string> = {
           </a>
         </div>
         <div class="hero__stats token-list" aria-hidden="true">
-          <span class="chip">9 layouts</span>
+          <span class="chip">11 layouts</span>
           <span class="chip">14 backgrounds</span>
           <span class="chip">17 fonts</span>
           <span class="chip">AI facts</span>
@@ -126,8 +128,8 @@ const icon: Record<string, string> = {
     <div class="container">
       <div class="section-head">
         <p class="eyebrow">Looks</p>
-        <h2>Nine layouts, fourteen backgrounds, one tap away</h2>
-        <p>Every layout pairs with every background style, and the colors come straight from the album art. Tap the screen to cycle, or push a look to any display from the admin panel.</p>
+        <h2>Eleven layouts, fourteen backgrounds, your choice</h2>
+        <p>Choose a layout and a background derived from the album art, or fill the screen with covers in Album Gallery. Change the look from the display or remotely from the admin panel.</p>
       </div>
 
       <div class="gallery">
