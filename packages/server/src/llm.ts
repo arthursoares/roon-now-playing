@@ -1,6 +1,13 @@
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
-import { DEFAULT_MAX_OUTPUT_TOKENS, type FactsConfig } from '@roon-screen-cover/shared';
+import {
+  getOpenAIReasoningEffort,
+  getOpenAIReasoningEfforts,
+  getRecommendedFactsOutputTokens,
+  isGpt56Model,
+  isOriginalGpt5Model,
+  type FactsConfig,
+} from '@roon-screen-cover/shared';
 import { logger } from './logger.js';
 import { parseFactsResponse as parseFacts } from './parseFacts.js';
 import { OutputLimitError } from './llmErrors.js';
@@ -9,12 +16,16 @@ export interface LLMProvider {
   generateFacts(artist: string, album: string, title: string): Promise<string[]>;
 }
 
+const PROVIDER_TIMEOUT_MS = 120_000;
+const OPENAI_FACTS_FORMAT_INSTRUCTION = [
+  'Return exactly one JSON object with a "facts" property containing an array of fact strings.',
+  'Follow the supplied JSON schema even if the user prompt requests a top-level JSON array or another format.',
+].join(' ');
+
 function buildPrompt(template: string, vars: Record<string, string | number>): string {
-  let result = template;
-  for (const [key, value] of Object.entries(vars)) {
-    result = result.replace(new RegExp(`\\{${key}\\}`, 'g'), String(value));
-  }
-  return result;
+  return template.replace(/\{(artist|album|title|factsCount)\}/g, (_match, key: string) => (
+    Object.hasOwn(vars, key) ? String(vars[key]) : _match
+  ));
 }
 
 function parseFactsResponse(text: string): string[] {
@@ -26,7 +37,97 @@ function parseFactsResponse(text: string): string[] {
 }
 
 function getMaxOutputTokens(config: FactsConfig): number {
-  return config.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
+  return config.maxOutputTokens ?? getRecommendedFactsOutputTokens(config.provider, config.model);
+}
+
+type OpenAIFactsRequest = OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming;
+type OpenAIFactsCompletion = Pick<OpenAI.Chat.Completions.ChatCompletion, 'choices'>;
+
+function usesOpenAIStructuredFacts(model: string): boolean {
+  return isGpt56Model(model)
+    || isOriginalGpt5Model(model)
+    || model === 'gpt-5.5'
+    || model === 'gpt-6-astra';
+}
+
+export function buildOpenAIFactsRequest(
+  config: FactsConfig,
+  artist: string,
+  album: string,
+  title: string,
+): OpenAIFactsRequest {
+  const prompt = buildPrompt(config.prompt, {
+    artist,
+    album,
+    title,
+    factsCount: config.factsCount,
+  });
+  const reasoningEffort = getOpenAIReasoningEffort(config.model, config.openaiReasoningEffort);
+  const request: OpenAIFactsRequest = {
+    model: config.model,
+    messages: [{ role: 'user', content: prompt }],
+    // max_completion_tokens includes visible output and hidden reasoning tokens.
+    max_completion_tokens: getMaxOutputTokens(config),
+  };
+
+  if (reasoningEffort !== undefined) request.reasoning_effort = reasoningEffort;
+  if (usesOpenAIStructuredFacts(config.model)) {
+    request.messages.unshift({ role: 'developer', content: OPENAI_FACTS_FORMAT_INSTRUCTION });
+    request.response_format = {
+      type: 'json_schema',
+      json_schema: {
+        name: 'music_facts',
+        strict: true,
+        schema: {
+          type: 'object',
+          properties: {
+            facts: { type: 'array', items: { type: 'string' } },
+          },
+          required: ['facts'],
+          additionalProperties: false,
+        },
+      },
+    };
+  }
+
+  return request;
+}
+
+export function parseOpenAIFactsCompletion(
+  response: OpenAIFactsCompletion,
+  config: FactsConfig,
+): string[] {
+  const choice = response.choices[0];
+  const reasoningEffort = getOpenAIReasoningEffort(config.model, config.openaiReasoningEffort);
+  if (choice?.finish_reason === 'length') {
+    const supportedEfforts = getOpenAIReasoningEfforts(config.model);
+    const reasoningIndex = reasoningEffort === undefined ? -1 : supportedEfforts.indexOf(reasoningEffort);
+    throw new OutputLimitError(getMaxOutputTokens(config), {
+      reasoningEffort,
+      canLowerReasoning: reasoningIndex > 0,
+    });
+  }
+
+  if (!choice
+    || choice.finish_reason !== 'stop'
+    || choice.message.refusal
+    || typeof choice.message.content !== 'string') return [];
+
+  if (!usesOpenAIStructuredFacts(config.model)) {
+    return parseFactsResponse(choice.message.content);
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(choice.message.content);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return [];
+    const facts = (parsed as Record<string, unknown>).facts;
+    if (!Array.isArray(facts)
+      || facts.length === 0
+      || !facts.every((fact) => typeof fact === 'string' && fact.trim().length > 0)) return [];
+    return facts as string[];
+  } catch {
+    return [];
+  }
 }
 
 class ProviderHttpError extends Error {
@@ -59,7 +160,11 @@ export class AnthropicProvider implements LLMProvider {
 
   constructor(config: FactsConfig) {
     this.config = config;
-    this.client = new Anthropic({ apiKey: config.apiKey });
+    this.client = new Anthropic({
+      apiKey: config.apiKey,
+      timeout: PROVIDER_TIMEOUT_MS,
+      maxRetries: 0,
+    });
   }
 
   async generateFacts(artist: string, album: string, title: string): Promise<string[]> {
@@ -100,41 +205,22 @@ export class OpenAIProvider implements LLMProvider {
 
   constructor(config: FactsConfig) {
     this.config = config;
-    this.client = new OpenAI({ apiKey: config.apiKey });
+    this.client = new OpenAI({
+      apiKey: config.apiKey,
+      timeout: PROVIDER_TIMEOUT_MS,
+      maxRetries: 0,
+    });
   }
 
   async generateFacts(artist: string, album: string, title: string): Promise<string[]> {
-    const prompt = buildPrompt(this.config.prompt, {
-      artist,
-      album,
-      title,
-      factsCount: this.config.factsCount,
-    });
-
     try {
-      const response = await this.client.chat.completions.create({
-        model: this.config.model,
-        messages: [{ role: 'user', content: prompt }],
-        // max_completion_tokens replaces the deprecated max_tokens and is required
-        // by reasoning models (gpt-5 family, o-series); accepted by gpt-4.x too.
-        max_completion_tokens: getMaxOutputTokens(this.config),
-      });
-
-      const choice = response.choices[0];
-      if (choice?.finish_reason === 'length') {
-        throw new OutputLimitError(getMaxOutputTokens(this.config));
-      }
-
-      const content = choice?.message?.content;
-      if (content) {
-        return parseFactsResponse(content);
-      }
+      const request = buildOpenAIFactsRequest(this.config, artist, album, title);
+      const response = await this.client.chat.completions.create(request);
+      return parseOpenAIFactsCompletion(response, this.config);
     } catch (error) {
       logProviderError('OpenAI API', error);
       throw error;
     }
-
-    return [];
   }
 }
 
@@ -167,6 +253,7 @@ export class OpenRouterProvider implements LLMProvider {
           messages: [{ role: 'user', content: prompt }],
           max_tokens: getMaxOutputTokens(this.config),
         }),
+        signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
       });
 
       if (!response.ok) {
@@ -228,6 +315,7 @@ export class LocalLLMProvider implements LLMProvider {
         method: 'POST',
         headers,
         body: JSON.stringify(requestBody),
+        signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
       });
 
       logger.info(`[LocalLLM] Response status: ${response.status}`);

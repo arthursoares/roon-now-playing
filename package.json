@@ -23,7 +23,8 @@
     "review:pack": "bash e2e/build-review-pack.sh",
     "review:gallery": "node e2e/build-gallery.mjs",
     "typecheck": "pnpm run clean:shared && pnpm run build:shared && pnpm -r typecheck",
-    "lint": "eslint packages"
+    "lint": "eslint packages",
+    "eval:facts": "pnpm --filter @roon-screen-cover/server eval:facts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

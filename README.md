@@ -238,7 +238,7 @@ Configure AI-powered facts generation for the facts layouts:
 - Set API key (or use environment variables)
 - Configure local LLM base URL for Ollama/LM Studio
 - Configure facts count per track (1-10)
-- Set maximum output tokens in Advanced Settings (1–65,536; default 1,024). Provider and model limits still apply.
+- Set reasoning and maximum output tokens in Advanced Settings (1–65,536). Luna starts at 2,048 with no reasoning; model-specific recommendations and saved custom limits are preserved. Provider and model limits still apply.
 - Customize rotation interval
 - Test configuration with sample track data
 
@@ -271,10 +271,11 @@ The facts feature supports multiple LLM providers for generating music facts:
 - Best for: High-quality, nuanced facts
 
 ### OpenAI
-- Models: GPT-5, GPT-5-mini, GPT-5-nano, GPT-4.1, GPT-4o, GPT-4o-mini
+- Models: GPT-5.6 Luna (recommended), GPT-5.6 Terra/Sol, GPT-5.5, and GPT-6 Astra (account access required)
 - Requires: `OPENAI_API_KEY` or API key in Admin panel
 - Best for: Fast, reliable generation
-- Note: GPT-5 / o-series reasoning models are sent `max_completion_tokens` (not the legacy `max_tokens`)
+- Uses strict structured facts output and explicit low-cost reasoning defaults. Older OpenAI picker choices migrate to Luna; custom prompts and explicit token caps are retained.
+- Authentication remains API-key based. The documented Codex/ChatGPT sign-in backend is a separate integration; see [facts configuration and migration](docs/facts-generation.md).
 
 ### OpenRouter
 - Access 200+ models through a unified API
@@ -339,6 +340,8 @@ ollama pull llama3.1
 | `POST` | `/api/facts/config` | Update facts configuration |
 | `POST` | `/api/facts` | Get or generate facts using artist, album, and title in the JSON body |
 | `POST` | `/api/facts/test` | Test facts generation with sample data |
+
+For recommended Luna/GPT-5 reasoning budgets, caching behavior, and an opt-in live comparison, see [Facts generation and operating costs](docs/facts-generation.md).
 
 Facts generation errors return a non-success status and an `error` object with
 `type` and `message`. Unusable model output returns 502. Displays retain their

@@ -43,19 +43,10 @@ import type { Track, PlaybackState, FactsResponse, FactsError } from '@roon-scre
 import { useFacts } from './useFacts';
 
 describe('useFacts', () => {
-  const mockSessionStorage = new Map<string, string>();
+  const mountedApps = new Set<ReturnType<typeof createApp>>();
 
   beforeEach(() => {
     vi.useFakeTimers();
-    mockSessionStorage.clear();
-
-    // Mock sessionStorage
-    vi.stubGlobal('sessionStorage', {
-      getItem: (key: string) => mockSessionStorage.get(key) ?? null,
-      setItem: (key: string, value: string) => mockSessionStorage.set(key, value),
-      removeItem: (key: string) => mockSessionStorage.delete(key),
-      clear: () => mockSessionStorage.clear(),
-    });
 
     // Mock fetch - default implementation returns config with 25s rotation
     vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
@@ -70,6 +61,8 @@ describe('useFacts', () => {
   });
 
   afterEach(() => {
+    for (const app of mountedApps) app.unmount();
+    mountedApps.clear();
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
@@ -134,10 +127,11 @@ describe('useFacts', () => {
     }));
 
     app.mount(host);
+    mountedApps.add(app);
 
     return {
       result: result!,
-      unmount: () => app.unmount(),
+      unmount: () => { app.unmount(); mountedApps.delete(app); },
     };
   }
 
@@ -146,7 +140,7 @@ describe('useFacts', () => {
       const track = ref<Track | null>(null);
       const playbackState = ref<PlaybackState>('stopped');
 
-      const { facts } = useFacts(track, playbackState);
+      const { facts } = mountUseFacts(track, playbackState).result;
 
       expect(facts.value).toEqual([]);
     });
@@ -155,7 +149,7 @@ describe('useFacts', () => {
       const track = ref<Track | null>(null);
       const playbackState = ref<PlaybackState>('stopped');
 
-      const { isLoading } = useFacts(track, playbackState);
+      const { isLoading } = mountUseFacts(track, playbackState).result;
 
       expect(isLoading.value).toBe(false);
     });
@@ -164,7 +158,7 @@ describe('useFacts', () => {
       const track = ref<Track | null>(null);
       const playbackState = ref<PlaybackState>('stopped');
 
-      const { error } = useFacts(track, playbackState);
+      const { error } = mountUseFacts(track, playbackState).result;
 
       expect(error.value).toBeNull();
     });
@@ -173,7 +167,7 @@ describe('useFacts', () => {
       const track = ref<Track | null>(null);
       const playbackState = ref<PlaybackState>('stopped');
 
-      const { currentFact } = useFacts(track, playbackState);
+      const { currentFact } = mountUseFacts(track, playbackState).result;
 
       expect(currentFact.value).toBeNull();
     });
@@ -190,7 +184,7 @@ describe('useFacts', () => {
         generatedAt: Date.now(),
       });
 
-      const { facts } = useFacts(track, playbackState);
+      const { facts } = mountUseFacts(track, playbackState).result;
 
       // Let config fetch complete
       await nextTick();
@@ -204,6 +198,7 @@ describe('useFacts', () => {
 
       // Should have called config endpoint + facts endpoint
       expect(fetch).toHaveBeenCalledWith('/api/facts', {
+        signal: expect.any(AbortSignal),
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -240,7 +235,7 @@ describe('useFacts', () => {
         return Promise.reject(new Error('Unmocked URL: ' + url));
       });
 
-      const { isLoading } = useFacts(track, playbackState);
+      const { isLoading } = mountUseFacts(track, playbackState).result;
 
       // Let config fetch complete
       await nextTick();
@@ -275,7 +270,7 @@ describe('useFacts', () => {
         generatedAt: Date.now(),
       });
 
-      const { cached } = useFacts(track, playbackState);
+      const { cached } = mountUseFacts(track, playbackState).result;
 
       track.value = createMockTrack();
       await nextTick();
@@ -314,7 +309,7 @@ describe('useFacts', () => {
         return Promise.reject(new Error('Unmocked URL: ' + url));
       });
 
-      const { facts } = useFacts(track, playbackState);
+      const { facts } = mountUseFacts(track, playbackState).result;
 
       // Let config fetch complete
       await nextTick();
@@ -374,7 +369,7 @@ describe('useFacts', () => {
         return Promise.reject(new Error('Unmocked URL: ' + url));
       });
 
-      useFacts(track, playbackState);
+      mountUseFacts(track, playbackState);
 
       // Let config fetch complete
       await nextTick();
@@ -395,83 +390,6 @@ describe('useFacts', () => {
     });
   });
 
-  describe('sessionStorage caching', () => {
-    it('should cache facts in sessionStorage', async () => {
-      const track = ref<Track | null>(null);
-      const playbackState = ref<PlaybackState>('playing');
-
-      mockFetchSuccess({
-        facts: ['Fact 1', 'Fact 2'],
-        cached: false,
-        generatedAt: 1234567890,
-      });
-
-      useFacts(track, playbackState);
-
-      track.value = createMockTrack();
-      await nextTick();
-      await vi.advanceTimersByTimeAsync(500);
-      await nextTick();
-
-      const cacheKey = 'facts::test artist::test album::test song';
-      const cached = mockSessionStorage.get(cacheKey);
-
-      expect(cached).toBeDefined();
-      const parsed = JSON.parse(cached!);
-      expect(parsed.facts).toEqual(['Fact 1', 'Fact 2']);
-    });
-
-    it('should use cached facts from sessionStorage', async () => {
-      const track = ref<Track | null>(null);
-      const playbackState = ref<PlaybackState>('playing');
-
-      // Pre-populate cache
-      const cacheKey = 'facts::test artist::test album::test song';
-      mockSessionStorage.set(cacheKey, JSON.stringify({
-        facts: ['Cached Fact'],
-        generatedAt: Date.now(),
-      }));
-
-      let factsCallCount = 0;
-      vi.mocked(fetch).mockImplementation((input: string | URL | Request) => {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-        if (url === '/api/facts/config') {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({ rotationInterval: 25 }),
-          } as Response);
-        }
-        if (url === '/api/facts') {
-          factsCallCount++;
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({
-              facts: ['API Fact'],
-              cached: false,
-              generatedAt: Date.now(),
-            }),
-          } as Response);
-        }
-        return Promise.reject(new Error('Unmocked URL: ' + url));
-      });
-
-      const { facts, cached } = useFacts(track, playbackState);
-
-      // Let config fetch complete
-      await nextTick();
-
-      track.value = createMockTrack();
-      await nextTick();
-      await vi.advanceTimersByTimeAsync(500);
-      await nextTick();
-
-      // Should not call facts API (used cache)
-      expect(factsCallCount).toBe(0);
-      expect(facts.value).toEqual(['Cached Fact']);
-      expect(cached.value).toBe(true);
-    });
-  });
-
   describe('error handling', () => {
     it('should set error when API returns error', async () => {
       const track = ref<Track | null>(null);
@@ -482,7 +400,7 @@ describe('useFacts', () => {
         message: 'No API key configured',
       });
 
-      const { error, facts } = useFacts(track, playbackState);
+      const { error, facts } = mountUseFacts(track, playbackState).result;
 
       track.value = createMockTrack();
       await nextTick();
@@ -514,7 +432,7 @@ describe('useFacts', () => {
         return Promise.reject(new Error('Unmocked URL: ' + url));
       });
 
-      const { error } = useFacts(track, playbackState);
+      const { error } = mountUseFacts(track, playbackState).result;
 
       // Let config fetch complete
       await nextTick();
@@ -537,7 +455,7 @@ describe('useFacts', () => {
       // First call fails
       mockFetchError({ type: 'api-error', message: 'Server error' });
 
-      const { error, facts } = useFacts(track, playbackState);
+      const { error, facts } = mountUseFacts(track, playbackState).result;
 
       track.value = createMockTrack({ title: 'Song 1' });
       await nextTick();
@@ -574,7 +492,7 @@ describe('useFacts', () => {
         generatedAt: Date.now(),
       });
 
-      const { currentFact, currentFactIndex } = useFacts(track, playbackState);
+      const { currentFact, currentFactIndex } = mountUseFacts(track, playbackState).result;
 
       track.value = createMockTrack();
       await nextTick();
@@ -596,7 +514,7 @@ describe('useFacts', () => {
         generatedAt: Date.now(),
       }, 10); // 10 second rotation
 
-      const { currentFactIndex } = useFacts(track, playbackState);
+      const { currentFactIndex } = mountUseFacts(track, playbackState).result;
 
       track.value = createMockTrack();
       await nextTick();
@@ -626,7 +544,7 @@ describe('useFacts', () => {
         generatedAt: Date.now(),
       }, 10); // 10 second rotation
 
-      const { currentFactIndex } = useFacts(track, playbackState);
+      const { currentFactIndex } = mountUseFacts(track, playbackState).result;
 
       track.value = createMockTrack();
       await nextTick();
@@ -657,7 +575,7 @@ describe('useFacts', () => {
         generatedAt: Date.now(),
       }, 10); // 10 second rotation
 
-      const { currentFactIndex } = useFacts(track, playbackState);
+      const { currentFactIndex } = mountUseFacts(track, playbackState).result;
 
       track.value = createMockTrack();
       await nextTick();
@@ -690,7 +608,7 @@ describe('useFacts', () => {
         generatedAt: Date.now(),
       }, 10); // 10 second rotation
 
-      const { currentFactIndex } = useFacts(track, playbackState);
+      const { currentFactIndex } = mountUseFacts(track, playbackState).result;
 
       track.value = createMockTrack();
       await nextTick();
@@ -731,7 +649,7 @@ describe('useFacts', () => {
         return Promise.reject(new Error('Unmocked URL: ' + url));
       });
 
-      const { currentFactIndex } = useFacts(track, playbackState);
+      const { currentFactIndex } = mountUseFacts(track, playbackState).result;
 
       track.value = createMockTrack();
       await nextTick();
@@ -760,7 +678,7 @@ describe('useFacts', () => {
         generatedAt: Date.now(),
       });
 
-      const { facts, currentFactIndex } = useFacts(track, playbackState);
+      const { facts, currentFactIndex } = mountUseFacts(track, playbackState).result;
 
       track.value = createMockTrack({ title: 'Song 1' });
       await nextTick();

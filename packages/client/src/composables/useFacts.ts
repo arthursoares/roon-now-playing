@@ -1,13 +1,8 @@
 import { ref, computed, watch, onUnmounted, type Ref, type ComputedRef } from 'vue';
-import type { Track, PlaybackState, FactsResponse, FactsError } from '@roon-screen-cover/shared';
+import type { Track, PlaybackState, FactsError } from '@roon-screen-cover/shared';
 
 const DEBOUNCE_DELAY = 500;
 const DEFAULT_ROTATION_INTERVAL = 25; // seconds, can be overridden by server config
-
-interface CachedFacts {
-  facts: string[];
-  generatedAt: number;
-}
 
 function readFacts(value: unknown): string[] | null {
   if (!Array.isArray(value) || !value.every((item): item is string => typeof item === 'string')) return null;
@@ -25,35 +20,6 @@ function readError(value: unknown): FactsError {
     };
   }
   return { type: 'api-error', message: 'Facts are unavailable right now. Please try again.' };
-}
-
-function getCacheKey(artist: string, album: string, title: string): string {
-  return `facts::${artist.toLowerCase()}::${album.toLowerCase()}::${title.toLowerCase()}`;
-}
-
-function getFromSessionStorage(key: string): CachedFacts | null {
-  try {
-    const cached = sessionStorage.getItem(key);
-    if (cached) {
-      const parsed = JSON.parse(cached);
-      const facts = readFacts(parsed?.facts);
-      if (facts?.length) {
-        return { facts, generatedAt: typeof parsed.generatedAt === 'number' && Number.isFinite(parsed.generatedAt) ? parsed.generatedAt : Date.now() };
-      }
-      sessionStorage.removeItem(key);
-    }
-  } catch {
-    // Ignore parse errors
-  }
-  return null;
-}
-
-function saveToSessionStorage(key: string, data: CachedFacts): void {
-  try {
-    sessionStorage.setItem(key, JSON.stringify(data));
-  } catch {
-    // Ignore storage errors (quota exceeded, etc.)
-  }
 }
 
 export interface UseFactsReturn {
@@ -80,6 +46,7 @@ export function useFacts(
   let rotationTimer: number | null = null;
   let requestGeneration = 0;
   let active = true;
+  let activeRequest: AbortController | null = null;
 
   // Fetch rotation interval from server config (immediately on composable init)
   fetch('/api/facts/config')
@@ -147,25 +114,14 @@ export function useFacts(
   }
 
   async function fetchFacts(trackData: Track, generation: number): Promise<void> {
-    const cacheKey = getCacheKey(trackData.artist, trackData.album, trackData.title);
-
-    // Check sessionStorage cache first
-    const cachedData = getFromSessionStorage(cacheKey);
-    if (cachedData) {
-      if (!active || generation !== requestGeneration) return;
-      facts.value = cachedData.facts;
-      cached.value = true;
-      isLoading.value = false;
-      error.value = null;
-      scheduleNextRotation();
-      return;
-    }
-
     isLoading.value = true;
     error.value = null;
 
+    const controller = typeof AbortController === 'undefined' ? null : new AbortController();
+    activeRequest = controller;
     try {
       const response = await fetch('/api/facts', {
+        signal: controller?.signal,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -196,20 +152,9 @@ export function useFacts(
           : { type: 'api-error', message: 'The facts service returned an invalid response. Please try again.' };
         return;
       }
-      const factsResponse: FactsResponse = {
-        facts: parsedFacts,
-        cached: data.cached === true,
-        generatedAt: typeof data.generatedAt === 'number' && Number.isFinite(data.generatedAt) ? data.generatedAt : Date.now(),
-      };
-      facts.value = factsResponse.facts;
-      cached.value = factsResponse.cached;
+      facts.value = parsedFacts;
+      cached.value = data.cached === true;
       error.value = null;
-
-      // Cache in sessionStorage
-      saveToSessionStorage(cacheKey, {
-        facts: factsResponse.facts,
-        generatedAt: factsResponse.generatedAt,
-      });
     } catch (err) {
       if (!active || generation !== requestGeneration) return;
       error.value = {
@@ -218,6 +163,7 @@ export function useFacts(
       };
       facts.value = [];
     } finally {
+      if (activeRequest === controller) activeRequest = null;
       if (active && generation === requestGeneration) {
         isLoading.value = false;
         // Schedule rotation AFTER loading is complete, so first fact gets full display time
@@ -244,6 +190,8 @@ export function useFacts(
       }
 
       const generation = ++requestGeneration;
+      activeRequest?.abort();
+      activeRequest = null;
 
       // Clear existing timers only when track actually changes
       clearDebounceTimer();
@@ -293,6 +241,8 @@ export function useFacts(
   onUnmounted(() => {
     active = false;
     requestGeneration++;
+    activeRequest?.abort();
+    activeRequest = null;
     clearDebounceTimer();
     clearRotationTimer();
     isLoading.value = false;

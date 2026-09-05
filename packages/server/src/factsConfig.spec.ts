@@ -23,10 +23,12 @@
  *   Then the environment variable should take precedence
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
-import { FactsConfigStore, DEFAULT_CONFIG } from './factsConfig.js';
+import { DEFAULT_FACTS_PROMPT } from '@roon-screen-cover/shared';
+import { FactsConfigStore, DEFAULT_CONFIG, validateFactsConfigUpdate } from './factsConfig.js';
+import { logger } from './logger.js';
 
 const TEST_CONFIG_PATH = path.join(process.cwd(), 'test-facts-config.json');
 
@@ -42,6 +44,7 @@ describe('FactsConfigStore', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     if (fs.existsSync(TEST_CONFIG_PATH)) {
       fs.unlinkSync(TEST_CONFIG_PATH);
     }
@@ -107,8 +110,91 @@ describe('FactsConfigStore', () => {
     expect(DEFAULT_CONFIG.apiKey).toBe('');
     expect(DEFAULT_CONFIG.factsCount).toBe(5);
     expect(DEFAULT_CONFIG.rotationInterval).toBe(25);
-    expect(DEFAULT_CONFIG.prompt).toContain('Generate');
+    expect(DEFAULT_CONFIG.prompt).toBe(DEFAULT_FACTS_PROMPT);
     expect(DEFAULT_CONFIG.maxOutputTokens).toBe(1024);
+    expect(DEFAULT_CONFIG.openaiReasoningEffort).toBe('none');
+  });
+
+  it.each([
+    [{ factsCount: 0 }, 'factsCount'],
+    [{ factsCount: 11 }, 'factsCount'],
+    [{ factsCount: 1.5 }, 'factsCount'],
+    [{ rotationInterval: 4 }, 'rotationInterval'],
+    [{ rotationInterval: 61 }, 'rotationInterval'],
+    [{ provider: 'unknown' }, 'provider'],
+    [{ model: '   ' }, 'model'],
+    [{ prompt: 7 }, 'prompt'],
+    [{ openaiReasoningEffort: 'ultra' }, 'openaiReasoningEffort'],
+    [{ localBaseUrl: '' }, 'localBaseUrl'],
+  ])('rejects invalid recognized config %#', (update, field) => {
+    const result = validateFactsConfigUpdate(update);
+    expect(result).toEqual({ error: expect.stringContaining(field) });
+  });
+
+  it('rejects unknown persisted fields but ignores the read-only hasApiKey response field', () => {
+    expect(validateFactsConfigUpdate({ surprise: true })).toEqual({
+      error: expect.stringContaining('Unknown facts config field'),
+    });
+    expect(validateFactsConfigUpdate({ hasApiKey: true, factsCount: 6 })).toEqual({
+      value: { factsCount: 6 },
+    });
+  });
+
+  it.each([null, [], 'config'])('rejects non-object updates: %s', (update) => {
+    expect(validateFactsConfigUpdate(update)).toEqual({ error: expect.any(String) });
+  });
+
+  it('normalizes invalid known values and drops unknown fields while loading', () => {
+    fs.writeFileSync(TEST_CONFIG_PATH, JSON.stringify({
+      ...DEFAULT_CONFIG,
+      provider: 'invalid',
+      factsCount: 99,
+      rotationInterval: 1,
+      openaiReasoningEffort: 'ultra',
+      unknown: 'do not persist',
+    }));
+    const loaded = new FactsConfigStore(TEST_CONFIG_PATH).get();
+    expect(loaded.provider).toBe(DEFAULT_CONFIG.provider);
+    expect(loaded.factsCount).toBe(DEFAULT_CONFIG.factsCount);
+    expect(loaded.rotationInterval).toBe(DEFAULT_CONFIG.rotationInterval);
+    expect(loaded.openaiReasoningEffort).toBe('none');
+    expect(loaded).not.toHaveProperty('unknown');
+  });
+
+  it('preserves valid custom model and prompt values while loading', () => {
+    fs.writeFileSync(TEST_CONFIG_PATH, JSON.stringify({
+      ...DEFAULT_CONFIG, provider: 'openrouter', model: 'vendor/custom-model', prompt: 'My custom prompt',
+    }));
+    const loaded = new FactsConfigStore(TEST_CONFIG_PATH).get();
+    expect(loaded.model).toBe('vendor/custom-model');
+    expect(loaded.prompt).toBe('My custom prompt');
+  });
+
+  it('migrates the exact v1.10 default prompt to the current shorter default', () => {
+    const legacyDefaultPrompt = `Generate {factsCount} interesting, lesser-known facts about this music:
+
+Artist: {artist}
+Album: {album}
+Track: {title}
+
+Focus on:
+- Recording history or interesting production details
+- Historical context or cultural impact
+- Connections to other artists or musical movements
+- Awards, chart positions, or notable achievements
+- Personal stories from the artist about this work
+
+When possible, include attribution (e.g., "In a 1985 interview..." or "According to Songfacts...").
+
+Keep each fact concise (2-3 sentences max). Prioritize surprising or educational information over common knowledge.
+
+IMPORTANT: Return ONLY a valid JSON array of strings with no additional text, markdown, or explanation.
+
+Example format:
+["Fact one goes here.", "Fact two goes here.", "Fact three goes here."]`;
+    fs.writeFileSync(TEST_CONFIG_PATH, JSON.stringify({ ...DEFAULT_CONFIG, prompt: legacyDefaultPrompt }));
+
+    expect(new FactsConfigStore(TEST_CONFIG_PATH).get().prompt).toBe(DEFAULT_FACTS_PROMPT);
   });
 
   it.each([0, 65537, 1.5, Number.NaN])(
@@ -147,6 +233,111 @@ describe('FactsConfigStore', () => {
     expect(store2.get().maxOutputTokens).toBe(1024);
   });
 
+  it.each([
+    ['gpt-5.6-luna', 'gpt-5.6-luna', 2048, 'none'],
+    ['gpt-5-mini', 'gpt-5.6-luna', 2048, 'none'],
+    ['gpt-5-mini-2025-08-07', 'gpt-5-mini-2025-08-07', 8192, 'minimal'],
+  ])('uses model-aware defaults for legacy OpenAI %s config', (model, expectedModel, tokens, effort) => {
+    const legacyConfig = { ...DEFAULT_CONFIG, provider: 'openai', model };
+    delete legacyConfig.maxOutputTokens;
+    fs.writeFileSync(TEST_CONFIG_PATH, JSON.stringify(legacyConfig));
+    const loaded = new FactsConfigStore(TEST_CONFIG_PATH).get();
+    expect(loaded.model).toBe(expectedModel);
+    expect(loaded.maxOutputTokens).toBe(tokens);
+    expect(loaded.openaiReasoningEffort).toBe(effort);
+  });
+
+  it('preserves an explicit valid output cap while resetting reasoning for a deprecated model', () => {
+    fs.writeFileSync(TEST_CONFIG_PATH, JSON.stringify({
+      ...DEFAULT_CONFIG,
+      provider: 'openai',
+      model: 'gpt-5-mini',
+      maxOutputTokens: 4096,
+      openaiReasoningEffort: 'none',
+    }));
+    const loaded = new FactsConfigStore(TEST_CONFIG_PATH).get();
+    expect(loaded.model).toBe('gpt-5.6-luna');
+    expect(loaded.maxOutputTokens).toBe(4096);
+    expect(loaded.openaiReasoningEffort).toBe('none');
+  });
+
+  it.each([
+    'gpt-5-mini', 'gpt-5', 'gpt-5-nano', 'gpt-4.1', 'gpt-4o', 'gpt-4o-mini', 'gpt-5.4', 'gpt-5.4-mini',
+  ])('migrates and persists deprecated OpenAI model %s without changing unrelated settings', (model) => {
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+    fs.writeFileSync(TEST_CONFIG_PATH, JSON.stringify({
+      ...DEFAULT_CONFIG,
+      provider: 'openai',
+      model,
+      apiKey: 'secret-key',
+      factsCount: 7,
+      rotationInterval: 30,
+      prompt: 'Custom prompt',
+      maxOutputTokens: 4096,
+      openaiReasoningEffort: 'high',
+    }));
+
+    const loaded = new FactsConfigStore(TEST_CONFIG_PATH).get();
+    const persisted = JSON.parse(fs.readFileSync(TEST_CONFIG_PATH, 'utf8'));
+    expect(loaded).toMatchObject({
+      provider: 'openai', model: 'gpt-5.6-luna', apiKey: 'secret-key', factsCount: 7,
+      rotationInterval: 30, prompt: 'Custom prompt', maxOutputTokens: 4096,
+      openaiReasoningEffort: 'none',
+    });
+    expect(persisted).toMatchObject({ model: 'gpt-5.6-luna', openaiReasoningEffort: 'none' });
+    expect(info.mock.calls.flat().join(' ')).toContain(`${model} to gpt-5.6-luna`);
+    expect(info.mock.calls.flat().join(' ')).not.toContain('secret-key');
+    info.mockRestore();
+  });
+
+  it('canonicalizes the GPT-5.6 alias to Sol while preserving reasoning effort', () => {
+    fs.writeFileSync(TEST_CONFIG_PATH, JSON.stringify({
+      ...DEFAULT_CONFIG, provider: 'openai', model: 'gpt-5.6', openaiReasoningEffort: 'high',
+    }));
+
+    const loaded = new FactsConfigStore(TEST_CONFIG_PATH).get();
+    expect(loaded.model).toBe('gpt-5.6-sol');
+    expect(loaded.openaiReasoningEffort).toBe('high');
+    expect(JSON.parse(fs.readFileSync(TEST_CONFIG_PATH, 'utf8')).model).toBe('gpt-5.6-sol');
+  });
+
+  it.each([
+    'gpt-5.6-luna', 'gpt-5.6-terra', 'gpt-5.6-sol', 'gpt-5.5', 'gpt-6-astra', 'vendor/custom-model',
+  ])('preserves current or custom OpenAI model %s', (model) => {
+    fs.writeFileSync(TEST_CONFIG_PATH, JSON.stringify({
+      ...DEFAULT_CONFIG, provider: 'openai', model, openaiReasoningEffort: 'high',
+    }));
+    const loaded = new FactsConfigStore(TEST_CONFIG_PATH).get();
+    expect(loaded.model).toBe(model);
+    if (model === 'vendor/custom-model') {
+      expect(loaded.openaiReasoningEffort).toBeUndefined();
+      expect(JSON.parse(fs.readFileSync(TEST_CONFIG_PATH, 'utf8')).openaiReasoningEffort).toBe('high');
+    } else {
+      expect(loaded.openaiReasoningEffort).toBe('high');
+    }
+  });
+
+  it.each(['anthropic', 'openrouter', 'local'] as const)(
+    'does not migrate model IDs for the %s provider',
+    (provider) => {
+      fs.writeFileSync(TEST_CONFIG_PATH, JSON.stringify({ ...DEFAULT_CONFIG, provider, model: 'gpt-4o' }));
+      expect(new FactsConfigStore(TEST_CONFIG_PATH).get().model).toBe('gpt-4o');
+    },
+  );
+
+  it('migrates deprecated model IDs submitted by an old UI before persisting', () => {
+    store.update({
+      provider: 'openai', model: 'gpt-4o-mini', openaiReasoningEffort: 'high', maxOutputTokens: 3072,
+    });
+
+    expect(store.get()).toMatchObject({
+      provider: 'openai', model: 'gpt-5.6-luna', openaiReasoningEffort: 'none', maxOutputTokens: 3072,
+    });
+    expect(JSON.parse(fs.readFileSync(TEST_CONFIG_PATH, 'utf8'))).toMatchObject({
+      model: 'gpt-5.6-luna', openaiReasoningEffort: 'none', maxOutputTokens: 3072,
+    });
+  });
+
   it('should reject API key updates containing non-ASCII characters', () => {
     // Masked keys contain bullet points (character 8226)
     const maskedKey = '••••••••1234';
@@ -162,6 +353,14 @@ describe('FactsConfigStore', () => {
 
     const config = store.get();
     expect(config.apiKey).toBe(validKey);
+  });
+
+  it('trims local base URL updates before storage and use', () => {
+    store.update({ localBaseUrl: '  http://localhost:11434/v1  ' });
+
+    expect(store.get().localBaseUrl).toBe('http://localhost:11434/v1');
+    expect(JSON.parse(fs.readFileSync(TEST_CONFIG_PATH, 'utf8')).localBaseUrl)
+      .toBe('http://localhost:11434/v1');
   });
 
   it('should clear corrupted API key on load', () => {
@@ -191,7 +390,7 @@ describe('FactsConfigStore', () => {
     });
 
     it('should return localBaseUrl from environment for local provider', () => {
-      process.env.LOCAL_LLM_URL = 'http://localhost:1234/v1';
+      process.env.LOCAL_LLM_URL = '  http://localhost:1234/v1  ';
       const store = new FactsConfigStore(TEST_CONFIG_PATH);
       store.update({ provider: 'local' });
 
