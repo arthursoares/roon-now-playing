@@ -15,6 +15,7 @@ export default defineConfig({
   use: {
     // Base URL for local dev server (Vite serves on 5173 — see packages/client/vite.config.ts)
     baseURL: 'http://localhost:5173',
+    channel: process.env.PLAYWRIGHT_CHANNEL || undefined,
 
     // Collect trace on failure
     trace: 'on-first-retry',
@@ -105,6 +106,11 @@ export default defineConfig({
   webServer: {
     command: 'pnpm run dev',
     url: 'http://localhost:5173',
+    env: {
+      ...process.env,
+      DATA_DIR: './test-results/server-data',
+      ROON_ENABLED: 'false',
+    },
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
   },

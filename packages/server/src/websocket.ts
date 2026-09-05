@@ -7,7 +7,6 @@ import type {
   ServerZonesMessage,
   ServerNowPlayingMessage,
   ServerSeekMessage,
-  ServerConnectionMessage,
   NowPlaying,
   Zone,
   LayoutType,
@@ -27,7 +26,7 @@ import { ExternalSourceManager } from './externalSources.js';
 import { generateFriendlyName } from './nameGenerator.js';
 import { logger } from './logger.js';
 import { loadDisplaySettings } from './display-settings.js';
-import type { ClientSettingsStore, ClientSettings } from './clientSettings.js';
+import type { ClientSettingsStore } from './clientSettings.js';
 
 interface ClientState {
   ws: WebSocket;
@@ -380,35 +379,31 @@ export class WebSocketManager {
       // overwritten by whatever it just reported.
       const storedSettings = this.clientSettingsStore.get(deviceId);
 
-      // On first connect, push stored settings if they differ from what the
-      // client sent, and adopt them as the client's current state.
+      // On first connect, always push the complete authoritative record. Some
+      // settings are absent from client metadata, so equality cannot establish
+      // that stale browser preferences have already been cleared.
       if (isNewClient && storedSettings) {
-        const needsPush =
-          storedSettings.layout !== clientState.layout ||
-          storedSettings.font !== clientState.font ||
-          storedSettings.background !== clientState.background ||
-          storedSettings.zoneId !== clientState.subscribedZoneId ||
-          storedSettings.fontScaleOverride !== (clientState.fontScaleOverride ?? null);
+        this.sendToClient(clientState.ws, {
+          type: 'remote_settings',
+          layout: storedSettings.layout,
+          font: storedSettings.font,
+          background: storedSettings.background,
+          zoneId: storedSettings.zoneId ?? undefined,
+          zoneName: storedSettings.zoneName ?? undefined,
+          fontScaleOverride: storedSettings.fontScaleOverride,
+          artworkScaleOverride: storedSettings.artworkScaleOverride,
+          enabledLayouts: storedSettings.enabledLayouts,
+        } as ServerRemoteSettingsMessage);
 
-        if (needsPush) {
-          this.sendToClient(clientState.ws, {
-            type: 'remote_settings',
-            layout: storedSettings.layout,
-            font: storedSettings.font,
-            background: storedSettings.background,
-            zoneId: storedSettings.zoneId ?? undefined,
-            zoneName: storedSettings.zoneName ?? undefined,
-            fontScaleOverride: storedSettings.fontScaleOverride,
-          } as ServerRemoteSettingsMessage);
-
-          // Update local state to match
-          clientState.layout = storedSettings.layout;
-          clientState.font = storedSettings.font;
-          clientState.background = storedSettings.background;
-          clientState.subscribedZoneId = storedSettings.zoneId;
-          clientState.subscribedZoneName = storedSettings.zoneName;
-          clientState.fontScaleOverride = storedSettings.fontScaleOverride;
-        }
+        // Update local state to match
+        clientState.layout = storedSettings.layout;
+        clientState.font = storedSettings.font;
+        clientState.background = storedSettings.background;
+        clientState.subscribedZoneId = storedSettings.zoneId;
+        clientState.subscribedZoneName = storedSettings.zoneName;
+        clientState.fontScaleOverride = storedSettings.fontScaleOverride;
+        clientState.artworkScaleOverride = storedSettings.artworkScaleOverride;
+        clientState.enabledLayouts = storedSettings.enabledLayouts;
       }
 
       // Persist the resulting authoritative state (after any replay above).
@@ -419,6 +414,8 @@ export class WebSocketManager {
         zoneId: clientState.subscribedZoneId,
         zoneName: clientState.subscribedZoneName,
         fontScaleOverride: clientState.fontScaleOverride ?? null,
+        artworkScaleOverride: clientState.artworkScaleOverride ?? null,
+        enabledLayouts: clientState.enabledLayouts ?? null,
       });
     }
 
@@ -671,6 +668,8 @@ export class WebSocketManager {
         zoneId: clientState.subscribedZoneId,
         zoneName: clientState.subscribedZoneName,
         fontScaleOverride: clientState.fontScaleOverride ?? null,
+        artworkScaleOverride: clientState.artworkScaleOverride ?? null,
+        enabledLayouts: clientState.enabledLayouts ?? null,
       });
     }
 

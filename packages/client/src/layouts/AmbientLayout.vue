@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import type { Track, PlaybackState, BackgroundType } from '@roon-screen-cover/shared';
 import { useColorExtraction } from '../composables/useColorExtraction';
 import { useBackgroundStyle } from '../composables/useBackgroundStyle';
+import { isDynamicBackground } from '../utils/backgrounds';
 import ProgressBar from '../components/ProgressBar.vue';
 import DynamicBackground from '../components/DynamicBackground.vue';
 
@@ -23,21 +24,8 @@ const artworkUrlRef = computed(() => props.artworkUrl);
 const { colors, vibrantGradient, palette, isTransitioning } = useColorExtraction(artworkUrlRef);
 const { style: backgroundStyle } = useBackgroundStyle(backgroundRef, colors, vibrantGradient);
 
-// Background types handled by DynamicBackground component
-const dynamicBackgroundTypes: BackgroundType[] = [
-  'gradient-linear-multi',
-  'gradient-radial-corner',
-  'gradient-mesh',
-  'blur-subtle',
-  'blur-heavy',
-  'duotone',
-  'posterized',
-  'gradient-noise',
-  'blur-grain',
-];
-
 const usesDynamicBackground = computed(() =>
-  dynamicBackgroundTypes.includes(props.background)
+  isDynamicBackground(props.background)
 );
 
 // Track previous artwork for crossfade
@@ -61,13 +49,6 @@ watch(
   },
   { immediate: true }
 );
-
-// Compute the effective color mode based on background type and extracted colors
-const effectiveColorMode = computed(() => {
-  if (props.background === 'white') return 'light';
-  if (props.background === 'black') return 'dark';
-  return colors.value.mode;
-});
 
 const ambientStyle = computed(() => {
   // CSS variables for ambient-specific styling (used by all background types)

@@ -6,6 +6,7 @@ import { useBackgroundStyle } from '../composables/useBackgroundStyle';
 import { useFacts } from '../composables/useFacts';
 import ProgressBar from '../components/ProgressBar.vue';
 import DynamicBackground from '../components/DynamicBackground.vue';
+import { isDynamicBackground } from '../utils/backgrounds';
 
 const props = defineProps<{
   track: Track | null;
@@ -113,21 +114,8 @@ onUnmounted(() => {
   }
 });
 
-// Background types handled by DynamicBackground component
-const dynamicBackgroundTypes: BackgroundType[] = [
-  'gradient-linear-multi',
-  'gradient-radial-corner',
-  'gradient-mesh',
-  'blur-subtle',
-  'blur-heavy',
-  'duotone',
-  'posterized',
-  'gradient-noise',
-  'blur-grain',
-];
-
 const usesDynamicBackground = computed(() =>
-  dynamicBackgroundTypes.includes(props.background)
+  isDynamicBackground(props.background)
 );
 
 // Track previous artwork for crossfade

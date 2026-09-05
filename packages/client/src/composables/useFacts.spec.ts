@@ -38,7 +38,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ref, nextTick } from 'vue';
+import { createApp, defineComponent, nextTick, ref, type Ref } from 'vue';
 import type { Track, PlaybackState, FactsResponse, FactsError } from '@roon-screen-cover/shared';
 import { useFacts } from './useFacts';
 
@@ -121,6 +121,24 @@ describe('useFacts', () => {
       }
       return Promise.reject(new Error('Unmocked URL: ' + url));
     });
+  }
+
+  function mountUseFacts(track: Ref<Track | null>, playbackState: Ref<PlaybackState>) {
+    let result: ReturnType<typeof useFacts> | undefined;
+    const host = document.createElement('div');
+    const app = createApp(defineComponent({
+      setup() {
+        result = useFacts(track, playbackState);
+        return () => null;
+      },
+    }));
+
+    app.mount(host);
+
+    return {
+      result: result!,
+      unmount: () => app.unmount(),
+    };
   }
 
   describe('initial state', () => {
@@ -769,6 +787,115 @@ describe('useFacts', () => {
       await nextTick();
 
       expect(facts.value).toEqual(['Fact for Song 2']);
+    });
+
+    it('ignores an older request that resolves after the current track', async () => {
+      const track = ref<Track | null>(null);
+      const playbackState = ref<PlaybackState>('playing');
+      const pending = new Map<string, (response: Response) => void>();
+
+      vi.mocked(fetch).mockImplementation((input, init) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+        if (url === '/api/facts/config') {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({ rotationInterval: 25 }) } as Response);
+        }
+
+        const title = JSON.parse(String(init?.body)).title as string;
+        return new Promise((resolve) => pending.set(title, resolve));
+      });
+
+      const mounted = mountUseFacts(track, playbackState);
+      track.value = createMockTrack({ title: 'Older Song' });
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(500);
+
+      track.value = createMockTrack({ title: 'Current Song' });
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(500);
+
+      pending.get('Current Song')!({
+        ok: true,
+        json: () => Promise.resolve({ facts: ['Current fact'], cached: false, generatedAt: 2 }),
+      } as Response);
+      await vi.waitFor(() => expect(mounted.result.facts.value).toEqual(['Current fact']));
+
+      pending.get('Older Song')!({
+        ok: true,
+        json: () => Promise.resolve({ facts: ['Stale fact', 'Another stale fact'], cached: false, generatedAt: 1 }),
+      } as Response);
+      await Promise.resolve();
+      await nextTick();
+
+      expect(mounted.result.facts.value).toEqual(['Current fact']);
+      expect(mounted.result.isLoading.value).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(25_000);
+      expect(mounted.result.currentFactIndex.value).toBe(0);
+      mounted.unmount();
+    });
+
+    it('invalidates an in-flight request when the track resets to null', async () => {
+      const track = ref<Track | null>(null);
+      const playbackState = ref<PlaybackState>('playing');
+      let resolveFacts: (response: Response) => void = () => {};
+
+      vi.mocked(fetch).mockImplementation((input) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+        if (url === '/api/facts/config') {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({ rotationInterval: 25 }) } as Response);
+        }
+        return new Promise((resolve) => { resolveFacts = resolve; });
+      });
+
+      const mounted = mountUseFacts(track, playbackState);
+      track.value = createMockTrack();
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(500);
+      expect(mounted.result.isLoading.value).toBe(true);
+
+      track.value = null;
+      await nextTick();
+      expect(mounted.result.isLoading.value).toBe(false);
+
+      resolveFacts({
+        ok: true,
+        json: () => Promise.resolve({ facts: ['Stale fact'], cached: false, generatedAt: 1 }),
+      } as Response);
+      await Promise.resolve();
+      await nextTick();
+
+      expect(mounted.result.facts.value).toEqual([]);
+      expect(mounted.result.isLoading.value).toBe(false);
+      mounted.unmount();
+    });
+
+    it('does not apply an in-flight completion after unmount', async () => {
+      const track = ref<Track | null>(createMockTrack());
+      const playbackState = ref<PlaybackState>('playing');
+      let resolveFacts: (response: Response) => void = () => {};
+
+      vi.mocked(fetch).mockImplementation((input) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+        if (url === '/api/facts/config') {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({ rotationInterval: 25 }) } as Response);
+        }
+        return new Promise((resolve) => { resolveFacts = resolve; });
+      });
+
+      const mounted = mountUseFacts(track, playbackState);
+      await vi.advanceTimersByTimeAsync(500);
+      expect(mounted.result.isLoading.value).toBe(true);
+      mounted.unmount();
+
+      resolveFacts({
+        ok: true,
+        json: () => Promise.resolve({ facts: ['Late fact'], cached: false, generatedAt: 1 }),
+      } as Response);
+      await Promise.resolve();
+      await nextTick();
+
+      expect(mounted.result.facts.value).toEqual([]);
+      expect(mounted.result.isLoading.value).toBe(false);
     });
   });
 });

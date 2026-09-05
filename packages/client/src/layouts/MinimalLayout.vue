@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import type { Track, PlaybackState, BackgroundType } from '@roon-screen-cover/shared';
 import DynamicBackground from '../components/DynamicBackground.vue';
 import { useColorExtraction } from '../composables/useColorExtraction';
+import { isDynamicBackground } from '../utils/backgrounds';
 
 const props = defineProps<{
   track: Track | null;
@@ -19,21 +20,8 @@ const props = defineProps<{
 const artworkUrlRef = computed(() => props.artworkUrl);
 const { palette, vibrantGradient } = useColorExtraction(artworkUrlRef);
 
-// Background types handled by DynamicBackground component
-const dynamicBackgroundTypes: BackgroundType[] = [
-  'gradient-linear-multi',
-  'gradient-radial-corner',
-  'gradient-mesh',
-  'blur-subtle',
-  'blur-heavy',
-  'duotone',
-  'posterized',
-  'gradient-noise',
-  'blur-grain',
-];
-
 const usesDynamicBackground = computed(() =>
-  dynamicBackgroundTypes.includes(props.background)
+  isDynamicBackground(props.background)
 );
 </script>
 

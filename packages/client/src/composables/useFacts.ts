@@ -55,6 +55,8 @@ export function useFacts(
 
   let debounceTimer: number | null = null;
   let rotationTimer: number | null = null;
+  let requestGeneration = 0;
+  let active = true;
 
   // Fetch rotation interval from server config (immediately on composable init)
   fetch('/api/facts/config')
@@ -65,7 +67,7 @@ export function useFacts(
       return null;
     })
     .then((config) => {
-      if (config && typeof config.rotationInterval === 'number' && config.rotationInterval > 0) {
+      if (active && config && typeof config.rotationInterval === 'number' && config.rotationInterval > 0) {
         rotationIntervalSec.value = config.rotationInterval;
       }
     })
@@ -114,17 +116,20 @@ export function useFacts(
     const displayTime = rotationIntervalSec.value * 1000;
 
     rotationTimer = window.setTimeout(() => {
+      rotationTimer = null;
+      if (!active) return;
       currentFactIndex.value = (currentFactIndex.value + 1) % facts.value.length;
       scheduleNextRotation();
     }, displayTime);
   }
 
-  async function fetchFacts(trackData: Track): Promise<void> {
+  async function fetchFacts(trackData: Track, generation: number): Promise<void> {
     const cacheKey = getCacheKey(trackData.artist, trackData.album, trackData.title);
 
     // Check sessionStorage cache first
     const cachedData = getFromSessionStorage(cacheKey);
     if (cachedData) {
+      if (!active || generation !== requestGeneration) return;
       facts.value = cachedData.facts;
       cached.value = true;
       error.value = null;
@@ -148,6 +153,8 @@ export function useFacts(
 
       const data = await response.json();
 
+      if (!active || generation !== requestGeneration) return;
+
       if (!response.ok) {
         error.value = data.error as FactsError;
         facts.value = [];
@@ -165,16 +172,19 @@ export function useFacts(
         generatedAt: factsResponse.generatedAt,
       });
     } catch (err) {
+      if (!active || generation !== requestGeneration) return;
       error.value = {
         type: 'api-error',
         message: err instanceof Error ? err.message : 'Unknown error',
       };
       facts.value = [];
     } finally {
-      isLoading.value = false;
-      // Schedule rotation AFTER loading is complete, so first fact gets full display time
-      if (facts.value.length > 1 && playbackState.value === 'playing') {
-        scheduleNextRotation();
+      if (active && generation === requestGeneration) {
+        isLoading.value = false;
+        // Schedule rotation AFTER loading is complete, so first fact gets full display time
+        if (facts.value.length > 1 && playbackState.value === 'playing') {
+          scheduleNextRotation();
+        }
       }
     }
   }
@@ -194,6 +204,8 @@ export function useFacts(
         return;
       }
 
+      const generation = ++requestGeneration;
+
       // Clear existing timers only when track actually changes
       clearDebounceTimer();
       clearRotationTimer();
@@ -204,6 +216,7 @@ export function useFacts(
         currentFactIndex.value = 0;
         cached.value = false;
         error.value = null;
+        isLoading.value = false;
       }
 
       if (!newTrack) {
@@ -212,7 +225,9 @@ export function useFacts(
 
       // Debounce the fetch
       debounceTimer = window.setTimeout(() => {
-        fetchFacts(newTrack);
+        debounceTimer = null;
+        if (!active || generation !== requestGeneration) return;
+        fetchFacts(newTrack, generation);
       }, DEBOUNCE_DELAY);
     },
     { immediate: true }
@@ -235,8 +250,11 @@ export function useFacts(
   // to ensure the first fact gets its full display time.
 
   onUnmounted(() => {
+    active = false;
+    requestGeneration++;
     clearDebounceTimer();
     clearRotationTimer();
+    isLoading.value = false;
   });
 
   return {

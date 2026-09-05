@@ -28,6 +28,19 @@ curl -X POST http://localhost:3000/api/sources/my-player/now-playing \
 
 By default, the API is open (no authentication required). You can enable API key authentication in the admin panel.
 
+Generate and save a key before enabling protection. Enabling protection requires
+that key in `X-API-Key`, so you must possess the key before turning it on. Once enabled, source updates,
+zone deletion, protection changes (`POST /api/sources/config`), and key rotation
+(`POST /api/sources/config/generate-key`) require the current key in `X-API-Key`.
+The admin Sources page accepts your current key for these operations and keeps it
+in memory only until you leave the page. After rotation, use the newly returned
+key for subsequent requests. Zone listings and masked configuration remain public.
+
+Rotation immediately invalidates the old key. If the response is lost or the key
+is forgotten, an operator with filesystem access can recover the current `apiKey`
+from `sources-config.json` in the server's `DATA_DIR`. The API does not accept the
+previous key as a recovery credential.
+
 When enabled, include the API key in your requests:
 
 ```bash
@@ -108,6 +121,7 @@ Use stable, descriptive zone IDs:
 ### Artwork
 
 - Prefer `artwork_url` over `artwork_base64` (less bandwidth)
+- If both fields are supplied, `artwork_url` takes precedence.
 - Keep images under 1000x1000 pixels
 - Use JPEG format for best compatibility
 

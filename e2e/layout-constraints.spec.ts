@@ -1,4 +1,10 @@
 import { test, expect, type Page } from '@playwright/test';
+import {
+  BACKGROUNDS,
+  LAYOUTS,
+  type BackgroundType,
+  type LayoutType,
+} from '../packages/shared/src/index.ts';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -12,6 +18,8 @@ const SCREENSHOT_DIR = 'e2e/screenshots';
 
 // Test artwork path
 const TEST_ARTWORK_PATH = path.join(__dirname, '..', 'assets', 'artwork_radiohead-in_rainbows.jpg');
+const TEST_ZONE_NAME = 'Test Spotify Player';
+const artworkRequestCounts = new WeakMap<Page, number>();
 
 /**
  * Test Plan: Layout Column Height Constraints
@@ -32,23 +40,6 @@ const TEST_ARTWORK_PATH = path.join(__dirname, '..', 'assets', 'artwork_radiohea
 // Test viewports are defined in playwright.config.ts
 
 /**
- * Helper to select a zone if zone picker is shown
- */
-async function selectZoneIfNeeded(page: Page): Promise<void> {
-  // Check if zone picker is visible
-  const zonePicker = page.locator('text=Select Zone');
-  const isZonePickerVisible = await zonePicker.isVisible({ timeout: 2000 }).catch(() => false);
-
-  if (isZonePickerVisible) {
-    // Click the first available zone
-    const firstZone = page.locator('li').first();
-    await firstZone.click();
-    // Wait for zone picker to disappear
-    await zonePicker.waitFor({ state: 'hidden', timeout: 5000 });
-  }
-}
-
-/**
  * Set up mock artwork route interception
  */
 async function setupMockArtwork(page: Page): Promise<void> {
@@ -56,12 +47,14 @@ async function setupMockArtwork(page: Page): Promise<void> {
   const artworkBuffer = fs.readFileSync(TEST_ARTWORK_PATH);
 
   // Intercept artwork requests and serve our test image
+  artworkRequestCounts.set(page, 0);
   await page.route('**/artwork/**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'image/jpeg',
       body: artworkBuffer,
     });
+    artworkRequestCounts.set(page, (artworkRequestCounts.get(page) ?? 0) + 1);
   });
 
   // Also intercept direct URL requests for artwork
@@ -85,20 +78,31 @@ async function pushMockPlayback(page: Page): Promise<void> {
   // /api/artwork/<key>) shows a placeholder. A data: URL fetch succeeds and
   // caches the real bytes, giving a non-null key and real artwork in the matrix.
   const artworkDataUrl = `data:image/jpeg;base64,${fs.readFileSync(TEST_ARTWORK_PATH).toString('base64')}`;
-  await page.request.post('http://localhost:3000/api/sources/test-spotify/now-playing', {
-    data: {
-      zone_name: 'Test Spotify Player',
-      state: 'playing',
-      title: '15 Step',
-      artist: 'Radiohead',
-      album: 'In Rainbows',
-      duration_seconds: 237,
-      seek_position: 45,
-      artwork_url: artworkDataUrl,
-    },
-  });
-  // Wait for WebSocket to propagate the update
-  await page.waitForTimeout(500);
+  await expect.poll(async () => {
+    try {
+      const response = await page.request.post(
+        'http://localhost:3000/api/sources/test-spotify/now-playing',
+        {
+          data: {
+            zone_name: TEST_ZONE_NAME,
+            state: 'playing',
+            title: '15 Step',
+            artist: 'Radiohead',
+            album: 'In Rainbows',
+            duration_seconds: 237,
+            seek_position: 45,
+            artwork_url: artworkDataUrl,
+          },
+        },
+      );
+      return response.status();
+    } catch {
+      return 0;
+    }
+  }, {
+    message: 'server should accept deterministic mock playback',
+    timeout: 10_000,
+  }).toBe(200);
 }
 
 /**
@@ -140,16 +144,44 @@ async function setupMockFactsApi(page: Page): Promise<void> {
   });
 }
 
+function fixtureUrl(layout: LayoutType, background: BackgroundType): string {
+  const params = new URLSearchParams({ layout, background, zone: TEST_ZONE_NAME });
+  return `/?${params}`;
+}
+
+async function expectFixture(page: Page, layout: LayoutType): Promise<void> {
+  const layoutRoot = page.locator(`.${layout}-layout`);
+  await expect(layoutRoot).toBeVisible({ timeout: 10_000 });
+
+  const artwork = layoutRoot.locator('img.artwork, img.bg-artwork, img.artwork-bg').last();
+  const gradient = layoutRoot.locator('.gradient-layer');
+  if (layout === 'minimal' && await gradient.count()) {
+    await expect(gradient).toBeVisible();
+    await expect.poll(() => gradient.evaluate((element) => getComputedStyle(element).backgroundImage)).not.toBe('none');
+    await expect.poll(() => artworkRequestCounts.get(page) ?? 0).toBeGreaterThan(0);
+  } else {
+    await expect(artwork).toBeVisible();
+    await expect.poll(
+      () => artwork.evaluate((image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0),
+      { message: `${layout} should decode the fixture artwork` },
+    ).toBe(true);
+  }
+
+  if (layout.startsWith('facts-')) {
+    await expect(layoutRoot.locator('.fact-text').first()).toContainText(MOCK_FACTS[0]);
+  }
+}
+
+test.beforeEach(async ({ page }) => {
+  await setupMockArtwork(page);
+  await setupMockFactsApi(page);
+  await pushMockPlayback(page);
+});
+
 test.describe('Layout Column Height Constraints', () => {
   test.beforeEach(async ({ page }) => {
-    // Navigate to facts-columns layout
-    await page.goto('/?layout=facts-columns&background=black');
-
-    // Handle zone selection
-    await selectZoneIfNeeded(page);
-
-    // Wait for layout to render
-    await page.waitForSelector('.facts-columns-layout', { timeout: 10000 });
+    await page.goto(fixtureUrl('facts-columns', 'black'));
+    await expectFixture(page, 'facts-columns');
   });
 
   test('facts column should not exceed artwork height in desktop view', async ({ page, viewport }) => {
@@ -243,35 +275,19 @@ test.describe('Basic Layout Rendering', () => {
       errors.push(err.message);
     });
 
-    await page.goto('/?layout=basic&background=black');
-
-    // Handle zone selection
-    await selectZoneIfNeeded(page);
-
-    // Wait for layout to render
-    await page.waitForSelector('.basic-layout', { timeout: 10000 });
+    await page.goto(fixtureUrl('basic', 'black'));
+    await expectFixture(page, 'basic');
 
     // Check for essential elements
     await expect(page.locator('.basic-layout')).toBeVisible();
     await expect(page.locator('.artwork-wrapper')).toBeVisible();
 
-    // Verify no JS errors (filter out expected API errors like facts API)
-    const criticalErrors = errors.filter(
-      (e) => !e.includes('/api/facts') && !e.includes('503') && !e.includes('WebSocket')
-    );
-    expect(criticalErrors).toHaveLength(0);
+    expect(errors).toHaveLength(0);
   });
 
-  test('should display artwork placeholder or image', async ({ page }) => {
-    await page.goto('/?layout=basic&background=black');
-    await selectZoneIfNeeded(page);
-    await page.waitForSelector('.basic-layout', { timeout: 10000 });
-
-    // Either artwork image or placeholder should be visible
-    const hasArtwork = await page.locator('.artwork').isVisible().catch(() => false);
-    const hasPlaceholder = await page.locator('.artwork-placeholder').isVisible().catch(() => false);
-
-    expect(hasArtwork || hasPlaceholder).toBe(true);
+  test('should display the fixture artwork', async ({ page }) => {
+    await page.goto(fixtureUrl('basic', 'black'));
+    await expectFixture(page, 'basic');
   });
 });
 
@@ -282,9 +298,8 @@ test.describe('Responsive Layout Behavior', () => {
       return;
     }
 
-    await page.goto('/?layout=facts-columns&background=black');
-    await selectZoneIfNeeded(page);
-    await page.waitForSelector('.facts-columns-layout', { timeout: 10000 });
+    await page.goto(fixtureUrl('facts-columns', 'black'));
+    await expectFixture(page, 'facts-columns');
 
     // In narrow view, content should be stacked (flex-direction: column)
     const direction = await page.evaluate(() => {
@@ -302,9 +317,8 @@ test.describe('Responsive Layout Behavior', () => {
       return;
     }
 
-    await page.goto('/?layout=facts-columns&background=black');
-    await selectZoneIfNeeded(page);
-    await page.waitForSelector('.facts-columns-layout', { timeout: 10000 });
+    await page.goto(fixtureUrl('facts-columns', 'black'));
+    await expectFixture(page, 'facts-columns');
 
     // In wide view, content should be side-by-side (flex-direction: row)
     const direction = await page.evaluate(() => {
@@ -318,38 +332,17 @@ test.describe('Responsive Layout Behavior', () => {
 });
 
 test.describe('All Layouts Smoke Test', () => {
-  const layouts = [
-    'detailed',
-    'minimal',
-    'fullscreen',
-    'ambient',
-    'cover',
-    'facts-columns',
-    'facts-overlay',
-    'facts-carousel',
-    'basic',
-  ];
-
-  for (const layout of layouts) {
+  for (const layout of LAYOUTS) {
     test(`${layout} layout should render without critical errors`, async ({ page }) => {
       const errors: string[] = [];
 
       page.on('pageerror', (err) => {
-        // Ignore SyntaxError for legacy bundles on modern browsers (expected)
-        if (!err.message.includes('SyntaxError')) {
-          errors.push(err.message);
-        }
+        errors.push(err.message);
       });
 
-      await page.goto(`/?layout=${layout}&background=black`);
+      await page.goto(fixtureUrl(layout, 'black'));
+      await expectFixture(page, layout);
 
-      // Handle zone selection
-      await selectZoneIfNeeded(page);
-
-      // Wait for any layout to appear
-      await page.waitForSelector('[class*="layout"]', { timeout: 10000 });
-
-      // Should not have critical JS errors
       expect(errors).toHaveLength(0);
     });
   }
@@ -360,19 +353,7 @@ test.describe('All Layouts Smoke Test', () => {
  * Run with: pnpm test:e2e --grep "Screenshot"
  */
 test.describe('Screenshot Capture for PR Validation', () => {
-  const layouts = [
-    'detailed',
-    'minimal',
-    'fullscreen',
-    'ambient',
-    'cover',
-    'facts-columns',
-    'facts-overlay',
-    'facts-carousel',
-    'basic',
-  ];
-
-  const backgrounds = ['black', 'dominant', 'gradient-radial'];
+  const backgrounds: BackgroundType[] = ['black', 'dominant', 'gradient-radial'];
 
   test.beforeAll(async () => {
     // Ensure screenshot directory exists
@@ -381,33 +362,16 @@ test.describe('Screenshot Capture for PR Validation', () => {
     }
   });
 
-  for (const layout of layouts) {
+  for (const layout of LAYOUTS) {
     test(`Screenshot: ${layout} layout`, async ({ page, viewport }, testInfo) => {
       const projectName = testInfo.project.name;
       const viewportName = viewport ? `${viewport.width}x${viewport.height}` : 'default';
 
-      // Set up mock artwork route interception
-      await setupMockArtwork(page);
-
-      // Push mock playback data with artwork
-      await pushMockPlayback(page);
-
-      // For facts layouts, set up API mocking before navigation
-      if (layout.startsWith('facts-')) {
-        await setupMockFactsApi(page);
-      }
-
-      await page.goto(`/?layout=${layout}&background=black`);
-      await selectZoneIfNeeded(page);
-
-      // Wait for layout to stabilize
-      await page.waitForSelector('[class*="layout"]', { timeout: 10000 });
+      await page.goto(fixtureUrl(layout, 'black'));
+      await expectFixture(page, layout);
 
       // For facts layouts, wait for facts to load and layout to stabilize
       if (layout.startsWith('facts-')) {
-        await page.waitForSelector('.fact-text', { timeout: 5000 }).catch(() => {
-          // Facts may not always load, continue anyway
-        });
         // Wait for layout recalculation (ResizeObserver, updateLayout)
         await page.waitForTimeout(500);
       }
@@ -443,7 +407,7 @@ test.describe('Screenshot Capture for PR Validation', () => {
         const constraint = await page.evaluate(() => {
           const artwork = document.querySelector('.artwork-wrapper');
           const facts = document.querySelector('.facts-column');
-          if (!artwork || !facts) return { pass: true, reason: 'elements not found' };
+          if (!artwork || !facts) return null;
 
           const artworkBottom = artwork.getBoundingClientRect().bottom;
           const factsBottom = facts.getBoundingClientRect().bottom;
@@ -456,12 +420,8 @@ test.describe('Screenshot Capture for PR Validation', () => {
           };
         });
 
-        if (!constraint.pass) {
-          testInfo.annotations.push({
-            type: 'warning',
-            description: `Facts column extends ${constraint.difference}px beyond artwork`,
-          });
-        }
+        expect(constraint, 'facts layout constraint elements should exist').not.toBeNull();
+        expect(constraint?.pass, `facts column extends ${constraint?.difference}px beyond artwork`).toBe(true);
       }
     });
   }
@@ -471,22 +431,9 @@ test.describe('Screenshot Capture for PR Validation', () => {
     const projectName = testInfo.project.name;
     const viewportName = viewport ? `${viewport.width}x${viewport.height}` : 'default';
 
-    // Set up mock artwork route interception
-    await setupMockArtwork(page);
-
-    // Push mock playback data with artwork
-    await pushMockPlayback(page);
-
-    // Set up API mocking for facts
-    await setupMockFactsApi(page);
-
     for (const bg of backgrounds) {
-      await page.goto(`/?layout=facts-columns&background=${bg}`);
-      await selectZoneIfNeeded(page);
-      await page.waitForSelector('.facts-columns-layout', { timeout: 10000 });
-
-      // Wait for facts to load
-      await page.waitForSelector('.fact-text', { timeout: 5000 }).catch(() => {});
+      await page.goto(fixtureUrl('facts-columns', bg));
+      await expectFixture(page, 'facts-columns');
       await page.waitForTimeout(500);
 
       const screenshotPath = path.join(
@@ -515,7 +462,7 @@ test.describe('Screenshot Capture for PR Validation', () => {
         const constraint = await page.evaluate(() => {
           const artwork = document.querySelector('.artwork-wrapper');
           const facts = document.querySelector('.facts-column');
-          if (!artwork || !facts) return { pass: true };
+          if (!artwork || !facts) return null;
 
           const artworkBottom = artwork.getBoundingClientRect().bottom;
           const factsBottom = facts.getBoundingClientRect().bottom;
@@ -526,12 +473,8 @@ test.describe('Screenshot Capture for PR Validation', () => {
           };
         });
 
-        if (!constraint.pass) {
-          testInfo.annotations.push({
-            type: 'warning',
-            description: `[${bg}] Facts column extends ${constraint.difference}px beyond artwork`,
-          });
-        }
+        expect(constraint, 'facts layout constraint elements should exist').not.toBeNull();
+        expect(constraint?.pass, `[${bg}] facts column extends ${constraint?.difference}px beyond artwork`).toBe(true);
       }
     }
   });
@@ -552,18 +495,6 @@ test.describe('Screenshot Capture for PR Validation', () => {
  *                downloadable artifact on every pull request.
  */
 test.describe('Matrix', () => {
-  const ALL_LAYOUTS = [
-    'detailed',
-    'minimal',
-    'fullscreen',
-    'ambient',
-    'cover',
-    'facts-columns',
-    'facts-overlay',
-    'facts-carousel',
-    'basic',
-  ];
-
   // Selective runs: set MATRIX_LAYOUTS=detailed,basic to render only those layouts
   // (CI derives this from the layouts a PR actually changed). Empty → full matrix.
   const requested = (process.env.MATRIX_LAYOUTS || '')
@@ -571,47 +502,16 @@ test.describe('Matrix', () => {
     .map((s) => s.trim())
     .filter(Boolean);
   const layouts = requested.length
-    ? ALL_LAYOUTS.filter((l) => requested.includes(l))
-    : ALL_LAYOUTS;
-
-  // Keep in sync with BACKGROUNDS in packages/shared/src/index.ts
-  const backgrounds = [
-    'black',
-    'white',
-    'dominant',
-    'gradient-radial',
-    'gradient-linear',
-    'gradient-linear-multi',
-    'gradient-radial-corner',
-    'gradient-mesh',
-    'blur-subtle',
-    'blur-heavy',
-    'duotone',
-    'posterized',
-    'gradient-noise',
-    'blur-grain',
-  ];
+    ? LAYOUTS.filter((layout) => requested.includes(layout))
+    : LAYOUTS;
 
   for (const layout of layouts) {
-    for (const background of backgrounds) {
+    for (const background of BACKGROUNDS) {
       test(`Matrix: ${layout} / ${background}`, async ({ page }, testInfo) => {
         const projectName = testInfo.project.name;
 
-        await setupMockArtwork(page);
-        await pushMockPlayback(page);
-        if (layout.startsWith('facts-')) {
-          await setupMockFactsApi(page);
-        }
-
-        await page.goto(`/?layout=${layout}&background=${background}`);
-        await selectZoneIfNeeded(page);
-        await page.waitForSelector('[class*="layout"]', { timeout: 10000 });
-
-        if (layout.startsWith('facts-')) {
-          await page.waitForSelector('.fact-text', { timeout: 5000 }).catch(() => {
-            // Facts may not always render; capture the frame regardless.
-          });
-        }
+        await page.goto(fixtureUrl(layout, background));
+        await expectFixture(page, layout);
         await page.waitForTimeout(600); // let gradients + animations settle
 
         const dir = path.join(SCREENSHOT_DIR, 'matrix', projectName);

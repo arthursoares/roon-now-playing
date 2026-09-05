@@ -267,6 +267,17 @@ export interface ClientMetadata {
   enabledLayouts?: LayoutType[] | null;
 }
 
+export interface PersistedClientSettings {
+  layout: LayoutType;
+  font: FontType;
+  background: BackgroundType;
+  zoneId: string | null;
+  zoneName: string | null;
+  fontScaleOverride: number | null;
+  artworkScaleOverride: number | null;
+  enabledLayouts: LayoutType[] | null;
+}
+
 export interface ClientMetadataMessage {
   type: 'client_metadata';
   clientId: string;
