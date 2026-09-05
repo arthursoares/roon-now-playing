@@ -152,6 +152,43 @@ describe('ExternalSourceManager', () => {
 
       expect(zonesHandler).not.toHaveBeenCalled();
     });
+
+    it('should cache embedded base64 artwork', async () => {
+      const cacheBase64 = vi.fn().mockResolvedValue('base64-key');
+      manager.setBase64ArtworkCallback(cacheBase64);
+
+      const result = await manager.updateZone('spotify-office', {
+        zone_name: 'Office Spotify',
+        state: 'playing',
+        title: 'Song',
+        artist: 'Artist',
+        artwork_base64: 'aW1hZ2U=',
+      });
+
+      expect(cacheBase64).toHaveBeenCalledWith('aW1hZ2U=');
+      expect(result.artwork_key).toBe('base64-key');
+      expect(manager.getNowPlaying('spotify-office')?.track?.artwork_key).toBe('base64-key');
+    });
+
+    it('should prefer an artwork URL when URL and base64 data are both provided', async () => {
+      const cacheUrl = vi.fn().mockResolvedValue('url-key');
+      const cacheBase64 = vi.fn().mockResolvedValue('base64-key');
+      manager.setArtworkCallback(cacheUrl);
+      manager.setBase64ArtworkCallback(cacheBase64);
+
+      const result = await manager.updateZone('spotify-office', {
+        zone_name: 'Office Spotify',
+        state: 'playing',
+        title: 'Song',
+        artist: 'Artist',
+        artwork_url: 'https://example.com/cover.jpg',
+        artwork_base64: 'aW1hZ2U=',
+      });
+
+      expect(cacheUrl).toHaveBeenCalledWith('https://example.com/cover.jpg');
+      expect(cacheBase64).not.toHaveBeenCalled();
+      expect(result.artwork_key).toBe('url-key');
+    });
   });
 
   describe('deleteZone', () => {

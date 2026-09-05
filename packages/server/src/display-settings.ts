@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { DisplaySettings, DEFAULT_DISPLAY_SETTINGS } from '@roon-screen-cover/shared';
 
-const CONFIG_DIR = path.join(process.cwd(), 'config');
+const CONFIG_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'config');
 const SETTINGS_FILE = path.join(CONFIG_DIR, 'display-settings.json');
 
 export function loadDisplaySettings(): DisplaySettings {

@@ -13,7 +13,7 @@ import { logger } from './logger.js';
 import { ExternalSourceManager } from './externalSources.js';
 import { SourcesConfigStore } from './sourcesConfig.js';
 import { createSourcesRouter } from './routes/sources.js';
-import { cacheExternalArtwork } from './artwork.js';
+import { cacheBase64Artwork, cacheExternalArtwork } from './artwork.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -40,6 +40,7 @@ async function main(): Promise<void> {
   // Initialize external source manager
   const externalSourceManager = new ExternalSourceManager();
   externalSourceManager.setArtworkCallback(cacheExternalArtwork);
+  externalSourceManager.setBase64ArtworkCallback(cacheBase64Artwork);
 
   // Initialize WebSocket manager
   const wsManager = new WebSocketManager(server, roonClient);

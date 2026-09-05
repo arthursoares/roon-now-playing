@@ -56,7 +56,7 @@ const testDuration = ref<number | null>(null);
 interface SourcesConfig {
   requireApiKey: boolean;
   hasApiKey: boolean;
-  apiKey: string;
+  apiKey: string | null;
 }
 
 interface ExternalZone {
@@ -78,6 +78,9 @@ const sourcesConfigSaving = ref(false);
 const generatingApiKey = ref(false);
 const deletingZone = ref<string | null>(null);
 const apiKeyCopied = ref(false);
+const sourcesCurrentKey = ref('');
+const generatedSourceKey = ref('');
+const sourcesError = ref<string | null>(null);
 
 // Display settings state
 const displaySettings = ref<{ fontScale: number; artworkScale: number }>({ fontScale: 1, artworkScale: 100 });
@@ -382,6 +385,22 @@ async function runFactsTest(): Promise<void> {
 }
 
 // External sources functions
+async function mutateSource(url: string, init: RequestInit): Promise<Response> {
+  sourcesError.value = null;
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(sourcesCurrentKey.value ? { 'X-API-Key': sourcesCurrentKey.value } : {}),
+    },
+  });
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.message || data.error || 'Failed to update source settings');
+  }
+  return response;
+}
+
 async function fetchSourcesConfig(): Promise<void> {
   try {
     const response = await fetch('/api/sources/config');
@@ -416,16 +435,13 @@ async function toggleRequireApiKey(): Promise<void> {
   sourcesConfigSaving.value = true;
   try {
     const newValue = !sourcesConfig.value.requireApiKey;
-    const response = await fetch('/api/sources/config', {
+    await mutateSource('/api/sources/config', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ requireApiKey: newValue }),
     });
-    if (response.ok) {
-      sourcesConfig.value.requireApiKey = newValue;
-    }
+    sourcesConfig.value.requireApiKey = newValue;
   } catch (error) {
-    console.error('Failed to update sources config:', error);
+    sourcesError.value = error instanceof Error ? error.message : 'Failed to update sources config';
   } finally {
     sourcesConfigSaving.value = false;
   }
@@ -434,24 +450,26 @@ async function toggleRequireApiKey(): Promise<void> {
 async function generateApiKey(): Promise<void> {
   generatingApiKey.value = true;
   try {
-    const response = await fetch('/api/sources/config/generate-key', {
+    const response = await mutateSource('/api/sources/config/generate-key', {
       method: 'POST',
     });
-    if (response.ok) {
-      const data = await response.json();
-      sourcesConfig.value.apiKey = data.apiKey;
-      sourcesConfig.value.hasApiKey = true;
-    }
+    const data = await response.json();
+    sourcesConfig.value.apiKey = data.apiKey;
+    sourcesConfig.value.hasApiKey = true;
+    sourcesCurrentKey.value = data.apiKey;
+    generatedSourceKey.value = data.apiKey;
+    apiKeyCopied.value = false;
   } catch (error) {
-    console.error('Failed to generate API key:', error);
+    sourcesError.value = error instanceof Error ? error.message : 'Failed to generate API key';
   } finally {
     generatingApiKey.value = false;
   }
 }
 
 async function copyApiKey(): Promise<void> {
+  if (!generatedSourceKey.value) return;
   try {
-    await navigator.clipboard.writeText(sourcesConfig.value.apiKey);
+    await navigator.clipboard.writeText(generatedSourceKey.value);
     apiKeyCopied.value = true;
     setTimeout(() => {
       apiKeyCopied.value = false;
@@ -464,14 +482,12 @@ async function copyApiKey(): Promise<void> {
 async function deleteExternalZone(zoneId: string): Promise<void> {
   deletingZone.value = zoneId;
   try {
-    const response = await fetch(`/api/sources/${encodeURIComponent(zoneId)}`, {
+    await mutateSource(`/api/sources/${encodeURIComponent(zoneId)}`, {
       method: 'DELETE',
     });
-    if (response.ok) {
-      externalZones.value = externalZones.value.filter((z) => z.zone_id !== zoneId);
-    }
+    externalZones.value = externalZones.value.filter((z) => z.zone_id !== zoneId);
   } catch (error) {
-    console.error('Failed to delete external zone:', error);
+    sourcesError.value = error instanceof Error ? error.message : 'Failed to delete external zone';
   } finally {
     deletingZone.value = null;
   }
@@ -1161,6 +1177,13 @@ onMounted(() => {
           <div class="config-card">
             <h2 class="card-title">API Configuration</h2>
 
+            <p v-if="sourcesError" role="alert">{{ sourcesError }}</p>
+            <div v-if="sourcesConfig.hasApiKey" class="api-key-section">
+              <label for="sources-current-key" class="setting-label">Current API key</label>
+              <input id="sources-current-key" v-model="sourcesCurrentKey" type="password" autocomplete="off" />
+              <p class="toggle-desc">Enter your current key to change protection, regenerate the key, or delete zones. It is kept only until you leave this page.</p>
+            </div>
+
             <div class="toggle-setting">
               <div class="toggle-info">
                 <label class="toggle-label">Require API Key</label>
@@ -1169,7 +1192,7 @@ onMounted(() => {
               <button
                 class="toggle-switch"
                 :class="{ active: sourcesConfig.requireApiKey }"
-                :disabled="sourcesConfigSaving"
+                :disabled="sourcesConfigSaving || (!sourcesConfig.requireApiKey && !sourcesCurrentKey)"
                 @click="toggleRequireApiKey"
               >
                 <span class="toggle-knob"></span>
@@ -1181,7 +1204,7 @@ onMounted(() => {
               <div v-if="sourcesConfig.hasApiKey" class="api-key-display">
                 <code class="api-key-value">{{ sourcesConfig.apiKey }}</code>
                 <div class="api-key-actions">
-                  <button class="btn-small" @click="copyApiKey" :disabled="apiKeyCopied">
+                  <button class="btn-small" @click="copyApiKey" :disabled="apiKeyCopied || !generatedSourceKey">
                     <svg v-if="!apiKeyCopied" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
