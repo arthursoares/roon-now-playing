@@ -1177,10 +1177,10 @@ onMounted(() => {
           <div class="config-card">
             <h2 class="card-title">API Configuration</h2>
 
-            <p v-if="sourcesError" role="alert">{{ sourcesError }}</p>
-            <div v-if="sourcesConfig.hasApiKey" class="api-key-section">
+            <p v-if="sourcesError" role="alert" class="message-card error">{{ sourcesError }}</p>
+            <div v-if="sourcesConfig.hasApiKey" class="api-key-section form-field">
               <label for="sources-current-key" class="setting-label">Current API key</label>
-              <input id="sources-current-key" v-model="sourcesCurrentKey" type="password" autocomplete="off" />
+              <input id="sources-current-key" v-model="sourcesCurrentKey" type="password" autocomplete="off" class="mono-input" />
               <p class="toggle-desc">Enter your current key to change protection, regenerate the key, or delete zones. It is kept only until you leave this page.</p>
             </div>
 
