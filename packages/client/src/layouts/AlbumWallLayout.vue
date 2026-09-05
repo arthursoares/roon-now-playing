@@ -294,7 +294,7 @@ h1 {
 
 .album-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: clamp(0.8rem, 1.25vw, 1.8rem);
 }
 
@@ -376,10 +376,6 @@ h1 {
 @keyframes album-enter {
   from { opacity: 0; transform: translateY(0.75rem); }
   to { opacity: 1; transform: translateY(0); }
-}
-
-@media (min-width: 1800px) {
-  .album-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 @media (max-width: 1050px), (max-aspect-ratio: 6/5) {

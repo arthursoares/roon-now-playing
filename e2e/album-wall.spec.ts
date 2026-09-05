@@ -56,13 +56,17 @@ test('Album Wall retains and displays the complete zone history after reload', a
   await page.reload();
   await expect(page.locator('.album-card')).toHaveCount(11);
   await expect(page.locator('.hero .album')).toHaveText('Evening Studies 12');
-  await expect.poll(() => page.locator('.album-grid').evaluate((grid) => {
-    const cards = [...grid.querySelectorAll('.album-card')];
-    return cards.every((card) => {
-      const bounds = card.getBoundingClientRect();
-      return bounds.left >= 0 && bounds.right <= innerWidth + 1 && bounds.bottom <= innerHeight + 1;
-    });
-  }), { message: 'All recent albums should fit the display without scrolling' }).toBe(true);
+  for (const scale of [1, 1.5]) {
+    await page.evaluate((value) => document.documentElement.style.setProperty('--font-scale', String(value)), scale);
+    await expect.poll(() => page.locator('.album-grid').evaluate((grid) => {
+      const cards = [...grid.querySelectorAll('.album-card')];
+      return cards.every((card) => {
+        const bounds = card.getBoundingClientRect();
+        return bounds.left >= 0 && bounds.right <= innerWidth + 1 && bounds.bottom <= innerHeight + 1;
+      });
+    }), { message: `All recent albums should fit at font scale ${scale}` }).toBe(true);
+  }
+  await page.evaluate(() => document.documentElement.style.setProperty('--font-scale', '1'));
   await expect.poll(() => page.locator('.album-card').evaluateAll((cards) =>
     cards.every((card) => getComputedStyle(card).opacity === '1'),
   )).toBe(true);
