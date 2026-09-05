@@ -21,7 +21,7 @@ export function createFactsRouter(): Router {
 
     const config = configStore.get();
 
-    if (!config.apiKey) {
+    if (!config.apiKey && config.provider !== 'local') {
       res.status(503).json({
         error: { type: 'no-key', message: 'No API key configured' },
       });
@@ -47,8 +47,8 @@ export function createFactsRouter(): Router {
       const facts = await provider.generateFacts(artist, album, title);
 
       if (facts.length === 0) {
-        res.status(200).json({
-          error: { type: 'empty', message: 'No facts generated' },
+        res.status(502).json({
+          error: { type: 'empty', message: 'No usable facts could be generated. Please try again.' },
         });
         return;
       }
@@ -62,10 +62,10 @@ export function createFactsRouter(): Router {
         generatedAt: Date.now(),
       };
       res.json(response);
-    } catch (error) {
-      logger.error(`Failed to generate facts: ${error}`);
+    } catch {
+      logger.error('Failed to generate facts');
       res.status(500).json({
-        error: { type: 'api-error', message: 'Failed to generate facts' },
+        error: { type: 'api-error', message: 'Failed to generate facts. Please try again.' },
       });
     }
   });
@@ -119,22 +119,20 @@ export function createFactsRouter(): Router {
       const facts = await provider.generateFacts(artist, album, title);
       const durationMs = Date.now() - startTime;
 
-      const response: FactsTestResponse = { facts, durationMs };
-
-      // Add warning if no facts were parsed (likely model output format issue)
       if (facts.length === 0) {
-        logger.warn(`Facts test returned 0 facts - model may not be returning valid JSON array. Check server logs for details.`);
-        res.json({
-          ...response,
-          warning: 'Model returned content but no facts could be parsed. The model may not be following the JSON array format. Check server logs for raw response.'
+        res.status(502).json({
+          error: { type: 'empty', message: 'No usable facts could be generated. Please try again.' },
         });
         return;
       }
 
+      const response: FactsTestResponse = { facts, durationMs };
       res.json(response);
-    } catch (error) {
-      logger.error(`Facts test failed: ${error}`);
-      res.status(500).json({ error: `API error: ${error}` });
+    } catch {
+      logger.error('Facts test failed');
+      res.status(500).json({
+        error: { type: 'api-error', message: 'Failed to generate facts. Please try again.' },
+      });
     }
   });
 

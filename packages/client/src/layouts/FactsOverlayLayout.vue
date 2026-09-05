@@ -81,6 +81,8 @@ watch(
             <p v-else-if="error && error.type === 'no-key'" class="error-hint">
               Configure API key in <a href="/admin">Admin</a>
             </p>
+            <p v-else-if="error" class="error-hint" role="status">{{ error.message }}</p>
+            <p v-else class="error-hint" role="status">Facts are unavailable for this track.</p>
 
             <!-- Dot indicators -->
             <div v-if="facts.length > 1" class="fact-dots">

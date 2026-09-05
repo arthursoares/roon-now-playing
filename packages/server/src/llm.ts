@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import type { FactsConfig } from '@roon-screen-cover/shared';
 import { logger } from './logger.js';
+import { parseFactsResponse as parseFacts } from './parseFacts.js';
 
 export interface LLMProvider {
   generateFacts(artist: string, album: string, title: string): Promise<string[]>;
@@ -16,44 +17,11 @@ function buildPrompt(template: string, vars: Record<string, string | number>): s
 }
 
 function parseFactsResponse(text: string): string[] {
-  // Strategy 1: Try to parse as a single JSON array
-  try {
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      if (Array.isArray(parsed) && parsed.every((item) => typeof item === 'string')) {
-        return parsed;
-      }
-    }
-  } catch {
-    // Single array parse failed, try alternative strategies
+  const facts = parseFacts(text);
+  if (facts.length === 0) {
+    logger.warn(`[ParseFacts] No usable facts in ${text.length} response characters.`);
   }
-
-  // Strategy 2: Handle multiple JSON arrays on separate lines (some models do this)
-  // e.g., ["Fact 1"]\n["Fact 2"]\n["Fact 3"]
-  try {
-    const lineArrays = text.match(/\["[^"]*"\]/g);
-    if (lineArrays && lineArrays.length > 0) {
-      const facts: string[] = [];
-      for (const arr of lineArrays) {
-        const parsed = JSON.parse(arr);
-        if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'string') {
-          facts.push(parsed[0]);
-        }
-      }
-      if (facts.length > 0) {
-        logger.info(`[ParseFacts] Parsed ${facts.length} facts from multi-array format`);
-        return facts;
-      }
-    }
-  } catch {
-    // Multi-array parse failed
-  }
-
-  // Log failure for debugging
-  const preview = text.length > 500 ? text.substring(0, 500) + '...' : text;
-  logger.warn(`[ParseFacts] Could not parse facts from response. Preview: ${preview}`);
-  return [];
+  return facts;
 }
 
 export class AnthropicProvider implements LLMProvider {
@@ -85,7 +53,7 @@ export class AnthropicProvider implements LLMProvider {
         return parseFactsResponse(textContent.text);
       }
     } catch (error) {
-      logger.error(`Anthropic API error: ${error}`);
+      logger.error('Anthropic API request failed');
       throw error;
     }
 
@@ -124,7 +92,7 @@ export class OpenAIProvider implements LLMProvider {
         return parseFactsResponse(content);
       }
     } catch (error) {
-      logger.error(`OpenAI API error: ${error}`);
+      logger.error('OpenAI API request failed');
       throw error;
     }
 
@@ -164,8 +132,7 @@ export class OpenRouterProvider implements LLMProvider {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`OpenRouter API error (${response.status}): ${errorText}`);
+        throw new Error(`OpenRouter API error (${response.status})`);
       }
 
       const data = await response.json();
@@ -174,7 +141,7 @@ export class OpenRouterProvider implements LLMProvider {
         return parseFactsResponse(content);
       }
     } catch (error) {
-      logger.error(`OpenRouter API error: ${error}`);
+      logger.error('OpenRouter API request failed');
       throw error;
     }
 
@@ -213,9 +180,7 @@ export class LocalLLMProvider implements LLMProvider {
       max_tokens: 1024,
     };
 
-    logger.info(`[LocalLLM] Request URL: ${url}`);
-    logger.info(`[LocalLLM] Model: ${this.config.model}`);
-    logger.debug(`[LocalLLM] Request body: ${JSON.stringify(requestBody, null, 2)}`);
+    logger.info('[LocalLLM] Requesting facts');
 
     try {
       const response = await fetch(url, {
@@ -227,9 +192,7 @@ export class LocalLLMProvider implements LLMProvider {
       logger.info(`[LocalLLM] Response status: ${response.status}`);
 
       if (!response.ok) {
-        const errorText = await response.text();
-        logger.error(`[LocalLLM] Error response: ${errorText}`);
-        throw new Error(`Local LLM API error (${response.status}): ${errorText}`);
+        throw new Error(`Local LLM API error (${response.status})`);
       }
 
       const data = await response.json();
@@ -244,25 +207,16 @@ export class LocalLLMProvider implements LLMProvider {
       }
 
       if (content) {
-        // Strip markdown code blocks if present (```json ... ```)
-        const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (codeBlockMatch) {
-          content = codeBlockMatch[1].trim();
-          logger.info(`[LocalLLM] Extracted content from markdown code block`);
-        }
-
         logger.info(`[LocalLLM] Got response content (${content.length} chars)`);
         return parseFactsResponse(content);
       } else {
-        // Log raw response to help debug why content is missing
-        const rawPreview = JSON.stringify(data, null, 2);
-        logger.warn(`[LocalLLM] No content in response. Raw response:\n${rawPreview}`);
+        logger.warn('[LocalLLM] No content in response');
       }
     } catch (error) {
       if (error instanceof Error && error.message.includes('ECONNREFUSED')) {
         throw new Error(`Cannot connect to local LLM at ${baseUrl}. Is Ollama/LM Studio running?`, { cause: error });
       }
-      logger.error(`Local LLM API error: ${error}`);
+      logger.error('Local LLM API request failed');
       throw error;
     }
 
