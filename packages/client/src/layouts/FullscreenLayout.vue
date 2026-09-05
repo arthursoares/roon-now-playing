@@ -100,7 +100,7 @@ const usesDynamicBackground = computed(() =>
 }
 
 .artwork-placeholder p {
-  font-size: var(--text-xl);
+  font-size: calc(var(--text-xl) * var(--font-scale, 1));
   color: var(--text-tertiary, #444);
 }
 </style>
