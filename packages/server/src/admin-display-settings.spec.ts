@@ -77,14 +77,51 @@ describe('admin display settings route', () => {
     expect(broadcastDisplaySettings).not.toHaveBeenCalled();
   });
 
-  async function start(broadcastDisplaySettings: ReturnType<typeof vi.fn>): Promise<string> {
+  it('accepts a lone false interaction lock setting', async () => {
+    const pushSettingsToClient = vi.fn().mockReturnValue(true);
+    const baseUrl = await start(vi.fn(), pushSettingsToClient);
+
+    const response = await fetch(`${baseUrl}/clients/client-1/push`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lockInteractions: false }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(pushSettingsToClient).toHaveBeenCalledWith('client-1', expect.objectContaining({
+      lockInteractions: false,
+    }));
+  });
+
+  it('rejects a non-boolean interaction lock setting', async () => {
+    const pushSettingsToClient = vi.fn();
+    const baseUrl = await start(vi.fn(), pushSettingsToClient);
+
+    const response = await fetch(`${baseUrl}/clients/client-1/push`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lockInteractions: 'false' }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'lockInteractions must be a boolean' });
+    expect(pushSettingsToClient).not.toHaveBeenCalled();
+  });
+
+  async function start(
+    broadcastDisplaySettings: ReturnType<typeof vi.fn>,
+    pushSettingsToClient: ReturnType<typeof vi.fn> = vi.fn(),
+  ): Promise<string> {
     dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'roon-admin-display-'));
     vi.stubEnv('DATA_DIR', dataDir);
     vi.resetModules();
     const { createAdminRouter } = await import('./admin.js');
     const app = express();
     app.use(express.json());
-    app.use('/api/admin', createAdminRouter({ broadcastDisplaySettings } as unknown as WebSocketManager));
+    app.use('/api/admin', createAdminRouter({
+      broadcastDisplaySettings,
+      pushSettingsToClient,
+    } as unknown as WebSocketManager));
     server = createServer(app);
     await new Promise<void>((resolve) => server!.listen(0, '127.0.0.1', resolve));
     const address = server.address();

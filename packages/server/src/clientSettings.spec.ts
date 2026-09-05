@@ -25,12 +25,31 @@ describe('ClientSettingsStore', () => {
       fontScaleOverride: null,
       artworkScaleOverride: 72,
       enabledLayouts: ['ambient', 'cover'],
+      lockInteractions: false,
     };
     store.set('device-1', settings);
     expect(store.get('device-1')).toEqual(settings);
 
     const persisted = JSON.parse(fs.readFileSync(TEST_FILE, 'utf8'));
     expect(persisted['device-1']).toEqual(settings);
+  });
+
+  it('should persist lockInteractions across a reload', () => {
+    const store1 = new ClientSettingsStore(TEST_FILE);
+    store1.set('device-1', {
+      layout: 'detailed' as const,
+      font: 'system' as const,
+      background: 'black' as const,
+      zoneId: null,
+      zoneName: null,
+      fontScaleOverride: null,
+      artworkScaleOverride: null,
+      enabledLayouts: null,
+      lockInteractions: true,
+    });
+
+    const store2 = new ClientSettingsStore(TEST_FILE);
+    expect(store2.get('device-1')!.lockInteractions).toBe(true);
   });
 
   it('should load from disk on construction', () => {
@@ -44,6 +63,7 @@ describe('ClientSettingsStore', () => {
       fontScaleOverride: null,
       artworkScaleOverride: 80,
       enabledLayouts: ['minimal'],
+      lockInteractions: false,
     });
 
     const store2 = new ClientSettingsStore(TEST_FILE);
@@ -71,6 +91,7 @@ describe('ClientSettingsStore', () => {
     expect(store.get('device-1')).toMatchObject({
       artworkScaleOverride: null,
       enabledLayouts: null,
+      lockInteractions: false,
     });
   });
 
@@ -85,6 +106,7 @@ describe('ClientSettingsStore', () => {
       fontScaleOverride: null,
       artworkScaleOverride: null,
       enabledLayouts: null,
+      lockInteractions: false,
     });
     store.delete('device-1');
     expect(store.get('device-1')).toBeNull();

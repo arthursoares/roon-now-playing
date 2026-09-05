@@ -28,15 +28,17 @@ describe('useWebSocket album history', () => {
   let app: App<Element> | null = null;
   let state: Ref<WebSocketState>;
   let subscribeToZone: (zoneId: string, zoneName?: string) => void;
+  const onRemoteSettings = vi.fn();
 
   beforeEach(() => {
     MockWebSocket.instances = [];
     localStorage.clear();
+    onRemoteSettings.mockClear();
     vi.stubGlobal('WebSocket', MockWebSocket);
 
     app = createApp(defineComponent({
       setup() {
-        const socket = useWebSocket();
+        const socket = useWebSocket({ onRemoteSettings });
         state = socket.state;
         subscribeToZone = socket.subscribeToZone;
         return () => h('div');
@@ -147,5 +149,24 @@ describe('useWebSocket album history', () => {
     socket.receive({ type: 'album_history', zone_id: 'zone-b', albums: [officeAlbum] });
     expect(state.value.nowPlaying?.track?.title).toBe('Office Track');
     expect(state.value.albumHistory).toEqual([officeAlbum]);
+  });
+
+  it('forwards an authoritative false interaction lock', () => {
+    MockWebSocket.instances[0].receive({
+      type: 'remote_settings',
+      lockInteractions: false,
+    });
+
+    expect(onRemoteSettings).toHaveBeenCalledWith(expect.objectContaining({
+      lockInteractions: false,
+    }));
+  });
+
+  it('clears the interaction lock when the server resets the client', () => {
+    localStorage.setItem('roon-screen-cover:lock-interactions', 'true');
+
+    MockWebSocket.instances[0].receive({ type: 'client_reset' });
+
+    expect(localStorage.getItem('roon-screen-cover:lock-interactions')).toBeNull();
   });
 });

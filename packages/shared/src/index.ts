@@ -292,6 +292,7 @@ export interface ClientMetadata {
   fontScaleOverride?: number | null; // null = use global, number = custom
   artworkScaleOverride?: number | null;
   enabledLayouts?: LayoutType[] | null;
+  lockInteractions?: boolean; // true = disable tap-to-cycle and double-tap-to-change-zone
 }
 
 export interface PersistedClientSettings {
@@ -303,6 +304,7 @@ export interface PersistedClientSettings {
   fontScaleOverride: number | null;
   artworkScaleOverride: number | null;
   enabledLayouts: LayoutType[] | null;
+  lockInteractions: boolean;
 }
 
 export interface ClientMetadataMessage {
@@ -347,6 +349,7 @@ export interface ServerRemoteSettingsMessage {
   fontScaleOverride?: number | null;
   artworkScaleOverride?: number | null;
   enabledLayouts?: LayoutType[] | null;
+  lockInteractions?: boolean;
 }
 
 export interface ServerClientResetMessage {

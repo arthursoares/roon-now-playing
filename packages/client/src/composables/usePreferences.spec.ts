@@ -22,7 +22,6 @@ import { usePreferences } from './usePreferences';
 
 describe('usePreferences', () => {
   beforeEach(() => {
-    // Clear localStorage before each test
     localStorage.clear();
     // Reset URL
     window.history.replaceState({}, '', '/');
@@ -157,5 +156,31 @@ describe('usePreferences', () => {
 
     expect(background.value).toBe('gradient-noise');
     expect(localStorage.getItem('roon-screen-cover:background')).toBe('gradient-noise');
+  });
+
+  it('should default lockInteractions to false', () => {
+    const { lockInteractions } = usePreferences();
+    expect(lockInteractions.value).toBe(false);
+  });
+
+  it('should load lockInteractions from localStorage', () => {
+    localStorage.setItem('roon-screen-cover:lock-interactions', 'true');
+    const { lockInteractions, loadPreferences } = usePreferences();
+    loadPreferences();
+    expect(lockInteractions.value).toBe(true);
+  });
+
+  it('should persist lockInteractions when saved', () => {
+    const { lockInteractions, saveLockInteractionsPreference } = usePreferences();
+    saveLockInteractionsPreference(true);
+    expect(lockInteractions.value).toBe(true);
+    expect(localStorage.getItem('roon-screen-cover:lock-interactions')).toBe('true');
+  });
+
+  it('should clear lockInteractions storage when saved false', () => {
+    localStorage.setItem('roon-screen-cover:lock-interactions', 'true');
+    const { saveLockInteractionsPreference } = usePreferences();
+    saveLockInteractionsPreference(false);
+    expect(localStorage.getItem('roon-screen-cover:lock-interactions')).toBeNull();
   });
 });

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onUnmounted, watch } from 'vue';
 import type { Zone, NowPlaying as NowPlayingType, LayoutType, BackgroundType, RecentAlbum } from '@roon-screen-cover/shared';
 import { useNowPlaying } from '../composables/useNowPlaying';
 import MinimalLayout from '../layouts/MinimalLayout.vue';
@@ -19,14 +19,25 @@ const props = withDefaults(defineProps<{
   zone: Zone;
   layout: LayoutType;
   background: BackgroundType;
+  lockInteractions?: boolean;
 }>(), {
   albumHistory: () => [],
+  lockInteractions: false,
 });
 
 const emit = defineEmits<{
   'change-zone': [];
   'cycle-layout': [];
 }>();
+
+const DOUBLE_CLICK_WINDOW_MS = 275;
+let pendingClickTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearPendingClick(): void {
+  if (pendingClickTimer === null) return;
+  clearTimeout(pendingClickTimer);
+  pendingClickTimer = null;
+}
 
 const {
   track,
@@ -65,12 +76,25 @@ const layoutComponent = computed(() => {
 });
 
 function handleClick(): void {
-  emit('cycle-layout');
+  if (props.lockInteractions) return;
+  clearPendingClick();
+  pendingClickTimer = setTimeout(() => {
+    pendingClickTimer = null;
+    if (!props.lockInteractions) emit('cycle-layout');
+  }, DOUBLE_CLICK_WINDOW_MS);
 }
 
 function handleDoubleClick(): void {
+  clearPendingClick();
+  if (props.lockInteractions) return;
   emit('change-zone');
 }
+
+watch(() => props.lockInteractions, (locked) => {
+  if (locked) clearPendingClick();
+});
+
+onUnmounted(clearPendingClick);
 </script>
 
 <template>

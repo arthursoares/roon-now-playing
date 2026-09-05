@@ -15,6 +15,7 @@ A now-playing display for Roon and other music sources. Shows real-time album ar
 - Seventeen customizable font families
 - AI-generated facts about currently playing music (Anthropic/OpenAI/OpenRouter/Local LLM)
 - **Self-service onboarding** — displays auto-generate friendly names and show QR codes linking to per-screen config
+- **Kiosk tap lock** — disable layout taps and zone double-taps per display from Admin or its screen configuration; Smart Idle wake gestures remain available
 - Admin panel for managing connected clients and AI configuration
 - **Roon optional** — set `ROON_ENABLED=false` to run in external-sources-only mode, no Roon required
 - **External Sources API** for non-Roon music sources (see [External API Documentation](docs/external-api.md))

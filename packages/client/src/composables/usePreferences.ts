@@ -6,6 +6,7 @@ const STORAGE_KEY_LAYOUT = 'roon-screen-cover:layout';
 const STORAGE_KEY_FONT = 'roon-screen-cover:font';
 const STORAGE_KEY_BACKGROUND = 'roon-screen-cover:background';
 const STORAGE_KEY_ENABLED_LAYOUTS = 'roon-screen-cover:enabled-layouts';
+const STORAGE_KEY_LOCK_INTERACTIONS = 'roon-screen-cover:lock-interactions';
 
 function isValidLayout(value: string | null): value is LayoutType {
   return value !== null && (LAYOUTS as readonly string[]).includes(value);
@@ -37,6 +38,7 @@ export function usePreferences() {
   const font = ref<FontType>('system');
   const background = ref<BackgroundType>('black');
   const enabledLayouts = ref<LayoutType[] | null>(null);
+  const lockInteractions = ref<boolean>(false);
 
   function getUrlParams(): { zone: string | null; layout: LayoutType | null; font: FontType | null; background: BackgroundType | null } {
     const params = new URLSearchParams(window.location.search);
@@ -99,6 +101,9 @@ export function usePreferences() {
     // Enabled layouts: localStorage only (no URL param)
     const storedLayouts = localStorage.getItem(STORAGE_KEY_ENABLED_LAYOUTS);
     enabledLayouts.value = isValidEnabledLayouts(storedLayouts);
+
+    // Lock interactions: localStorage only (no URL param)
+    lockInteractions.value = localStorage.getItem(STORAGE_KEY_LOCK_INTERACTIONS) === 'true';
   }
 
   function saveZonePreference(zoneIdOrName: string): void {
@@ -142,6 +147,15 @@ export function usePreferences() {
     }
   }
 
+  function saveLockInteractionsPreference(value: boolean): void {
+    lockInteractions.value = value;
+    if (value) {
+      localStorage.setItem(STORAGE_KEY_LOCK_INTERACTIONS, 'true');
+    } else {
+      localStorage.removeItem(STORAGE_KEY_LOCK_INTERACTIONS);
+    }
+  }
+
   // Load on mount
   onMounted(() => {
     loadPreferences();
@@ -174,6 +188,8 @@ export function usePreferences() {
     clearZonePreference,
     enabledLayouts,
     saveEnabledLayoutsPreference,
+    lockInteractions,
+    saveLockInteractionsPreference,
     loadPreferences,
     reapplyUrlParams,
   };

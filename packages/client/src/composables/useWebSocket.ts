@@ -37,6 +37,7 @@ export interface RemoteSettingsHandler {
     fontScaleOverride?: number | null;
     artworkScaleOverride?: number | null;
     enabledLayouts?: LayoutType[] | null;
+    lockInteractions?: boolean;
     zoneId?: string;
     zoneName?: string;
   }) => void;
@@ -58,6 +59,7 @@ export interface UseWebSocketOptions {
     fontScaleOverride?: number | null;
     artworkScaleOverride?: number | null;
     enabledLayouts?: LayoutType[] | null;
+    lockInteractions?: boolean;
     zoneId?: string;
     zoneName?: string;
   }) => void;
@@ -236,6 +238,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
               fontScaleOverride: message.fontScaleOverride,
               artworkScaleOverride: message.artworkScaleOverride,
               enabledLayouts: message.enabledLayouts,
+              lockInteractions: message.lockInteractions,
               zoneId: message.zoneId,
               zoneName: message.zoneName,
             });
@@ -254,6 +257,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
           localStorage.removeItem('roon-screen-cover:layout');
           localStorage.removeItem('roon-screen-cover:font');
           localStorage.removeItem('roon-screen-cover:background');
+          localStorage.removeItem('roon-screen-cover:lock-interactions');
           window.location.reload();
           break;
       }

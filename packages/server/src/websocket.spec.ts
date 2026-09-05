@@ -40,12 +40,29 @@ describe('WebSocketManager settings replay', () => {
     first.socket.send(JSON.stringify(metadata('screen:one')));
     await vi.waitFor(() => expect(manager.getClientById('screen:one')).toBeDefined());
 
+    const sibling = await connect(`ws://127.0.0.1:${port}/ws`, sockets);
+    sibling.socket.send(JSON.stringify(metadata('screen:two')));
+    await vi.waitFor(() => expect(manager.getClientById('screen:two')).toBeDefined());
+
     expect(manager.pushSettingsToClient('screen:one', {
       artworkScaleOverride: 68,
       enabledLayouts: ['ambient', 'cover'],
+      lockInteractions: true,
     })).toBe(true);
+    await vi.waitFor(() => {
+      expect(first.messages).toContainEqual(expect.objectContaining({
+        type: 'remote_settings',
+        lockInteractions: true,
+      }));
+      expect(sibling.messages).toContainEqual(expect.objectContaining({
+        type: 'remote_settings',
+        lockInteractions: true,
+      }));
+    });
     first.socket.close();
     await new Promise<void>((resolve) => first.socket.once('close', () => resolve()));
+    sibling.socket.close();
+    await new Promise<void>((resolve) => sibling.socket.once('close', () => resolve()));
 
     const second = await connect(`ws://127.0.0.1:${port}/ws`, sockets);
     second.socket.send(JSON.stringify(metadata('screen:two')));
@@ -55,6 +72,7 @@ describe('WebSocketManager settings replay', () => {
         type: 'remote_settings',
         artworkScaleOverride: 68,
         enabledLayouts: ['ambient', 'cover'],
+        lockInteractions: true,
       }));
     });
 
@@ -77,6 +95,7 @@ describe('WebSocketManager settings replay', () => {
       fontScaleOverride: null,
       artworkScaleOverride: null,
       enabledLayouts: null,
+      lockInteractions: false,
     });
     server = createServer();
     const manager = new WebSocketManager(server, null);
@@ -93,6 +112,7 @@ describe('WebSocketManager settings replay', () => {
         fontScaleOverride: null,
         artworkScaleOverride: null,
         enabledLayouts: null,
+        lockInteractions: false,
       }));
     });
   });

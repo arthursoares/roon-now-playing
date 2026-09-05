@@ -21,8 +21,9 @@ export class ClientSettingsStore {
     try {
       if (fs.existsSync(this.filePath)) {
         const data = fs.readFileSync(this.filePath, 'utf-8');
-        type LegacyClientSettings = Omit<ClientSettings, 'fontScaleOverride' | 'artworkScaleOverride' | 'enabledLayouts'> &
-          Partial<Pick<ClientSettings, 'fontScaleOverride' | 'artworkScaleOverride' | 'enabledLayouts'>>;
+        type OptionalSetting = 'fontScaleOverride' | 'artworkScaleOverride' | 'enabledLayouts' | 'lockInteractions';
+        type LegacyClientSettings = Omit<ClientSettings, OptionalSetting> &
+          Partial<Pick<ClientSettings, OptionalSetting>>;
         const parsed = JSON.parse(data) as Record<string, LegacyClientSettings>;
         this.settings = new Map(
           Object.entries(parsed).map(([deviceId, settings]) => [deviceId, {
@@ -30,6 +31,7 @@ export class ClientSettingsStore {
             fontScaleOverride: settings.fontScaleOverride ?? null,
             artworkScaleOverride: settings.artworkScaleOverride ?? null,
             enabledLayouts: settings.enabledLayouts ?? null,
+            lockInteractions: settings.lockInteractions ?? false,
           }])
         );
         logger.info(`Loaded ${this.settings.size} client settings from ${this.filePath}`);

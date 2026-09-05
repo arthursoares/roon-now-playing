@@ -21,6 +21,8 @@ const {
   saveFontPreference,
   saveBackgroundPreference,
   saveEnabledLayoutsPreference,
+  lockInteractions,
+  saveLockInteractionsPreference,
   loadPreferences,
   reapplyUrlParams,
 } = usePreferences();
@@ -39,6 +41,7 @@ function handleRemoteSettings(settings: {
   fontScaleOverride?: number | null;
   artworkScaleOverride?: number | null;
   enabledLayouts?: LayoutType[] | null;
+  lockInteractions?: boolean;
   zoneId?: string;
   zoneName?: string;
 }) {
@@ -59,6 +62,9 @@ function handleRemoteSettings(settings: {
   }
   if (settings.enabledLayouts !== undefined) {
     saveEnabledLayoutsPreference(settings.enabledLayouts);
+  }
+  if (settings.lockInteractions !== undefined) {
+    saveLockInteractionsPreference(settings.lockInteractions);
   }
   if (settings.zoneId) {
     const urlZone = findZoneByPreference(wsState.value.zones, urlZonePreference);
@@ -317,6 +323,7 @@ onUnmounted(() => {
       :zone="selectedZone"
       :layout="activeLayout"
       :background="background"
+      :lock-interactions="lockInteractions"
       @change-zone="changeZone"
       @cycle-layout="cycleLayout"
     />
