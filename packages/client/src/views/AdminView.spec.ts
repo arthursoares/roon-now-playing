@@ -189,4 +189,26 @@ describe('Admin source authentication', () => {
     await vi.waitFor(() => expect(container.querySelector('#idleMode')).not.toBeNull());
     expect(container.textContent).not.toContain('Loading settings...');
   });
+
+  it('shows and saves the maximum output tokens advanced setting', async () => {
+    button('AI Facts').click();
+    await nextTick();
+    button('Advanced Settings').click();
+    await nextTick();
+
+    const input = container.querySelector<HTMLInputElement>('#maxOutputTokens');
+    expect(input).not.toBeNull();
+    expect(input!.value).toBe('1024');
+    expect(input!.min).toBe('1');
+    expect(input!.max).toBe('65536');
+
+    input!.value = '4096';
+    input!.dispatchEvent(new Event('input', { bubbles: true }));
+    button('Save Configuration').click();
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      '/api/facts/config',
+      expect.objectContaining({ body: expect.stringContaining('"maxOutputTokens":4096') }),
+    ));
+  });
 });

@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import type { FactsConfig, FactsRequest, FactsResponse, FactsTestResponse } from '@roon-screen-cover/shared';
-import { FactsConfigStore } from './factsConfig.js';
+import { FactsConfigStore, isValidMaxOutputTokens } from './factsConfig.js';
 import { FactsCache } from './factsCache.js';
 import { createLLMProvider } from './llm.js';
 import { logger } from './logger.js';
+import { OutputLimitError } from './llmErrors.js';
 
 export function createFactsRouter(): Router {
   const router = Router();
@@ -62,8 +63,15 @@ export function createFactsRouter(): Router {
         generatedAt: Date.now(),
       };
       res.json(response);
-    } catch {
-      logger.error('Failed to generate facts');
+    } catch (error) {
+      if (error instanceof OutputLimitError) {
+        logger.warn('Facts generation reached the configured output limit');
+        res.status(502).json({
+          error: { type: 'api-error', message: error.message },
+        });
+        return;
+      }
+      logger.error('Facts generation failed');
       res.status(500).json({
         error: { type: 'api-error', message: 'Failed to generate facts. Please try again.' },
       });
@@ -84,6 +92,13 @@ export function createFactsRouter(): Router {
   // Update facts configuration
   router.post('/facts/config', (req, res) => {
     const updates = req.body as Partial<FactsConfig>;
+
+    if (updates.maxOutputTokens !== undefined && !isValidMaxOutputTokens(updates.maxOutputTokens)) {
+      res.status(400).json({
+        error: 'maxOutputTokens must be an integer between 1 and 65536',
+      });
+      return;
+    }
 
     // Don't save masked API key (contains bullet points from UI display)
     if (updates.apiKey && updates.apiKey.includes('••••')) {
@@ -128,7 +143,14 @@ export function createFactsRouter(): Router {
 
       const response: FactsTestResponse = { facts, durationMs };
       res.json(response);
-    } catch {
+    } catch (error) {
+      if (error instanceof OutputLimitError) {
+        logger.warn('Facts test reached the configured output limit');
+        res.status(502).json({
+          error: { type: 'api-error', message: error.message },
+        });
+        return;
+      }
       logger.error('Facts test failed');
       res.status(500).json({
         error: { type: 'api-error', message: 'Failed to generate facts. Please try again.' },

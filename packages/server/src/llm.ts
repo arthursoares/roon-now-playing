@@ -1,8 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
-import type { FactsConfig } from '@roon-screen-cover/shared';
+import { DEFAULT_MAX_OUTPUT_TOKENS, type FactsConfig } from '@roon-screen-cover/shared';
 import { logger } from './logger.js';
 import { parseFactsResponse as parseFacts } from './parseFacts.js';
+import { OutputLimitError } from './llmErrors.js';
 
 export interface LLMProvider {
   generateFacts(artist: string, album: string, title: string): Promise<string[]>;
@@ -22,6 +23,34 @@ function parseFactsResponse(text: string): string[] {
     logger.warn(`[ParseFacts] No usable facts in ${text.length} response characters.`);
   }
   return facts;
+}
+
+function getMaxOutputTokens(config: FactsConfig): number {
+  return config.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
+}
+
+class ProviderHttpError extends Error {
+  constructor(readonly status: number) {
+    super('Provider request failed');
+    this.name = 'ProviderHttpError';
+  }
+}
+
+function logProviderError(provider: string, error: unknown): void {
+  if (error instanceof OutputLimitError) {
+    logger.warn(`${provider} response reached the configured output limit`);
+  } else {
+    const status = typeof error === 'object'
+      && error !== null
+      && 'status' in error
+      && typeof error.status === 'number'
+      && Number.isInteger(error.status)
+      ? error.status
+      : undefined;
+    logger.error(status === undefined
+      ? `${provider} request failed`
+      : `${provider} request failed with HTTP status ${status}`);
+  }
 }
 
 export class AnthropicProvider implements LLMProvider {
@@ -44,16 +73,20 @@ export class AnthropicProvider implements LLMProvider {
     try {
       const response = await this.client.messages.create({
         model: this.config.model,
-        max_tokens: 1024,
+        max_tokens: getMaxOutputTokens(this.config),
         messages: [{ role: 'user', content: prompt }],
       });
+
+      if (response.stop_reason === 'max_tokens') {
+        throw new OutputLimitError(getMaxOutputTokens(this.config));
+      }
 
       const textContent = response.content.find((c) => c.type === 'text');
       if (textContent && textContent.type === 'text') {
         return parseFactsResponse(textContent.text);
       }
     } catch (error) {
-      logger.error('Anthropic API request failed');
+      logProviderError('Anthropic API', error);
       throw error;
     }
 
@@ -84,15 +117,20 @@ export class OpenAIProvider implements LLMProvider {
         messages: [{ role: 'user', content: prompt }],
         // max_completion_tokens replaces the deprecated max_tokens and is required
         // by reasoning models (gpt-5 family, o-series); accepted by gpt-4.x too.
-        max_completion_tokens: 1024,
+        max_completion_tokens: getMaxOutputTokens(this.config),
       });
 
-      const content = response.choices[0]?.message?.content;
+      const choice = response.choices[0];
+      if (choice?.finish_reason === 'length') {
+        throw new OutputLimitError(getMaxOutputTokens(this.config));
+      }
+
+      const content = choice?.message?.content;
       if (content) {
         return parseFactsResponse(content);
       }
     } catch (error) {
-      logger.error('OpenAI API request failed');
+      logProviderError('OpenAI API', error);
       throw error;
     }
 
@@ -127,21 +165,26 @@ export class OpenRouterProvider implements LLMProvider {
         body: JSON.stringify({
           model: this.config.model,
           messages: [{ role: 'user', content: prompt }],
-          max_tokens: 1024,
+          max_tokens: getMaxOutputTokens(this.config),
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`OpenRouter API error (${response.status})`);
+        throw new ProviderHttpError(response.status);
       }
 
       const data = await response.json();
-      const content = data.choices?.[0]?.message?.content;
+      const choice = data.choices?.[0];
+      if (choice?.finish_reason === 'length') {
+        throw new OutputLimitError(getMaxOutputTokens(this.config));
+      }
+
+      const content = choice?.message?.content;
       if (content) {
         return parseFactsResponse(content);
       }
     } catch (error) {
-      logger.error('OpenRouter API request failed');
+      logProviderError('OpenRouter API', error);
       throw error;
     }
 
@@ -177,10 +220,8 @@ export class LocalLLMProvider implements LLMProvider {
     const requestBody = {
       model: this.config.model,
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 1024,
+      max_tokens: getMaxOutputTokens(this.config),
     };
-
-    logger.info('[LocalLLM] Requesting facts');
 
     try {
       const response = await fetch(url, {
@@ -192,13 +233,18 @@ export class LocalLLMProvider implements LLMProvider {
       logger.info(`[LocalLLM] Response status: ${response.status}`);
 
       if (!response.ok) {
-        throw new Error(`Local LLM API error (${response.status})`);
+        throw new ProviderHttpError(response.status);
       }
 
       const data = await response.json();
 
+      const choice = data.choices?.[0];
+      if (choice?.finish_reason === 'length') {
+        throw new OutputLimitError(getMaxOutputTokens(this.config));
+      }
+
       // Try content first, then reasoning (for "thinking" models like lfm2.5-thinking)
-      let content = data.choices?.[0]?.message?.content;
+      let content = choice?.message?.content;
 
       // Some thinking models put output in "reasoning" field instead of "content"
       if (!content && data.choices?.[0]?.message?.reasoning) {
@@ -214,9 +260,10 @@ export class LocalLLMProvider implements LLMProvider {
       }
     } catch (error) {
       if (error instanceof Error && error.message.includes('ECONNREFUSED')) {
-        throw new Error(`Cannot connect to local LLM at ${baseUrl}. Is Ollama/LM Studio running?`, { cause: error });
+        logger.error('Local LLM connection failed');
+        throw new Error('Cannot connect to the local LLM. Is Ollama/LM Studio running?', { cause: error });
       }
-      logger.error('Local LLM API request failed');
+      logProviderError('Local LLM API', error);
       throw error;
     }
 

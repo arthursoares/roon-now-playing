@@ -11,6 +11,9 @@ import {
   LLM_MODELS,
   DEFAULT_FACTS_PROMPT,
   DEFAULT_DISPLAY_SETTINGS,
+  DEFAULT_MAX_OUTPUT_TOKENS,
+  MAX_OUTPUT_TOKENS,
+  MIN_OUTPUT_TOKENS,
   type LayoutType,
   type FontType,
   type BackgroundType,
@@ -36,6 +39,7 @@ const factsConfig = ref<FactsConfig>({
   factsCount: 5,
   rotationInterval: 25,
   prompt: DEFAULT_FACTS_PROMPT,
+  maxOutputTokens: DEFAULT_MAX_OUTPUT_TOKENS,
   localBaseUrl: 'http://localhost:11434/v1',
 });
 const factsConfigLoading = ref(true);
@@ -303,7 +307,11 @@ async function loadFactsConfig(): Promise<void> {
     const response = await fetch('/api/facts/config');
     if (response.ok) {
       const config = await response.json();
-      factsConfig.value = config;
+      factsConfig.value = {
+        ...factsConfig.value,
+        ...config,
+        maxOutputTokens: config.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
+      };
     }
   } catch (error) {
     console.error('Failed to load facts config:', error);
@@ -348,6 +356,7 @@ function resetFactsConfig(): void {
     factsCount: 5,
     rotationInterval: 25,
     prompt: DEFAULT_FACTS_PROMPT,
+    maxOutputTokens: DEFAULT_MAX_OUTPUT_TOKENS,
     localBaseUrl: 'http://localhost:11434/v1',
   };
 }
@@ -1023,6 +1032,24 @@ onMounted(() => {
               </button>
 
               <div v-if="showAdvanced" class="card-content">
+                <div class="form-field">
+                  <label for="maxOutputTokens">Maximum output tokens</label>
+                  <div class="number-input">
+                    <input
+                      id="maxOutputTokens"
+                      type="number"
+                      v-model.number="factsConfig.maxOutputTokens"
+                      :min="MIN_OUTPUT_TOKENS"
+                      :max="MAX_OUTPUT_TOKENS"
+                      step="1"
+                    />
+                    <span class="number-hint">1-65,536</span>
+                  </div>
+                  <p class="field-hint">
+                    Increase this if responses are cut off before all facts are returned. Provider and model limits still apply.
+                  </p>
+                </div>
+
                 <div class="form-field full-width">
                   <label for="prompt">Custom Prompt Template</label>
                   <textarea
