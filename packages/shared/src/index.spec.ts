@@ -23,6 +23,7 @@ describe('shared configuration registries', () => {
       'facts-overlay',
       'facts-carousel',
       'basic',
+      'album-wall',
     ]);
     expect(new Set(LAYOUTS).size).toBe(LAYOUTS.length);
   });

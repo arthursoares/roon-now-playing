@@ -10,7 +10,7 @@ A now-playing display for Roon and other music sources. Shows real-time album ar
 
 - Real-time album artwork and track metadata display
 - Multiple simultaneous clients viewing different zones
-- Nine display layouts including AI-powered Facts layouts
+- Ten display layouts including Album Wall and AI-powered Facts layouts
 - Fourteen background options with dynamic color extraction
 - Seventeen customizable font families
 - AI-generated facts about currently playing music (Anthropic/OpenAI/OpenRouter/Local LLM)
@@ -78,7 +78,7 @@ pnpm dev
 | Parameter | Values | Description |
 |-----------|--------|-------------|
 | `zone` | Zone name or ID | Auto-select zone (e.g., `?zone=Living%20Room`) |
-| `layout` | `detailed`, `minimal`, `fullscreen`, `ambient`, `cover`, `facts-columns`, `facts-overlay`, `facts-carousel`, `basic` | Display layout |
+| `layout` | `detailed`, `minimal`, `fullscreen`, `ambient`, `cover`, `facts-columns`, `facts-overlay`, `facts-carousel`, `basic`, `album-wall` | Display layout |
 | `background` | See [Backgrounds](#backgrounds) section | Background style |
 | `font` | See [Fonts](#fonts) section | Font family |
 
@@ -102,10 +102,21 @@ Example: `http://localhost:3000/?zone=Office&layout=detailed&background=gradient
 | `facts-overlay` | Full artwork background with facts overlaid at the bottom. |
 | `facts-carousel` | Blurred artwork background with the rotating fact shown as large type, plus a compact now-playing chip. Sized for legibility on TVs. |
 | `basic` | Legacy-compatible layout for older browsers (iOS 12+). Artwork with title, artist, album, and progress bar. Auto-adapts to portrait/landscape. |
+| `album-wall` | A prominent current album with a gallery of recent albums from the selected zone. History persists across restarts and supports Roon and external sources. |
 
 **Note:** Facts layouts require an LLM provider configured in the Admin panel. Supported providers: Anthropic, OpenAI, OpenRouter, or Local LLM (Ollama/LM Studio).
 
 **Note:** The `basic` layout is designed for older browsers like iOS 12 Safari. It avoids modern CSS features (gap, aspect-ratio, backdrop-filter) for maximum compatibility on legacy devices used as dedicated displays.
+
+### Album Wall
+
+Choose **Album wall** in screen configuration or open `/?layout=album-wall`.
+The server retains the 12 most recent distinct artist/album pairs for each zone,
+including the current album, in `DATA_DIR/album-history.json`. Consecutive tracks
+from one album share a single entry; returning to an older album moves it to the
+front. History gathers as the server observes playback, including when no display
+is connected. Paused/stopped updates and tracks without album metadata do not add
+entries. Missing or unavailable covers show placeholders.
 
 ### Screenshots
 
