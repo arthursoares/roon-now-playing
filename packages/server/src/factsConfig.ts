@@ -1,7 +1,12 @@
 import fs from 'fs';
 import path from 'path';
 import type { FactsConfig, LLMProvider } from '@roon-screen-cover/shared';
-import { DEFAULT_FACTS_PROMPT } from '@roon-screen-cover/shared';
+import {
+  DEFAULT_FACTS_PROMPT,
+  DEFAULT_MAX_OUTPUT_TOKENS,
+  MAX_OUTPUT_TOKENS,
+  MIN_OUTPUT_TOKENS,
+} from '@roon-screen-cover/shared';
 import { logger } from './logger.js';
 
 const DATA_DIR = process.env.DATA_DIR || './config';
@@ -15,8 +20,16 @@ export const DEFAULT_CONFIG: FactsConfig = {
   factsCount: 5,
   rotationInterval: 25,
   prompt: DEFAULT_FACTS_PROMPT,
+  maxOutputTokens: DEFAULT_MAX_OUTPUT_TOKENS,
   localBaseUrl: DEFAULT_LOCAL_BASE_URL,
 };
+
+export function isValidMaxOutputTokens(value: unknown): value is number {
+  return typeof value === 'number'
+    && Number.isInteger(value)
+    && value >= MIN_OUTPUT_TOKENS
+    && value <= MAX_OUTPUT_TOKENS;
+}
 
 export class FactsConfigStore {
   private config: FactsConfig;
@@ -34,6 +47,10 @@ export class FactsConfigStore {
         const data = fs.readFileSync(this.configPath, 'utf-8');
         const parsed = JSON.parse(data) as Partial<FactsConfig>;
         this.config = { ...DEFAULT_CONFIG, ...parsed };
+
+        if (!isValidMaxOutputTokens(parsed.maxOutputTokens)) {
+          this.config.maxOutputTokens = DEFAULT_MAX_OUTPUT_TOKENS;
+        }
 
         // Clear any corrupted API key (e.g., contains mask characters)
         if (this.config.apiKey && this.containsNonAscii(this.config.apiKey)) {
@@ -99,6 +116,12 @@ export class FactsConfigStore {
   }
 
   update(partial: Partial<FactsConfig>): void {
+    if (partial.maxOutputTokens !== undefined && !isValidMaxOutputTokens(partial.maxOutputTokens)) {
+      throw new RangeError(
+        `maxOutputTokens must be an integer between ${MIN_OUTPUT_TOKENS} and ${MAX_OUTPUT_TOKENS}`,
+      );
+    }
+
     // Don't save API keys containing non-ASCII characters (e.g., masked keys with bullets)
     if (partial.apiKey && this.containsNonAscii(partial.apiKey)) {
       logger.warn('Rejecting API key update: contains non-ASCII characters');

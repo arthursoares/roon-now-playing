@@ -3,7 +3,7 @@ import type { WebSocketManager } from './websocket.js';
 import type { LayoutType, FontType, BackgroundType } from '@roon-screen-cover/shared';
 import { LAYOUTS, FONTS, BACKGROUNDS } from '@roon-screen-cover/shared';
 import { logger } from './logger.js';
-import { loadDisplaySettings, saveDisplaySettings } from './display-settings.js';
+import { loadDisplaySettings, saveDisplaySettings, validateDisplaySettingsUpdate } from './display-settings.js';
 
 export function createAdminRouter(wsManager: WebSocketManager): Router {
   const router = Router();
@@ -150,18 +150,21 @@ export function createAdminRouter(wsManager: WebSocketManager): Router {
 
   // Update display settings
   router.post('/display-settings', (req, res) => {
-    const { fontScale, artworkScale } = req.body;
+    const error = validateDisplaySettingsUpdate(req.body);
+    if (error) {
+      res.status(400).json({ error });
+      return;
+    }
     const settings = loadDisplaySettings();
+    Object.assign(settings, req.body);
 
-    if (typeof fontScale === 'number' && fontScale >= 0.75 && fontScale <= 1.5) {
-      settings.fontScale = fontScale;
+    try {
+      saveDisplaySettings(settings);
+    } catch (saveError) {
+      logger.error(`Failed to save display settings: ${saveError instanceof Error ? saveError.message : 'unknown error'}`);
+      res.status(500).json({ error: 'Failed to save display settings' });
+      return;
     }
-
-    if (typeof artworkScale === 'number' && artworkScale >= 50 && artworkScale <= 100) {
-      settings.artworkScale = artworkScale;
-    }
-
-    saveDisplaySettings(settings);
     wsManager.broadcastDisplaySettings(settings);
     res.json(settings);
   });

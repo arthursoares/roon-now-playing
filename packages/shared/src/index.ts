@@ -35,6 +35,8 @@ export const LAYOUTS = [
   'facts-overlay',
   'facts-carousel',
   'basic',
+  'album-wall',
+  'album-gallery',
 ] as const;
 export type LayoutType = (typeof LAYOUTS)[number];
 
@@ -150,8 +152,13 @@ export interface FactsConfig {
   factsCount: number;
   rotationInterval: number;
   prompt: string;
+  maxOutputTokens?: number;
   localBaseUrl?: string; // Only used for 'local' provider
 }
+
+export const DEFAULT_MAX_OUTPUT_TOKENS = 1024;
+export const MIN_OUTPUT_TOKENS = 1;
+export const MAX_OUTPUT_TOKENS = 65536;
 
 // Facts API types
 export interface FactsRequest {
@@ -237,6 +244,26 @@ export interface ServerSeekMessage {
   seek_position: number;
 }
 
+export interface RecentAlbum {
+  id: string;
+  artist: string;
+  album: string;
+  artwork_key: string | null;
+  last_played_at: number;
+}
+
+export const ALBUM_HISTORY_LIMIT = 12;
+
+export function getAlbumId(artist: string, album: string): string {
+  return JSON.stringify([artist.trim().toLowerCase(), album.trim().toLowerCase()]);
+}
+
+export interface ServerAlbumHistoryMessage {
+  type: 'album_history';
+  zone_id: string;
+  albums: RecentAlbum[];
+}
+
 export interface ServerErrorMessage {
   type: 'error';
   message: string;
@@ -265,6 +292,17 @@ export interface ClientMetadata {
   fontScaleOverride?: number | null; // null = use global, number = custom
   artworkScaleOverride?: number | null;
   enabledLayouts?: LayoutType[] | null;
+}
+
+export interface PersistedClientSettings {
+  layout: LayoutType;
+  font: FontType;
+  background: BackgroundType;
+  zoneId: string | null;
+  zoneName: string | null;
+  fontScaleOverride: number | null;
+  artworkScaleOverride: number | null;
+  enabledLayouts: LayoutType[] | null;
 }
 
 export interface ClientMetadataMessage {
@@ -319,11 +357,28 @@ export interface ServerClientResetMessage {
 export interface DisplaySettings {
   fontScale: number;
   artworkScale: number;
+  idleMode: IdleMode;
+  idleLayout: LayoutType;
+  idleDelayMinutes: number;
+  nightDimmingEnabled: boolean;
+  nightDimmingStart: string;
+  nightDimmingEnd: string;
+  nightBrightness: number;
 }
+
+export const IDLE_MODES = ['off', 'clock', 'black', 'layout'] as const;
+export type IdleMode = (typeof IDLE_MODES)[number];
 
 export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
   fontScale: 1.0,
   artworkScale: 100,
+  idleMode: 'off',
+  idleLayout: 'cover',
+  idleDelayMinutes: 5,
+  nightDimmingEnabled: false,
+  nightDimmingStart: '22:00',
+  nightDimmingEnd: '07:00',
+  nightBrightness: 30,
 };
 
 export interface DisplaySettingsUpdateMessage {
@@ -381,6 +436,7 @@ export type ServerMessage =
   | ServerZonesMessage
   | ServerNowPlayingMessage
   | ServerSeekMessage
+  | ServerAlbumHistoryMessage
   | ServerErrorMessage
   | ServerConnectionMessage
   | ServerClientsListMessage

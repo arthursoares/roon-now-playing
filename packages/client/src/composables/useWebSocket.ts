@@ -1,4 +1,5 @@
 import { ref, onMounted, onUnmounted, type Ref } from 'vue';
+import { DEFAULT_DISPLAY_SETTINGS } from '@roon-screen-cover/shared';
 import type {
   ServerMessage,
   ClientMessage,
@@ -10,6 +11,7 @@ import type {
   BackgroundType,
   ClientMetadata,
   DisplaySettings,
+  RecentAlbum,
 } from '@roon-screen-cover/shared';
 import { useClientId } from './useClientId';
 
@@ -20,6 +22,7 @@ export interface WebSocketState {
   friendlyName: string | null;
   zones: Zone[];
   nowPlaying: NowPlaying | null;
+  albumHistory: RecentAlbum[];
   // Admin-only state
   clients: ClientMetadata[];
   // Display settings
@@ -70,8 +73,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     friendlyName: null,
     zones: [],
     nowPlaying: null,
+    albumHistory: [],
     clients: [],
-    displaySettings: { fontScale: 1, artworkScale: 100 },
+    displaySettings: { ...DEFAULT_DISPLAY_SETTINGS },
   });
 
   let ws: WebSocket | null = null;
@@ -176,12 +180,20 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
           break;
 
         case 'now_playing':
-          state.value.nowPlaying = {
-            zone_id: message.zone_id,
-            state: message.state,
-            track: message.track,
-            seek_position: message.seek_position,
-          };
+          if (message.zone_id === subscribedZoneId) {
+            state.value.nowPlaying = {
+              zone_id: message.zone_id,
+              state: message.state,
+              track: message.track,
+              seek_position: message.seek_position,
+            };
+          }
+          break;
+
+        case 'album_history':
+          if (message.zone_id === subscribedZoneId) {
+            state.value.albumHistory = [...message.albums];
+          }
           break;
 
         case 'seek':
@@ -257,6 +269,10 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   }
 
   function subscribeToZone(zoneId: string, zoneName?: string): void {
+    if (subscribedZoneId !== zoneId) {
+      state.value.nowPlaying = null;
+      state.value.albumHistory = [];
+    }
     subscribedZoneId = zoneId;
     subscribedZoneName = zoneName || null;
     send({ type: 'subscribe', zone_id: zoneId });
@@ -268,6 +284,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     subscribedZoneId = null;
     subscribedZoneName = null;
     state.value.nowPlaying = null;
+    state.value.albumHistory = [];
     send({ type: 'unsubscribe' });
     // Update metadata to reflect zone change
     sendMetadata();

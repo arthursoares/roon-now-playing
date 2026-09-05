@@ -9,6 +9,24 @@ interface CachedFacts {
   generatedAt: number;
 }
 
+function readFacts(value: unknown): string[] | null {
+  if (!Array.isArray(value) || !value.every((item): item is string => typeof item === 'string')) return null;
+  return value.map((fact) => fact.trim()).filter(Boolean);
+}
+
+function readError(value: unknown): FactsError {
+  if (typeof value === 'string' && value.trim()) return { type: 'api-error', message: value };
+  if (value && typeof value === 'object') {
+    const error = value as Partial<FactsError>;
+    return {
+      type: error.type === 'no-key' || error.type === 'empty' ? error.type : 'api-error',
+      message: typeof error.message === 'string' && error.message.trim()
+        ? error.message : 'Facts are unavailable right now. Please try again.',
+    };
+  }
+  return { type: 'api-error', message: 'Facts are unavailable right now. Please try again.' };
+}
+
 function getCacheKey(artist: string, album: string, title: string): string {
   return `facts::${artist.toLowerCase()}::${album.toLowerCase()}::${title.toLowerCase()}`;
 }
@@ -17,7 +35,12 @@ function getFromSessionStorage(key: string): CachedFacts | null {
   try {
     const cached = sessionStorage.getItem(key);
     if (cached) {
-      return JSON.parse(cached) as CachedFacts;
+      const parsed = JSON.parse(cached);
+      const facts = readFacts(parsed?.facts);
+      if (facts?.length) {
+        return { facts, generatedAt: typeof parsed.generatedAt === 'number' && Number.isFinite(parsed.generatedAt) ? parsed.generatedAt : Date.now() };
+      }
+      sessionStorage.removeItem(key);
     }
   } catch {
     // Ignore parse errors
@@ -55,6 +78,8 @@ export function useFacts(
 
   let debounceTimer: number | null = null;
   let rotationTimer: number | null = null;
+  let requestGeneration = 0;
+  let active = true;
 
   // Fetch rotation interval from server config (immediately on composable init)
   fetch('/api/facts/config')
@@ -65,7 +90,7 @@ export function useFacts(
       return null;
     })
     .then((config) => {
-      if (config && typeof config.rotationInterval === 'number' && config.rotationInterval > 0) {
+      if (active && config && typeof config.rotationInterval === 'number' && config.rotationInterval > 0) {
         rotationIntervalSec.value = config.rotationInterval;
       }
     })
@@ -114,19 +139,23 @@ export function useFacts(
     const displayTime = rotationIntervalSec.value * 1000;
 
     rotationTimer = window.setTimeout(() => {
+      rotationTimer = null;
+      if (!active) return;
       currentFactIndex.value = (currentFactIndex.value + 1) % facts.value.length;
       scheduleNextRotation();
     }, displayTime);
   }
 
-  async function fetchFacts(trackData: Track): Promise<void> {
+  async function fetchFacts(trackData: Track, generation: number): Promise<void> {
     const cacheKey = getCacheKey(trackData.artist, trackData.album, trackData.title);
 
     // Check sessionStorage cache first
     const cachedData = getFromSessionStorage(cacheKey);
     if (cachedData) {
+      if (!active || generation !== requestGeneration) return;
       facts.value = cachedData.facts;
       cached.value = true;
+      isLoading.value = false;
       error.value = null;
       scheduleNextRotation();
       return;
@@ -146,15 +175,32 @@ export function useFacts(
         }),
       });
 
-      const data = await response.json();
+      const body: unknown = await response.json();
+      const data = body && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : {};
 
-      if (!response.ok) {
-        error.value = data.error as FactsError;
+      if (!active || generation !== requestGeneration) return;
+
+      if (!response.ok || data.error) {
+        error.value = readError(data.error);
         facts.value = [];
+        cached.value = false;
         return;
       }
 
-      const factsResponse = data as FactsResponse;
+      const parsedFacts = readFacts(data.facts);
+      if (!parsedFacts?.length) {
+        facts.value = [];
+        cached.value = false;
+        error.value = parsedFacts
+          ? { type: 'empty', message: 'No usable facts could be generated. Please try again.' }
+          : { type: 'api-error', message: 'The facts service returned an invalid response. Please try again.' };
+        return;
+      }
+      const factsResponse: FactsResponse = {
+        facts: parsedFacts,
+        cached: data.cached === true,
+        generatedAt: typeof data.generatedAt === 'number' && Number.isFinite(data.generatedAt) ? data.generatedAt : Date.now(),
+      };
       facts.value = factsResponse.facts;
       cached.value = factsResponse.cached;
       error.value = null;
@@ -165,16 +211,19 @@ export function useFacts(
         generatedAt: factsResponse.generatedAt,
       });
     } catch (err) {
+      if (!active || generation !== requestGeneration) return;
       error.value = {
         type: 'api-error',
         message: err instanceof Error ? err.message : 'Unknown error',
       };
       facts.value = [];
     } finally {
-      isLoading.value = false;
-      // Schedule rotation AFTER loading is complete, so first fact gets full display time
-      if (facts.value.length > 1 && playbackState.value === 'playing') {
-        scheduleNextRotation();
+      if (active && generation === requestGeneration) {
+        isLoading.value = false;
+        // Schedule rotation AFTER loading is complete, so first fact gets full display time
+        if (facts.value.length > 1 && playbackState.value === 'playing') {
+          scheduleNextRotation();
+        }
       }
     }
   }
@@ -194,6 +243,8 @@ export function useFacts(
         return;
       }
 
+      const generation = ++requestGeneration;
+
       // Clear existing timers only when track actually changes
       clearDebounceTimer();
       clearRotationTimer();
@@ -204,15 +255,20 @@ export function useFacts(
         currentFactIndex.value = 0;
         cached.value = false;
         error.value = null;
+        isLoading.value = false;
       }
 
       if (!newTrack) {
         return;
       }
 
+      isLoading.value = true;
+
       // Debounce the fetch
       debounceTimer = window.setTimeout(() => {
-        fetchFacts(newTrack);
+        debounceTimer = null;
+        if (!active || generation !== requestGeneration) return;
+        fetchFacts(newTrack, generation);
       }, DEBOUNCE_DELAY);
     },
     { immediate: true }
@@ -235,8 +291,11 @@ export function useFacts(
   // to ensure the first fact gets its full display time.
 
   onUnmounted(() => {
+    active = false;
+    requestGeneration++;
     clearDebounceTimer();
     clearRotationTimer();
+    isLoading.value = false;
   });
 
   return {

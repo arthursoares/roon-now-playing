@@ -9,6 +9,7 @@
     "dev:server": "pnpm --filter @roon-screen-cover/server dev",
     "dev:client": "pnpm --filter @roon-screen-cover/client dev",
     "build": "pnpm run build:shared && pnpm run build:client && pnpm run build:server",
+    "clean:shared": "pnpm --filter @roon-screen-cover/shared exec tsc --build --clean",
     "build:shared": "pnpm --filter @roon-screen-cover/shared build",
     "build:client": "pnpm --filter @roon-screen-cover/client build",
     "build:server": "pnpm --filter @roon-screen-cover/server build",
@@ -21,14 +22,20 @@
     "test:e2e:matrix": "playwright test --grep 'Matrix' --project=iPad-landscape --project=TV-1080p --project=TV-4K",
     "review:pack": "bash e2e/build-review-pack.sh",
     "review:gallery": "node e2e/build-gallery.mjs",
-    "typecheck": "pnpm -r typecheck",
-    "lint": "eslint packages --ext .ts,.vue"
+    "typecheck": "pnpm run clean:shared && pnpm run build:shared && pnpm -r typecheck",
+    "lint": "eslint packages"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.58.1",
     "@types/node": "^25.0.10",
+    "@vitejs/plugin-vue": "^6.0.3",
+    "eslint": "^10.10.0",
+    "eslint-plugin-vue": "^10.10.0",
+    "globals": "^17.12.0",
     "jsdom": "^27.4.0",
     "typescript": "~5.9.3",
+    "typescript-eslint": "^8.69.0",
     "vitest": "^4.0.18"
   },
   "packageManager": "pnpm@10.28.2",

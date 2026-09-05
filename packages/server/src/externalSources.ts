@@ -33,6 +33,7 @@ export class ExternalSourceManager extends EventEmitter {
   private zonesPath: string;
   private timeoutChecker: NodeJS.Timeout | null = null;
   private artworkCallback?: (url: string) => Promise<string | null>;
+  private base64ArtworkCallback?: (base64: string) => Promise<string | null>;
 
   constructor(zonesPath: string = DEFAULT_ZONES_PATH) {
     super();
@@ -43,6 +44,10 @@ export class ExternalSourceManager extends EventEmitter {
 
   setArtworkCallback(callback: (url: string) => Promise<string | null>): void {
     this.artworkCallback = callback;
+  }
+
+  setBase64ArtworkCallback(callback: (base64: string) => Promise<string | null>): void {
+    this.base64ArtworkCallback = callback;
   }
 
   private load(): void {
@@ -140,6 +145,8 @@ export class ExternalSourceManager extends EventEmitter {
       // Handle artwork
       if (payload.artwork_url && this.artworkCallback) {
         artworkKey = await this.artworkCallback(payload.artwork_url);
+      } else if (payload.artwork_base64 && this.base64ArtworkCallback) {
+        artworkKey = await this.base64ArtworkCallback(payload.artwork_base64);
       }
 
       track = {

@@ -17,7 +17,7 @@
  *   Then localStorage should be updated
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { usePreferences } from './usePreferences';
 
 describe('usePreferences', () => {

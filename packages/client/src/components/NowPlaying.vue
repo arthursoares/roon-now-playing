@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Zone, NowPlaying as NowPlayingType, LayoutType, BackgroundType } from '@roon-screen-cover/shared';
+import type { Zone, NowPlaying as NowPlayingType, LayoutType, BackgroundType, RecentAlbum } from '@roon-screen-cover/shared';
 import { useNowPlaying } from '../composables/useNowPlaying';
 import MinimalLayout from '../layouts/MinimalLayout.vue';
 import DetailedLayout from '../layouts/DetailedLayout.vue';
@@ -11,13 +11,17 @@ import FactsColumnsLayout from '../layouts/FactsColumnsLayout.vue';
 import FactsOverlayLayout from '../layouts/FactsOverlayLayout.vue';
 import FactsCarouselLayout from '../layouts/FactsCarouselLayout.vue';
 import BasicLayout from '../layouts/BasicLayout.vue';
+import AlbumWallLayout from '../layouts/AlbumWallLayout.vue';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   nowPlaying: NowPlayingType | null;
+  albumHistory?: RecentAlbum[];
   zone: Zone;
   layout: LayoutType;
   background: BackgroundType;
-}>();
+}>(), {
+  albumHistory: () => [],
+});
 
 const emit = defineEmits<{
   'change-zone': [];
@@ -52,6 +56,9 @@ const layoutComponent = computed(() => {
       return FactsCarouselLayout;
     case 'basic':
       return BasicLayout;
+    case 'album-wall':
+    case 'album-gallery':
+      return AlbumWallLayout;
     default:
       return DetailedLayout;
   }
@@ -83,6 +90,9 @@ function handleDoubleClick(): void {
       :artwork-url="artworkUrl"
       :zone-name="zone.display_name"
       :background="background"
+      v-bind="layout === 'album-wall' || layout === 'album-gallery'
+        ? { albumHistory, galleryOnly: layout === 'album-gallery' }
+        : {}"
     />
   </div>
 </template>

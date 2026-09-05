@@ -5,6 +5,7 @@ import ProgressBar from '../components/ProgressBar.vue';
 import DynamicBackground from '../components/DynamicBackground.vue';
 import { useColorExtraction } from '../composables/useColorExtraction';
 import { useBackgroundStyle } from '../composables/useBackgroundStyle';
+import { isDynamicBackground } from '../utils/backgrounds';
 
 const props = defineProps<{
   track: Track | null;
@@ -23,21 +24,8 @@ const artworkUrlRef = computed(() => props.artworkUrl);
 const { colors, vibrantGradient, palette } = useColorExtraction(artworkUrlRef);
 const { style: backgroundStyle } = useBackgroundStyle(backgroundRef, colors, vibrantGradient);
 
-// Background types handled by DynamicBackground component
-const dynamicBackgroundTypes: BackgroundType[] = [
-  'gradient-linear-multi',
-  'gradient-radial-corner',
-  'gradient-mesh',
-  'blur-subtle',
-  'blur-heavy',
-  'duotone',
-  'posterized',
-  'gradient-noise',
-  'blur-grain',
-];
-
 const usesDynamicBackground = computed(() =>
-  dynamicBackgroundTypes.includes(props.background)
+  isDynamicBackground(props.background)
 );
 </script>
 

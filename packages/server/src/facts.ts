@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import type { FactsConfig, FactsRequest, FactsResponse, FactsTestResponse } from '@roon-screen-cover/shared';
-import { FactsConfigStore } from './factsConfig.js';
+import { FactsConfigStore, isValidMaxOutputTokens } from './factsConfig.js';
 import { FactsCache } from './factsCache.js';
 import { createLLMProvider } from './llm.js';
 import { logger } from './logger.js';
+import { OutputLimitError } from './llmErrors.js';
 
 export function createFactsRouter(): Router {
   const router = Router();
@@ -21,7 +22,7 @@ export function createFactsRouter(): Router {
 
     const config = configStore.get();
 
-    if (!config.apiKey) {
+    if (!config.apiKey && config.provider !== 'local') {
       res.status(503).json({
         error: { type: 'no-key', message: 'No API key configured' },
       });
@@ -47,8 +48,8 @@ export function createFactsRouter(): Router {
       const facts = await provider.generateFacts(artist, album, title);
 
       if (facts.length === 0) {
-        res.status(200).json({
-          error: { type: 'empty', message: 'No facts generated' },
+        res.status(502).json({
+          error: { type: 'empty', message: 'No usable facts could be generated. Please try again.' },
         });
         return;
       }
@@ -63,9 +64,16 @@ export function createFactsRouter(): Router {
       };
       res.json(response);
     } catch (error) {
-      logger.error(`Failed to generate facts: ${error}`);
+      if (error instanceof OutputLimitError) {
+        logger.warn('Facts generation reached the configured output limit');
+        res.status(502).json({
+          error: { type: 'api-error', message: error.message },
+        });
+        return;
+      }
+      logger.error('Facts generation failed');
       res.status(500).json({
-        error: { type: 'api-error', message: 'Failed to generate facts' },
+        error: { type: 'api-error', message: 'Failed to generate facts. Please try again.' },
       });
     }
   });
@@ -84,6 +92,13 @@ export function createFactsRouter(): Router {
   // Update facts configuration
   router.post('/facts/config', (req, res) => {
     const updates = req.body as Partial<FactsConfig>;
+
+    if (updates.maxOutputTokens !== undefined && !isValidMaxOutputTokens(updates.maxOutputTokens)) {
+      res.status(400).json({
+        error: 'maxOutputTokens must be an integer between 1 and 65536',
+      });
+      return;
+    }
 
     // Don't save masked API key (contains bullet points from UI display)
     if (updates.apiKey && updates.apiKey.includes('••••')) {
@@ -119,22 +134,27 @@ export function createFactsRouter(): Router {
       const facts = await provider.generateFacts(artist, album, title);
       const durationMs = Date.now() - startTime;
 
-      const response: FactsTestResponse = { facts, durationMs };
-
-      // Add warning if no facts were parsed (likely model output format issue)
       if (facts.length === 0) {
-        logger.warn(`Facts test returned 0 facts - model may not be returning valid JSON array. Check server logs for details.`);
-        res.json({
-          ...response,
-          warning: 'Model returned content but no facts could be parsed. The model may not be following the JSON array format. Check server logs for raw response.'
+        res.status(502).json({
+          error: { type: 'empty', message: 'No usable facts could be generated. Please try again.' },
         });
         return;
       }
 
+      const response: FactsTestResponse = { facts, durationMs };
       res.json(response);
     } catch (error) {
-      logger.error(`Facts test failed: ${error}`);
-      res.status(500).json({ error: `API error: ${error}` });
+      if (error instanceof OutputLimitError) {
+        logger.warn('Facts test reached the configured output limit');
+        res.status(502).json({
+          error: { type: 'api-error', message: error.message },
+        });
+        return;
+      }
+      logger.error('Facts test failed');
+      res.status(500).json({
+        error: { type: 'api-error', message: 'Failed to generate facts. Please try again.' },
+      });
     }
   });
 
