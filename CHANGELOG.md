@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.10.0] - 2026-09-05
+
+### Added
+
+- **Album Wall and Album Gallery**: Show the current album with recent listening history, or fill the viewport with covers only. Store the last 12 distinct artist/album pairs per zone from Roon and external sources, retaining history across restarts.
+- **Smart Idle and night dimming**: Optional clock, black-screen, or selected-layout idle presentations after a configurable pause/stop delay; return on playback or wake gestures. Scheduled dimming follows the display's local time and affects the page, not device power or hardware brightness.
+- **Per-display tap lock**: Disable layout taps and zone double-taps from Admin or screen configuration while retaining Smart Idle wake gestures. Persist and replay the setting; clear its local preference on display reset.
+- **Configurable facts output limit**: Advanced Settings accepts 1–65,536 output tokens for all four providers, retaining 1024 for existing configurations. Explicit truncation is reported before parsing or caching; provider/model limits still apply.
+- Project website and expanded unit, API, WebSocket, and browser regression coverage.
+
+### Fixed
+
+- Malformed facts responses no longer blank the display. Recover supported formatting mistakes conservatively, validate response/cache shapes, and keep artwork and metadata visible on failures. Local generation works without a key when the model server allows it.
+- Do not log raw provider responses or exception details that may contain credentials.
+- Apply font scaling to Basic text and the Fullscreen idle message.
+- Give rapid double-taps a 275 ms window before changing the layout; cancel pending taps when locking or unmounting.
+- Replay all saved display overrides, including cleared defaults, before persisting a reconnecting display's state.
+- Ignore stale asynchronous facts/palette results and clear timers when tracks or views change.
+- Honor `DATA_DIR` for global display settings and accept external-source base64 artwork through the existing cache.
+
+### Upgrade notes
+
+- Preserve existing configuration/artwork volumes. Smart Idle, night dimming, and tap locking are off by default; album history fills from playback after upgrading.
+- Protected source configuration changes and key rotation now require the current key in `X-API-Key`. The Admin Sources page accepts it. Rotation immediately invalidates the old key; see `docs/external-api.md` for filesystem recovery.
+- Repository guidance now lives in `AGENTS.md`; the obsolete assistant framework and duplicated summaries were removed.
+
+### Thanks
+
+- @leolobato for tap controls and font scaling (#18, #19).
+- @MikeO3 for detailed local-model reports and @lmgithu for OpenRouter reports and the output-limit request (#14, #16).
+- @webbrain-one for the parsing-recovery investigation and proposal (#21).
+
 ## [1.9.0] - 2026-06-17
 
 ### Added
