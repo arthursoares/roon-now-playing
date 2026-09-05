@@ -3,9 +3,11 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
+const serverUrl = process.env.E2E_SERVER_URL ?? 'http://localhost:3000';
+
 async function seedAlbums(page: Page, zone: string, count = 12) {
   await expect.poll(async () => {
-    try { return (await page.request.get('http://localhost:3000/api/health')).status(); }
+    try { return (await page.request.get(`${serverUrl}/api/health`)).status(); }
     catch { return 0; }
   }).toBe(200);
 
@@ -28,7 +30,7 @@ async function seedAlbums(page: Page, zone: string, count = 12) {
   }), count);
 
   for (let i = 0; i < count; i++) {
-    const response = await page.request.post(`http://localhost:3000/api/sources/${zone}/now-playing`, {
+    const response = await page.request.post(`${serverUrl}/api/sources/${zone}/now-playing`, {
       data: {
         zone_name: 'Listening room', state: 'playing', title: 'A Place Between the Notes',
         artist: `The Session ${i + 1}`, album: `Evening Studies ${i + 1}`,
@@ -80,7 +82,7 @@ test('Album Wall clears history on zone changes and renders missing artwork', as
   const first = `wall-${randomUUID()}`;
   const second = `wall-${randomUUID()}`;
   await seedAlbums(page, first, 3);
-  const response = await page.request.post(`http://localhost:3000/api/sources/${second}/now-playing`, {
+  const response = await page.request.post(`${serverUrl}/api/sources/${second}/now-playing`, {
     data: { zone_name: 'Other room', state: 'playing', title: 'No cover yet', artist: 'New artist', album: 'New album' },
   });
   expect(response.ok()).toBe(true);
@@ -116,10 +118,12 @@ test('Album Gallery fills the viewport with covers only and clips only at screen
   await page.goto(`/?layout=album-gallery&zone=${zone}`);
   const gallery = page.locator('.album-gallery-layout');
   await expect(gallery).toBeVisible();
-  await expect(page.locator('.gallery-card')).toHaveCount(12);
+  await expect(page.locator('.gallery-card')).toHaveCount(40);
+  await expect(page.locator('.gallery-card:not([aria-hidden="true"])')).toHaveCount(12);
   await expect(page.locator('.hero, .gallery-header, .album-copy, .current-marker')).toHaveCount(0);
   expect((await gallery.innerText()).trim()).toBe('');
-  await expect(page.locator('.gallery-card[aria-current="true"] img')).toHaveAttribute('alt', 'Evening Studies 12 by The Session 12');
+  await expect(page.locator('.gallery-card').first()).toHaveAttribute('aria-current', 'true');
+  await expect(page.locator('.gallery-card').first().locator('img')).toHaveAttribute('alt', 'Evening Studies 12 by The Session 12');
   await expectCoverMosaic(page);
   const directory = path.join('e2e/screenshots/album-gallery', testInfo.project.name);
   fs.mkdirSync(directory, { recursive: true });
@@ -132,7 +136,8 @@ test('Album Gallery fills the screen with incomplete history and on landscape ph
     const zone = `partial-gallery-${randomUUID()}`;
     await seedAlbums(page, zone, count);
     await page.goto(`/?layout=album-gallery&zone=${zone}`);
-    await expect(page.locator('.gallery-card')).toHaveCount(count);
+    await expect(page.locator('.gallery-card')).toHaveCount(40);
+    await expect(page.locator('.gallery-card:not([aria-hidden="true"])')).toHaveCount(count);
     await expectCoverMosaic(page);
   }
   for (const viewport of [{ width: 600, height: 400 }, { width: 568, height: 320 }, { width: 390, height: 844 }]) {

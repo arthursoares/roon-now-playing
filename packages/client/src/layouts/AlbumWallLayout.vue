@@ -63,24 +63,31 @@ const currentAlbumId = computed(() => props.track
   : null
 );
 
-const previousAlbums = computed(() => props.albumHistory.filter((album) =>
-  album.id !== currentAlbumId.value
-));
-const galleryAlbums = computed<RecentAlbum[]>(() => {
+const distinctHistoryAlbums = computed(() => {
   const seenAlbumIds = new Set<string>();
-  const albums = props.albumHistory.filter((album) => {
+  return props.albumHistory.filter((album) => {
     if (seenAlbumIds.has(album.id)) return false;
     seenAlbumIds.add(album.id);
     return true;
   });
-  if (props.track && currentAlbumId.value && !albums.some((album) => album.id === currentAlbumId.value)) {
-    albums.unshift({
-      id: currentAlbumId.value,
-      artist: props.track.artist,
-      album: props.track.album,
-      artwork_key: props.track.artwork_key,
-      last_played_at: Date.now(),
-    });
+});
+const previousAlbums = computed(() => distinctHistoryAlbums.value.filter((album) =>
+  album.id !== currentAlbumId.value
+));
+const galleryAlbums = computed<RecentAlbum[]>(() => {
+  const albums = [...distinctHistoryAlbums.value];
+  if (props.track && currentAlbumId.value) {
+    const currentIndex = albums.findIndex((album) => album.id === currentAlbumId.value);
+    const currentAlbum = currentIndex >= 0
+      ? albums.splice(currentIndex, 1)[0]
+      : {
+          id: currentAlbumId.value,
+          artist: props.track.artist,
+          album: props.track.album,
+          artwork_key: props.track.artwork_key,
+          last_played_at: Date.now(),
+        };
+    albums.unshift(currentAlbum);
   }
   return albums.slice(0, ALBUM_HISTORY_LIMIT);
 });
@@ -94,10 +101,24 @@ const galleryGeometry = computed(() => calculateAlbumGalleryGeometry(
   galleryViewportSize.value.width,
   galleryViewportSize.value.height
 ));
+const galleryTiles = computed(() => {
+  const albums = galleryAlbums.value;
+  const tileCount = galleryGeometry.value.rowLengths.reduce((sum, length) => sum + length, 0);
+  if (albums.length === 0) return [];
+
+  return Array.from({ length: tileCount }, (_, index) => {
+    const album = albums[index % albums.length];
+    return {
+      album,
+      accessible: index < albums.length,
+      key: `${album.id}:${Math.floor(index / albums.length)}`,
+    };
+  });
+});
 const galleryRows = computed(() => {
   let offset = 0;
   return galleryGeometry.value.rowLengths.map((length) => {
-    const row = galleryAlbums.value.slice(offset, offset + length);
+    const row = galleryTiles.value.slice(offset, offset + length);
     offset += length;
     return row;
   });
@@ -181,21 +202,22 @@ function markArtworkFailed(album: RecentAlbum): void {
         >
           <div v-for="(row, rowIndex) in galleryRows" :key="rowIndex" class="gallery-row">
             <article
-              v-for="album in row"
-              :key="album.id"
+              v-for="tile in row"
+              :key="tile.key"
               class="gallery-card"
-              :title="`${album.album} — ${album.artist}`"
-              :aria-label="`${album.album} by ${album.artist}`"
-              :aria-current="album.id === currentAlbumId ? 'true' : undefined"
+              :title="tile.accessible ? `${tile.album.album} — ${tile.album.artist}` : undefined"
+              :aria-label="tile.accessible ? `${tile.album.album} by ${tile.album.artist}` : undefined"
+              :aria-hidden="tile.accessible ? undefined : 'true'"
+              :aria-current="tile.accessible && tile.album.id === currentAlbumId ? 'true' : undefined"
             >
               <div class="album-cover-frame">
                 <img
-                  v-if="recentArtworkUrl(album) && failedArtworkKeys.get(album.id) !== album.artwork_key"
-                  :src="recentArtworkUrl(album)!"
-                  :alt="`${album.album} by ${album.artist}`"
+                  v-if="recentArtworkUrl(tile.album) && failedArtworkKeys.get(tile.album.id) !== tile.album.artwork_key"
+                  :src="recentArtworkUrl(tile.album)!"
+                  :alt="tile.accessible ? `${tile.album.album} by ${tile.album.artist}` : ''"
                   class="album-cover artwork"
                   loading="eager"
-                  @error="markArtworkFailed(album)"
+                  @error="markArtworkFailed(tile.album)"
                 />
                 <div v-else class="cover-placeholder" aria-hidden="true"><span>♪</span></div>
               </div>

@@ -9,14 +9,14 @@ describe('calculateAlbumGalleryGeometry', () => {
     { width: 3840, height: 2160 },
   ];
 
-  it('covers each viewport with every item exactly once in balanced square rows', () => {
+  it('covers each viewport with at least forty regular square slots', () => {
     for (const viewport of viewports) {
       for (let count = 1; count <= 12; count++) {
         const geometry = calculateAlbumGalleryGeometry(count, viewport.width, viewport.height);
         const tileSizes = geometry.rowLengths.map((length) => geometry.canvasWidth / length);
 
-        expect(geometry.rowLengths.reduce((sum, length) => sum + length, 0)).toBe(count);
-        expect(Math.max(...geometry.rowLengths) - Math.min(...geometry.rowLengths)).toBeLessThanOrEqual(1);
+        expect(geometry.rowLengths.reduce((sum, length) => sum + length, 0)).toBeGreaterThanOrEqual(40);
+        expect(new Set(geometry.rowLengths)).toHaveLength(1);
         expect(Number.isFinite(geometry.canvasWidth)).toBe(true);
         expect(Number.isFinite(geometry.canvasHeight)).toBe(true);
         expect(geometry.canvasWidth).toBeGreaterThanOrEqual(viewport.width - 0.001);
@@ -30,9 +30,12 @@ describe('calculateAlbumGalleryGeometry', () => {
     }
   });
 
-  it('selects a four-by-three mosaic for twelve covers on wide screens and three-by-four in portrait', () => {
-    expect(calculateAlbumGalleryGeometry(12, 1920, 1080).rowLengths).toEqual([4, 4, 4]);
-    expect(calculateAlbumGalleryGeometry(12, 834, 1194).rowLengths).toEqual([3, 3, 3, 3]);
+  it('selects an eight-by-five mosaic on wide screens and a narrower portrait mosaic', () => {
+    expect(calculateAlbumGalleryGeometry(1, 1920, 1080).rowLengths).toEqual([8, 8, 8, 8, 8]);
+    expect(calculateAlbumGalleryGeometry(12, 3840, 2160).rowLengths).toEqual([8, 8, 8, 8, 8]);
+    expect(calculateAlbumGalleryGeometry(3, 834, 1194).rowLengths).toEqual(
+      [5, 5, 5, 5, 5, 5, 5, 5]
+    );
   });
 
   it('returns safe finite dimensions before a viewport has measurable size', () => {

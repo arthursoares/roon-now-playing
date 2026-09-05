@@ -4,14 +4,7 @@ export interface AlbumGalleryGeometry {
   canvasHeight: number;
 }
 
-function balancedRows(itemCount: number, rowCount: number): number[] {
-  const shortLength = Math.floor(itemCount / rowCount);
-  const longerRows = itemCount % rowCount;
-  return Array.from(
-    { length: rowCount },
-    (_, index) => shortLength + (index < longerRows ? 1 : 0)
-  );
-}
+const MINIMUM_GALLERY_SLOTS = 40;
 
 export function calculateAlbumGalleryGeometry(
   itemCount: number,
@@ -26,26 +19,15 @@ export function calculateAlbumGalleryGeometry(
     return { rowLengths: [], canvasWidth: width, canvasHeight: height };
   }
 
-  const viewportAspect = width / height;
-  let rowLengths = [count];
-  let bestDifference = Number.POSITIVE_INFINITY;
-
-  for (let rowCount = 1; rowCount <= count; rowCount++) {
-    const candidate = balancedRows(count, rowCount);
-    const normalizedHeight = candidate.reduce((sum, rowLength) => sum + 1 / rowLength, 0);
-    const difference = Math.abs(Math.log(viewportAspect * normalizedHeight));
-    if (difference < bestDifference) {
-      bestDifference = difference;
-      rowLengths = candidate;
-    }
-  }
-
-  const normalizedHeight = rowLengths.reduce((sum, rowLength) => sum + 1 / rowLength, 0);
-  const canvasWidth = width * Math.max(1, height / (width * normalizedHeight));
+  const slotCount = Math.max(MINIMUM_GALLERY_SLOTS, count);
+  const columnCount = Math.max(1, Math.round(Math.sqrt(slotCount * width / height)));
+  const rowCount = Math.ceil(slotCount / columnCount);
+  const tileSize = Math.max(width / columnCount, height / rowCount);
+  const canvasWidth = tileSize * columnCount;
 
   return {
-    rowLengths,
+    rowLengths: Array.from({ length: rowCount }, () => columnCount),
     canvasWidth,
-    canvasHeight: canvasWidth * normalizedHeight,
+    canvasHeight: tileSize * rowCount,
   };
 }
