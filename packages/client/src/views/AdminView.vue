@@ -10,11 +10,16 @@ import {
   LLM_PROVIDERS,
   LLM_MODELS,
   DEFAULT_FACTS_PROMPT,
+  DEFAULT_DISPLAY_SETTINGS,
+  DEFAULT_MAX_OUTPUT_TOKENS,
+  MAX_OUTPUT_TOKENS,
+  MIN_OUTPUT_TOKENS,
   type LayoutType,
   type FontType,
   type BackgroundType,
   type ClientMetadata,
   type FactsConfig,
+  type DisplaySettings,
 } from '@roon-screen-cover/shared';
 
 const { state: wsState } = useWebSocket({ isAdmin: true });
@@ -34,6 +39,7 @@ const factsConfig = ref<FactsConfig>({
   factsCount: 5,
   rotationInterval: 25,
   prompt: DEFAULT_FACTS_PROMPT,
+  maxOutputTokens: DEFAULT_MAX_OUTPUT_TOKENS,
   localBaseUrl: 'http://localhost:11434/v1',
 });
 const factsConfigLoading = ref(true);
@@ -56,7 +62,7 @@ const testDuration = ref<number | null>(null);
 interface SourcesConfig {
   requireApiKey: boolean;
   hasApiKey: boolean;
-  apiKey: string;
+  apiKey: string | null;
 }
 
 interface ExternalZone {
@@ -78,18 +84,23 @@ const sourcesConfigSaving = ref(false);
 const generatingApiKey = ref(false);
 const deletingZone = ref<string | null>(null);
 const apiKeyCopied = ref(false);
+const sourcesCurrentKey = ref('');
+const generatedSourceKey = ref('');
+const sourcesError = ref<string | null>(null);
 
 // Display settings state
-const displaySettings = ref<{ fontScale: number; artworkScale: number }>({ fontScale: 1, artworkScale: 100 });
+const displaySettings = ref<DisplaySettings>({ ...DEFAULT_DISPLAY_SETTINGS });
 const displaySettingsLoading = ref(true);
 const displaySettingsSaving = ref(false);
+const displaySettingsError = ref<string | null>(null);
+let displaySettingsSaveRequest = 0;
 
 async function loadDisplaySettings(): Promise<void> {
   try {
     displaySettingsLoading.value = true;
     const response = await fetch('/api/admin/display-settings');
     if (response.ok) {
-      displaySettings.value = await response.json();
+      displaySettings.value = { ...DEFAULT_DISPLAY_SETTINGS, ...await response.json() };
     }
   } catch (error) {
     console.error('Failed to load display settings:', error);
@@ -117,18 +128,39 @@ function onArtworkScaleChange(event: Event): void {
   saveTimeout = setTimeout(() => saveDisplaySettings(), 300);
 }
 
+function onDisplaySettingChange(): void {
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => saveDisplaySettings(), 300);
+}
+
 async function saveDisplaySettings(): Promise<void> {
+  const requestId = ++displaySettingsSaveRequest;
+  const submitted = { ...displaySettings.value };
   displaySettingsSaving.value = true;
+  displaySettingsError.value = null;
   try {
-    await fetch('/api/admin/display-settings', {
+    const response = await fetch('/api/admin/display-settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(displaySettings.value),
+      body: JSON.stringify(submitted),
     });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || data.message || 'Failed to save display settings');
+    }
+    const unchangedSinceSubmit = Object.entries(submitted).every(
+      ([key, value]) => displaySettings.value[key as keyof DisplaySettings] === value,
+    );
+    if (requestId === displaySettingsSaveRequest && unchangedSinceSubmit) {
+      displaySettings.value = { ...DEFAULT_DISPLAY_SETTINGS, ...data };
+    }
   } catch (error) {
     console.error('Failed to save display settings:', error);
+    if (requestId === displaySettingsSaveRequest) {
+      displaySettingsError.value = error instanceof Error ? error.message : 'Failed to save display settings';
+    }
   } finally {
-    displaySettingsSaving.value = false;
+    if (requestId === displaySettingsSaveRequest) displaySettingsSaving.value = false;
   }
 }
 
@@ -207,7 +239,7 @@ async function pushSetting(
 }
 
 function getLayoutDisplayName(layout: LayoutType): string {
-  return layout.charAt(0).toUpperCase() + layout.slice(1);
+  return layout.charAt(0).toUpperCase() + layout.slice(1).replace(/-/g, ' ');
 }
 
 function getFontDisplayName(font: FontType): string {
@@ -260,7 +292,7 @@ const availableModels = computed(() => {
 
 const isCustomModel = computed(() =>
   factsConfig.value.provider === 'openrouter' &&
-  !LLM_MODELS.openrouter.includes(factsConfig.value.model as any) &&
+  !(LLM_MODELS.openrouter as readonly string[]).includes(factsConfig.value.model) &&
   factsConfig.value.model !== 'custom' &&
   factsConfig.value.model !== ''
 );
@@ -280,7 +312,11 @@ async function loadFactsConfig(): Promise<void> {
     const response = await fetch('/api/facts/config');
     if (response.ok) {
       const config = await response.json();
-      factsConfig.value = config;
+      factsConfig.value = {
+        ...factsConfig.value,
+        ...config,
+        maxOutputTokens: config.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
+      };
     }
   } catch (error) {
     console.error('Failed to load facts config:', error);
@@ -310,7 +346,7 @@ async function saveFactsConfig(): Promise<void> {
       const data = await response.json();
       factsConfigError.value = data.error || 'Failed to save configuration';
     }
-  } catch (error) {
+  } catch {
     factsConfigError.value = 'Network error';
   } finally {
     factsConfigSaving.value = false;
@@ -325,6 +361,7 @@ function resetFactsConfig(): void {
     factsCount: 5,
     rotationInterval: 25,
     prompt: DEFAULT_FACTS_PROMPT,
+    maxOutputTokens: DEFAULT_MAX_OUTPUT_TOKENS,
     localBaseUrl: 'http://localhost:11434/v1',
   };
 }
@@ -379,7 +416,7 @@ async function runFactsTest(): Promise<void> {
     } else {
       testError.value = data.error?.message || 'Test failed';
     }
-  } catch (error) {
+  } catch {
     testError.value = 'Network error';
   } finally {
     testRunning.value = false;
@@ -387,6 +424,22 @@ async function runFactsTest(): Promise<void> {
 }
 
 // External sources functions
+async function mutateSource(url: string, init: RequestInit): Promise<Response> {
+  sourcesError.value = null;
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(sourcesCurrentKey.value ? { 'X-API-Key': sourcesCurrentKey.value } : {}),
+    },
+  });
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.message || data.error || 'Failed to update source settings');
+  }
+  return response;
+}
+
 async function fetchSourcesConfig(): Promise<void> {
   try {
     const response = await fetch('/api/sources/config');
@@ -421,16 +474,13 @@ async function toggleRequireApiKey(): Promise<void> {
   sourcesConfigSaving.value = true;
   try {
     const newValue = !sourcesConfig.value.requireApiKey;
-    const response = await fetch('/api/sources/config', {
+    await mutateSource('/api/sources/config', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ requireApiKey: newValue }),
     });
-    if (response.ok) {
-      sourcesConfig.value.requireApiKey = newValue;
-    }
+    sourcesConfig.value.requireApiKey = newValue;
   } catch (error) {
-    console.error('Failed to update sources config:', error);
+    sourcesError.value = error instanceof Error ? error.message : 'Failed to update sources config';
   } finally {
     sourcesConfigSaving.value = false;
   }
@@ -439,24 +489,26 @@ async function toggleRequireApiKey(): Promise<void> {
 async function generateApiKey(): Promise<void> {
   generatingApiKey.value = true;
   try {
-    const response = await fetch('/api/sources/config/generate-key', {
+    const response = await mutateSource('/api/sources/config/generate-key', {
       method: 'POST',
     });
-    if (response.ok) {
-      const data = await response.json();
-      sourcesConfig.value.apiKey = data.apiKey;
-      sourcesConfig.value.hasApiKey = true;
-    }
+    const data = await response.json();
+    sourcesConfig.value.apiKey = data.apiKey;
+    sourcesConfig.value.hasApiKey = true;
+    sourcesCurrentKey.value = data.apiKey;
+    generatedSourceKey.value = data.apiKey;
+    apiKeyCopied.value = false;
   } catch (error) {
-    console.error('Failed to generate API key:', error);
+    sourcesError.value = error instanceof Error ? error.message : 'Failed to generate API key';
   } finally {
     generatingApiKey.value = false;
   }
 }
 
 async function copyApiKey(): Promise<void> {
+  if (!generatedSourceKey.value) return;
   try {
-    await navigator.clipboard.writeText(sourcesConfig.value.apiKey);
+    await navigator.clipboard.writeText(generatedSourceKey.value);
     apiKeyCopied.value = true;
     setTimeout(() => {
       apiKeyCopied.value = false;
@@ -469,14 +521,12 @@ async function copyApiKey(): Promise<void> {
 async function deleteExternalZone(zoneId: string): Promise<void> {
   deletingZone.value = zoneId;
   try {
-    const response = await fetch(`/api/sources/${encodeURIComponent(zoneId)}`, {
+    await mutateSource(`/api/sources/${encodeURIComponent(zoneId)}`, {
       method: 'DELETE',
     });
-    if (response.ok) {
-      externalZones.value = externalZones.value.filter((z) => z.zone_id !== zoneId);
-    }
+    externalZones.value = externalZones.value.filter((z) => z.zone_id !== zoneId);
   } catch (error) {
-    console.error('Failed to delete external zone:', error);
+    sourcesError.value = error instanceof Error ? error.message : 'Failed to delete external zone';
   } finally {
     deletingZone.value = null;
   }
@@ -998,6 +1048,24 @@ onMounted(() => {
               </button>
 
               <div v-if="showAdvanced" class="card-content">
+                <div class="form-field">
+                  <label for="maxOutputTokens">Maximum output tokens</label>
+                  <div class="number-input">
+                    <input
+                      id="maxOutputTokens"
+                      type="number"
+                      v-model.number="factsConfig.maxOutputTokens"
+                      :min="MIN_OUTPUT_TOKENS"
+                      :max="MAX_OUTPUT_TOKENS"
+                      step="1"
+                    />
+                    <span class="number-hint">1-65,536</span>
+                  </div>
+                  <p class="field-hint">
+                    Increase this if responses are cut off before all facts are returned. Provider and model limits still apply.
+                  </p>
+                </div>
+
                 <div class="form-field full-width">
                   <label for="prompt">Custom Prompt Template</label>
                   <textarea
@@ -1177,6 +1245,13 @@ onMounted(() => {
           <div class="config-card">
             <h2 class="card-title">API Configuration</h2>
 
+            <p v-if="sourcesError" role="alert" class="message-card error">{{ sourcesError }}</p>
+            <div v-if="sourcesConfig.hasApiKey" class="api-key-section form-field">
+              <label for="sources-current-key" class="setting-label">Current API key</label>
+              <input id="sources-current-key" v-model="sourcesCurrentKey" type="password" autocomplete="off" class="mono-input" />
+              <p class="toggle-desc">Enter your current key to change protection, regenerate the key, or delete zones. It is kept only until you leave this page.</p>
+            </div>
+
             <div class="toggle-setting">
               <div class="toggle-info">
                 <label class="toggle-label">Require API Key</label>
@@ -1185,7 +1260,7 @@ onMounted(() => {
               <button
                 class="toggle-switch"
                 :class="{ active: sourcesConfig.requireApiKey }"
-                :disabled="sourcesConfigSaving"
+                :disabled="sourcesConfigSaving || (!sourcesConfig.requireApiKey && !sourcesCurrentKey)"
                 @click="toggleRequireApiKey"
               >
                 <span class="toggle-knob"></span>
@@ -1197,7 +1272,7 @@ onMounted(() => {
               <div v-if="sourcesConfig.hasApiKey" class="api-key-display">
                 <code class="api-key-value">{{ sourcesConfig.apiKey }}</code>
                 <div class="api-key-actions">
-                  <button class="btn-small" @click="copyApiKey" :disabled="apiKeyCopied">
+                  <button class="btn-small" @click="copyApiKey" :disabled="apiKeyCopied || !generatedSourceKey">
                     <svg v-if="!apiKeyCopied" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
@@ -1297,7 +1372,12 @@ onMounted(() => {
           <span>Loading settings...</span>
         </div>
 
-        <div v-else class="config-card">
+        <template v-else>
+          <p v-if="displaySettingsError" role="alert" class="message-card error">
+            {{ displaySettingsError }}
+          </p>
+
+        <div class="config-card">
           <h2 class="card-title">Font Scale</h2>
           <p class="card-desc">Adjust the global font size multiplier. Individual screens can override this setting.</p>
 
@@ -1359,6 +1439,85 @@ onMounted(() => {
             Saving...
           </div>
         </div>
+
+        <div class="config-card">
+          <h2 class="card-title">Smart Idle</h2>
+          <p class="card-desc">Show an idle presentation after the selected zone has been paused or stopped. Playback returns immediately when music resumes.</p>
+
+          <div class="form-grid idle-settings-grid">
+            <div class="form-field">
+              <label for="idleMode">Idle presentation</label>
+              <select id="idleMode" v-model="displaySettings.idleMode" @change="onDisplaySettingChange">
+                <option value="off">Off</option>
+                <option value="clock">Clock</option>
+                <option value="black">Black screen</option>
+                <option value="layout">Selected layout</option>
+              </select>
+            </div>
+            <div v-if="displaySettings.idleMode === 'layout'" class="form-field">
+              <label for="idleLayout">Idle layout</label>
+              <select id="idleLayout" v-model="displaySettings.idleLayout" @change="onDisplaySettingChange">
+                <option v-for="layoutOption in LAYOUTS" :key="layoutOption" :value="layoutOption">
+                  {{ getLayoutDisplayName(layoutOption) }}
+                </option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="idleDelayMinutes">Delay (minutes)</label>
+              <input
+                id="idleDelayMinutes"
+                v-model.number="displaySettings.idleDelayMinutes"
+                type="number"
+                min="1"
+                max="60"
+                step="1"
+                :disabled="displaySettings.idleMode === 'off'"
+                @change="onDisplaySettingChange"
+              />
+            </div>
+          </div>
+
+          <div class="toggle-setting">
+            <div class="toggle-info">
+              <label class="toggle-label">Night dimming</label>
+              <p class="toggle-desc">Dim this display page during a local-time schedule. This does not control the device screen or power.</p>
+            </div>
+            <button
+              type="button"
+              class="toggle-switch"
+              :class="{ active: displaySettings.nightDimmingEnabled }"
+              :aria-pressed="displaySettings.nightDimmingEnabled"
+              @click="displaySettings.nightDimmingEnabled = !displaySettings.nightDimmingEnabled; onDisplaySettingChange()"
+            ><span class="toggle-knob"></span></button>
+          </div>
+
+          <div v-if="displaySettings.nightDimmingEnabled" class="form-grid idle-settings-grid">
+            <div class="form-field">
+              <label for="nightDimmingStart">Starts</label>
+              <input id="nightDimmingStart" v-model="displaySettings.nightDimmingStart" type="time" @change="onDisplaySettingChange" />
+            </div>
+            <div class="form-field">
+              <label for="nightDimmingEnd">Ends</label>
+              <input id="nightDimmingEnd" v-model="displaySettings.nightDimmingEnd" type="time" @change="onDisplaySettingChange" />
+            </div>
+            <div class="form-field full-width">
+              <label for="nightBrightness">Page brightness: {{ displaySettings.nightBrightness }}%</label>
+              <input
+                id="nightBrightness"
+                v-model.number="displaySettings.nightBrightness"
+                type="range"
+                min="1"
+                max="100"
+                step="1"
+                class="slider-input"
+                @input="onDisplaySettingChange"
+              />
+            </div>
+          </div>
+
+          <div v-if="displaySettingsSaving" class="saving-indicator">Saving...</div>
+        </div>
+        </template>
       </section>
     </main>
   </div>
@@ -2749,6 +2908,11 @@ onMounted(() => {
 
 .slider-field {
   max-width: 400px;
+}
+
+.idle-settings-grid {
+  max-width: 640px;
+  margin-bottom: 12px;
 }
 
 .slider-header {

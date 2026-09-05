@@ -93,18 +93,36 @@ export function createSourcesRouter(
   });
 
   // POST /api/sources/config - Update sources config (for admin)
-  router.post('/config', (req: Request, res: Response) => {
-    const { requireApiKey } = req.body;
+  router.post('/config', authenticate, (req: Request, res: Response) => {
+    const { requireApiKey } = req.body ?? {};
 
-    if (typeof requireApiKey === 'boolean') {
-      sourcesConfigStore.update({ requireApiKey });
+    if (typeof requireApiKey !== 'boolean') {
+      res.status(400).json({ error: 'Bad Request', message: 'requireApiKey must be a boolean' });
+      return;
     }
 
+    if (requireApiKey && !sourcesConfigStore.get().apiKey) {
+      res.status(400).json({
+        error: 'Bad Request',
+        message: 'Generate an API key before enabling authentication',
+      });
+      return;
+    }
+
+    if (requireApiKey) {
+      const apiKey = req.headers['x-api-key'] as string;
+      if (!apiKey || !sourcesConfigStore.validateApiKey(apiKey)) {
+        res.status(401).json({ error: 'Unauthorized', message: 'Invalid or missing API key' });
+        return;
+      }
+    }
+
+    sourcesConfigStore.update({ requireApiKey });
     res.json({ success: true });
   });
 
   // POST /api/sources/config/generate-key - Generate new API key
-  router.post('/config/generate-key', (req: Request, res: Response) => {
+  router.post('/config/generate-key', authenticate, (req: Request, res: Response) => {
     const key = sourcesConfigStore.generateApiKey();
     res.json({ success: true, apiKey: key });
   });

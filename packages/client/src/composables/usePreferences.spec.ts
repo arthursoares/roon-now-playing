@@ -17,46 +17,14 @@
  *   Then localStorage should be updated
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { usePreferences } from './usePreferences';
-
-// jsdom in this setup does not provide a functional `localStorage` (its
-// methods are undefined), so back it with a Map-based Storage implementation.
-// `length` is a live getter over the backing store, not a stale snapshot.
-function createLocalStorageMock(): Storage {
-  const store = new Map<string, string>();
-  return {
-    get length(): number {
-      return store.size;
-    },
-    clear(): void {
-      store.clear();
-    },
-    getItem(key: string): string | null {
-      return store.has(key) ? (store.get(key) as string) : null;
-    },
-    key(index: number): string | null {
-      return Array.from(store.keys())[index] ?? null;
-    },
-    removeItem(key: string): void {
-      store.delete(key);
-    },
-    setItem(key: string, value: string): void {
-      store.set(key, String(value));
-    },
-  };
-}
 
 describe('usePreferences', () => {
   beforeEach(() => {
-    // Fresh localStorage per test
-    vi.stubGlobal('localStorage', createLocalStorageMock());
+    localStorage.clear();
     // Reset URL
     window.history.replaceState({}, '', '/');
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
   });
 
   it('should initialize with default layout', () => {

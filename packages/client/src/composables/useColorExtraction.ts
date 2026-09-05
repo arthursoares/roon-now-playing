@@ -1,4 +1,4 @@
-import { ref, watch, type Ref } from 'vue';
+import { onUnmounted, ref, watch, type Ref } from 'vue';
 import {
   extractDominantColor,
   extractColorPalette,
@@ -9,7 +9,6 @@ import {
   SAMPLE_SIZE,
   type ExtractedColors,
   type ExtractedPalette,
-  type HSL,
 } from './colorUtils';
 
 export type { ExtractedColors, ExtractedPalette, HSL } from './colorUtils';
@@ -49,6 +48,16 @@ export function useColorExtraction(artworkUrl: Ref<string | null>) {
   const isTransitioning = ref(false);
 
   let currentImageUrl: string | null = null;
+  let extractionGeneration = 0;
+  let transitionTimer: number | null = null;
+  let active = true;
+
+  function clearTransitionTimer(): void {
+    if (transitionTimer !== null) {
+      clearTimeout(transitionTimer);
+      transitionTimer = null;
+    }
+  }
 
   async function extractColors(url: string): Promise<{ colors: ExtractedColors; vibrant: VibrantGradient; palette: ExtractedPalette }> {
     return new Promise((resolve) => {
@@ -120,14 +129,17 @@ export function useColorExtraction(artworkUrl: Ref<string | null>) {
     artworkUrl,
     async (newUrl) => {
       if (newUrl === currentImageUrl) return;
+      const generation = ++extractionGeneration;
       currentImageUrl = newUrl;
+      clearTransitionTimer();
 
       if (!newUrl) {
         // No artwork - use default
-        previousColors.value = colors.value.ready ? { ...colors.value } : null;
+        previousColors.value = null;
         colors.value = { ...DEFAULT_LIGHT };
         vibrantGradient.value = { ...DEFAULT_VIBRANT };
         palette.value = { ...DEFAULT_PALETTE };
+        isTransitioning.value = false;
         return;
       }
 
@@ -139,18 +151,29 @@ export function useColorExtraction(artworkUrl: Ref<string | null>) {
       isTransitioning.value = true;
 
       const extracted = await extractColors(newUrl);
+      if (!active || generation !== extractionGeneration) return;
       colors.value = extracted.colors;
       vibrantGradient.value = extracted.vibrant;
       palette.value = extracted.palette;
 
       // Clear transition state after animation duration
-      setTimeout(() => {
+      transitionTimer = window.setTimeout(() => {
+        transitionTimer = null;
+        if (!active || generation !== extractionGeneration) return;
         isTransitioning.value = false;
         previousColors.value = null;
       }, 500);
     },
     { immediate: true }
   );
+
+  onUnmounted(() => {
+    active = false;
+    extractionGeneration++;
+    clearTransitionTimer();
+    isTransitioning.value = false;
+    previousColors.value = null;
+  });
 
   return {
     colors,

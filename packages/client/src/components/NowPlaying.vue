@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import type { Zone, NowPlaying as NowPlayingType, LayoutType, BackgroundType } from '@roon-screen-cover/shared';
+import { computed, onUnmounted, watch } from 'vue';
+import type { Zone, NowPlaying as NowPlayingType, LayoutType, BackgroundType, RecentAlbum } from '@roon-screen-cover/shared';
 import { useNowPlaying } from '../composables/useNowPlaying';
 import MinimalLayout from '../layouts/MinimalLayout.vue';
 import DetailedLayout from '../layouts/DetailedLayout.vue';
@@ -11,19 +11,33 @@ import FactsColumnsLayout from '../layouts/FactsColumnsLayout.vue';
 import FactsOverlayLayout from '../layouts/FactsOverlayLayout.vue';
 import FactsCarouselLayout from '../layouts/FactsCarouselLayout.vue';
 import BasicLayout from '../layouts/BasicLayout.vue';
+import AlbumWallLayout from '../layouts/AlbumWallLayout.vue';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   nowPlaying: NowPlayingType | null;
+  albumHistory?: RecentAlbum[];
   zone: Zone;
   layout: LayoutType;
   background: BackgroundType;
   lockInteractions?: boolean;
-}>();
+}>(), {
+  albumHistory: () => [],
+  lockInteractions: false,
+});
 
 const emit = defineEmits<{
   'change-zone': [];
   'cycle-layout': [];
 }>();
+
+const DOUBLE_CLICK_WINDOW_MS = 275;
+let pendingClickTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearPendingClick(): void {
+  if (pendingClickTimer === null) return;
+  clearTimeout(pendingClickTimer);
+  pendingClickTimer = null;
+}
 
 const {
   track,
@@ -53,6 +67,9 @@ const layoutComponent = computed(() => {
       return FactsCarouselLayout;
     case 'basic':
       return BasicLayout;
+    case 'album-wall':
+    case 'album-gallery':
+      return AlbumWallLayout;
     default:
       return DetailedLayout;
   }
@@ -60,13 +77,24 @@ const layoutComponent = computed(() => {
 
 function handleClick(): void {
   if (props.lockInteractions) return;
-  emit('cycle-layout');
+  clearPendingClick();
+  pendingClickTimer = setTimeout(() => {
+    pendingClickTimer = null;
+    if (!props.lockInteractions) emit('cycle-layout');
+  }, DOUBLE_CLICK_WINDOW_MS);
 }
 
 function handleDoubleClick(): void {
+  clearPendingClick();
   if (props.lockInteractions) return;
   emit('change-zone');
 }
+
+watch(() => props.lockInteractions, (locked) => {
+  if (locked) clearPendingClick();
+});
+
+onUnmounted(clearPendingClick);
 </script>
 
 <template>
@@ -86,6 +114,9 @@ function handleDoubleClick(): void {
       :artwork-url="artworkUrl"
       :zone-name="zone.display_name"
       :background="background"
+      v-bind="layout === 'album-wall' || layout === 'album-gallery'
+        ? { albumHistory, galleryOnly: layout === 'album-gallery' }
+        : {}"
     />
   </div>
 </template>

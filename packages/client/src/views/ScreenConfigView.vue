@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import {
   LAYOUTS,
@@ -171,30 +171,6 @@ watch(error, (val) => {
   }
 });
 
-// Poll for screen data if not yet found via WebSocket
-const pollTimer = ref<ReturnType<typeof setInterval> | null>(null);
-
-onMounted(() => {
-  // Poll API as fallback if screen not in WS client list
-  pollTimer.value = setInterval(async () => {
-    if (screen.value) {
-      if (pollTimer.value) {
-        clearInterval(pollTimer.value);
-        pollTimer.value = null;
-      }
-      return;
-    }
-    try {
-      await fetch(`/api/admin/screens/${encodeURIComponent(friendlyName.value)}`);
-    } catch {
-      // ignore — screen may not be connected yet
-    }
-  }, 3000);
-});
-
-onUnmounted(() => {
-  if (pollTimer.value) clearInterval(pollTimer.value);
-});
 </script>
 
 <template>

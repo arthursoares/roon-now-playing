@@ -7,7 +7,6 @@ import type {
   ServerZonesMessage,
   ServerNowPlayingMessage,
   ServerSeekMessage,
-  ServerConnectionMessage,
   NowPlaying,
   Zone,
   LayoutType,
@@ -27,7 +26,8 @@ import { ExternalSourceManager } from './externalSources.js';
 import { generateFriendlyName } from './nameGenerator.js';
 import { logger } from './logger.js';
 import { loadDisplaySettings } from './display-settings.js';
-import type { ClientSettingsStore, ClientSettings } from './clientSettings.js';
+import type { ClientSettingsStore } from './clientSettings.js';
+import type { AlbumHistoryStore } from './albumHistory.js';
 
 interface ClientState {
   ws: WebSocket;
@@ -45,7 +45,7 @@ interface ClientState {
   fontScaleOverride?: number | null;
   artworkScaleOverride?: number | null;
   enabledLayouts?: LayoutType[] | null;
-  lockInteractions?: boolean;
+  lockInteractions: boolean;
 }
 
 function extractDeviceId(clientId: string): string {
@@ -61,6 +61,7 @@ export class WebSocketManager {
   private roonClient: RoonClient | null;
   private externalSourceManager: ExternalSourceManager | null = null;
   private clientSettingsStore: ClientSettingsStore | null = null;
+  private albumHistoryStore: AlbumHistoryStore | null = null;
   private friendlyNames: Map<string, string> = new Map();
   private onFriendlyNameChange?: (clientId: string, name: string | null) => void;
 
@@ -81,6 +82,10 @@ export class WebSocketManager {
 
   setClientSettingsStore(store: ClientSettingsStore): void {
     this.clientSettingsStore = store;
+  }
+
+  setAlbumHistoryStore(store: AlbumHistoryStore): void {
+    this.albumHistoryStore = store;
   }
 
   setFriendlyNameChangeCallback(callback: (clientId: string, name: string | null) => void): void {
@@ -112,6 +117,7 @@ export class WebSocketManager {
         connectedAt: Date.now(),
         userAgent,
         isAdmin,
+        lockInteractions: false,
       };
       this.clients.set(ws, clientState);
 
@@ -215,6 +221,7 @@ export class WebSocketManager {
     });
 
     this.roonClient!.on('now_playing', (nowPlaying: NowPlaying) => {
+      this.recordAlbumHistory(nowPlaying);
       const message: ServerNowPlayingMessage = {
         type: 'now_playing',
         zone_id: nowPlaying.zone_id,
@@ -247,6 +254,7 @@ export class WebSocketManager {
     });
 
     this.externalSourceManager.on('now_playing', (nowPlaying: NowPlaying) => {
+      this.recordAlbumHistory(nowPlaying);
       const message: ServerNowPlayingMessage = {
         type: 'now_playing',
         zone_id: nowPlaying.zone_id,
@@ -271,6 +279,16 @@ export class WebSocketManager {
     const roonZones = this.roonClient?.getZones() ?? [];
     const externalZones = this.externalSourceManager?.getZones() || [];
     return [...roonZones, ...externalZones];
+  }
+
+  private recordAlbumHistory(nowPlaying: NowPlaying): void {
+    if (this.albumHistoryStore?.record(nowPlaying)) {
+      this.broadcastToZoneSubscribers(nowPlaying.zone_id, {
+        type: 'album_history',
+        zone_id: nowPlaying.zone_id,
+        albums: this.albumHistoryStore.get(nowPlaying.zone_id),
+      });
+    }
   }
 
   private handleClientMessage(ws: WebSocket, data: Buffer): void {
@@ -381,38 +399,33 @@ export class WebSocketManager {
       // overwritten by whatever it just reported.
       const storedSettings = this.clientSettingsStore.get(deviceId);
 
-      // On first connect, push stored settings if they differ from what the
-      // client sent, and adopt them as the client's current state.
+      // On first connect, always push the complete authoritative record. Some
+      // settings are absent from client metadata, so equality cannot establish
+      // that stale browser preferences have already been cleared.
       if (isNewClient && storedSettings) {
-        const needsPush =
-          storedSettings.layout !== clientState.layout ||
-          storedSettings.font !== clientState.font ||
-          storedSettings.background !== clientState.background ||
-          storedSettings.zoneId !== clientState.subscribedZoneId ||
-          storedSettings.fontScaleOverride !== (clientState.fontScaleOverride ?? null) ||
-          (storedSettings.lockInteractions ?? false) !== (clientState.lockInteractions ?? false);
+        this.sendToClient(clientState.ws, {
+          type: 'remote_settings',
+          layout: storedSettings.layout,
+          font: storedSettings.font,
+          background: storedSettings.background,
+          zoneId: storedSettings.zoneId ?? undefined,
+          zoneName: storedSettings.zoneName ?? undefined,
+          fontScaleOverride: storedSettings.fontScaleOverride,
+          artworkScaleOverride: storedSettings.artworkScaleOverride,
+          enabledLayouts: storedSettings.enabledLayouts,
+          lockInteractions: storedSettings.lockInteractions,
+        } as ServerRemoteSettingsMessage);
 
-        if (needsPush) {
-          this.sendToClient(clientState.ws, {
-            type: 'remote_settings',
-            layout: storedSettings.layout,
-            font: storedSettings.font,
-            background: storedSettings.background,
-            zoneId: storedSettings.zoneId ?? undefined,
-            zoneName: storedSettings.zoneName ?? undefined,
-            fontScaleOverride: storedSettings.fontScaleOverride,
-            lockInteractions: storedSettings.lockInteractions ?? false,
-          } as ServerRemoteSettingsMessage);
-
-          // Update local state to match
-          clientState.layout = storedSettings.layout;
-          clientState.font = storedSettings.font;
-          clientState.background = storedSettings.background;
-          clientState.subscribedZoneId = storedSettings.zoneId;
-          clientState.subscribedZoneName = storedSettings.zoneName;
-          clientState.fontScaleOverride = storedSettings.fontScaleOverride;
-          clientState.lockInteractions = storedSettings.lockInteractions ?? false;
-        }
+        // Update local state to match
+        clientState.layout = storedSettings.layout;
+        clientState.font = storedSettings.font;
+        clientState.background = storedSettings.background;
+        clientState.subscribedZoneId = storedSettings.zoneId;
+        clientState.subscribedZoneName = storedSettings.zoneName;
+        clientState.fontScaleOverride = storedSettings.fontScaleOverride;
+        clientState.artworkScaleOverride = storedSettings.artworkScaleOverride;
+        clientState.enabledLayouts = storedSettings.enabledLayouts;
+        clientState.lockInteractions = storedSettings.lockInteractions;
       }
 
       // Persist the resulting authoritative state (after any replay above).
@@ -423,7 +436,9 @@ export class WebSocketManager {
         zoneId: clientState.subscribedZoneId,
         zoneName: clientState.subscribedZoneName,
         fontScaleOverride: clientState.fontScaleOverride ?? null,
-        lockInteractions: clientState.lockInteractions ?? false,
+        artworkScaleOverride: clientState.artworkScaleOverride ?? null,
+        enabledLayouts: clientState.enabledLayouts ?? null,
+        lockInteractions: clientState.lockInteractions,
       });
     }
 
@@ -460,6 +475,7 @@ export class WebSocketManager {
       nowPlaying = this.externalSourceManager.getNowPlaying(zoneId);
     }
     if (nowPlaying) {
+      this.recordAlbumHistory(nowPlaying);
       this.sendToClient(clientState.ws, {
         type: 'now_playing',
         zone_id: nowPlaying.zone_id,
@@ -468,6 +484,12 @@ export class WebSocketManager {
         seek_position: nowPlaying.seek_position,
       });
     }
+
+    this.sendToClient(clientState.ws, {
+      type: 'album_history',
+      zone_id: zoneId,
+      albums: this.albumHistoryStore?.get(zoneId) ?? [],
+    });
 
     // Notify admins about the update
     if (clientState.clientId) {
@@ -681,7 +703,9 @@ export class WebSocketManager {
         zoneId: clientState.subscribedZoneId,
         zoneName: clientState.subscribedZoneName,
         fontScaleOverride: clientState.fontScaleOverride ?? null,
-        lockInteractions: clientState.lockInteractions ?? false,
+        artworkScaleOverride: clientState.artworkScaleOverride ?? null,
+        enabledLayouts: clientState.enabledLayouts ?? null,
+        lockInteractions: clientState.lockInteractions,
       });
     }
 

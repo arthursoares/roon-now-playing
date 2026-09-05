@@ -10,11 +10,12 @@ A now-playing display for Roon and other music sources. Shows real-time album ar
 
 - Real-time album artwork and track metadata display
 - Multiple simultaneous clients viewing different zones
-- Nine display layouts including AI-powered Facts layouts
+- Eleven display layouts including Album Wall, Album Gallery, and AI-powered Facts layouts
 - Fourteen background options with dynamic color extraction
 - Seventeen customizable font families
 - AI-generated facts about currently playing music (Anthropic/OpenAI/OpenRouter/Local LLM)
 - **Self-service onboarding** — displays auto-generate friendly names and show QR codes linking to per-screen config
+- **Kiosk tap lock** — disable layout taps and zone double-taps per display from Admin or its screen configuration; Smart Idle wake gestures remain available
 - Admin panel for managing connected clients and AI configuration
 - **Roon optional** — set `ROON_ENABLED=false` to run in external-sources-only mode, no Roon required
 - **External Sources API** for non-Roon music sources (see [External API Documentation](docs/external-api.md))
@@ -78,7 +79,7 @@ pnpm dev
 | Parameter | Values | Description |
 |-----------|--------|-------------|
 | `zone` | Zone name or ID | Auto-select zone (e.g., `?zone=Living%20Room`) |
-| `layout` | `detailed`, `minimal`, `fullscreen`, `ambient`, `cover`, `facts-columns`, `facts-overlay`, `facts-carousel`, `basic` | Display layout |
+| `layout` | `detailed`, `minimal`, `fullscreen`, `ambient`, `cover`, `facts-columns`, `facts-overlay`, `facts-carousel`, `basic`, `album-wall`, `album-gallery` | Display layout |
 | `background` | See [Backgrounds](#backgrounds) section | Background style |
 | `font` | See [Fonts](#fonts) section | Font family |
 
@@ -102,10 +103,34 @@ Example: `http://localhost:3000/?zone=Office&layout=detailed&background=gradient
 | `facts-overlay` | Full artwork background with facts overlaid at the bottom. |
 | `facts-carousel` | Blurred artwork background with the rotating fact shown as large type, plus a compact now-playing chip. Sized for legibility on TVs. |
 | `basic` | Legacy-compatible layout for older browsers (iOS 12+). Artwork with title, artist, album, and progress bar. Auto-adapts to portrait/landscape. |
+| `album-wall` | A prominent current album with a gallery of recent albums from the selected zone. History persists across restarts and supports Roon and external sources. |
+| `album-gallery` | Covers-only mosaic of up to 12 recent albums. Square artwork fills the screen; the viewport clips the outer tiles. |
 
 **Note:** Facts layouts require an LLM provider configured in the Admin panel. Supported providers: Anthropic, OpenAI, OpenRouter, or Local LLM (Ollama/LM Studio).
 
 **Note:** The `basic` layout is designed for older browsers like iOS 12 Safari. It avoids modern CSS features (gap, aspect-ratio, backdrop-filter) for maximum compatibility on legacy devices used as dedicated displays.
+
+### Album Wall and Album Gallery
+
+Choose **Album wall** in screen configuration or open `/?layout=album-wall`.
+The server retains the 12 most recent distinct artist/album pairs for each zone,
+including the current album, in `DATA_DIR/album-history.json`. Consecutive tracks
+from one album share a single entry; returning to an older album moves it to the
+front. History gathers as the server observes playback, including when no display
+is connected. Paused/stopped updates and tracks without album metadata do not add
+entries. Missing or unavailable covers show placeholders.
+
+Choose **Album gallery** or `/?layout=album-gallery` for a covers-only mosaic,
+without a header, captions, or badges. Each image stays intact within its square
+tile; the centered mosaic extends beyond the viewport so only the screen edges
+clip the outer covers. The arrangement adapts to screen size and shorter
+histories without repeating albums or leaving empty cells. Metadata remains in
+accessible labels and hover titles.
+
+Album Wall retains its artwork-derived backgrounds and metadata. Its track
+titles stop at three lines, with ellipsis for artist and album labels. Dynamic
+backgrounds receive a dark content layer to keep that text readable; there is
+no automatic scrolling text.
 
 ### Screenshots
 
@@ -200,6 +225,12 @@ A mobile-friendly page for configuring a single display:
 - Auto-generated friendly names (admin can rename anytime)
 - Real-time updates when clients connect/disconnect
 
+### Smart Idle and Night Dimming
+
+Global Display Settings can show a clock, black screen, or chosen display layout after the selected zone has been paused or stopped for 1–60 minutes. Smart Idle is off by default, wakes temporarily on touch or key input, and returns to the user's normal layout as soon as playback resumes. The temporary idle layout does not change the display's saved layout preference.
+
+Optional night dimming reduces the brightness of the web page during a schedule evaluated in each display's local time, including schedules that cross midnight. It adds a dark page overlay; it does not change physical screen brightness or device power.
+
 ### Facts Configuration
 Configure AI-powered facts generation for the facts layouts:
 - Choose from four providers: Anthropic, OpenAI, OpenRouter, or Local LLM
@@ -207,6 +238,7 @@ Configure AI-powered facts generation for the facts layouts:
 - Set API key (or use environment variables)
 - Configure local LLM base URL for Ollama/LM Studio
 - Configure facts count per track (1-10)
+- Set maximum output tokens in Advanced Settings (1–65,536; default 1,024). Provider and model limits still apply.
 - Customize rotation interval
 - Test configuration with sample track data
 
@@ -296,6 +328,8 @@ ollama pull llama3.1
 | `POST` | `/api/admin/clients/:id/name` | Set client friendly name |
 | `POST` | `/api/admin/clients/:id/push` | Push settings to client (layout, font, background, zoneId) |
 | `GET` | `/api/admin/screens/:name` | Get screen by friendly name |
+| `GET` | `/api/admin/display-settings` | Get global display and Smart Idle settings |
+| `POST` | `/api/admin/display-settings` | Partially update global display and Smart Idle settings |
 
 ### Facts API
 
@@ -303,8 +337,17 @@ ollama pull llama3.1
 |--------|------|-------------|
 | `GET` | `/api/facts/config` | Get current facts configuration |
 | `POST` | `/api/facts/config` | Update facts configuration |
-| `GET` | `/api/facts/:artist/:album/:title` | Get cached facts for a track |
+| `POST` | `/api/facts` | Get or generate facts using artist, album, and title in the JSON body |
 | `POST` | `/api/facts/test` | Test facts generation with sample data |
+
+Facts generation errors return a non-success status and an `error` object with
+`type` and `message`. Unusable model output returns 502. Displays retain their
+artwork and track metadata and show an error message; failed responses are not
+cached. Local models can generate facts without an API key on both endpoints.
+
+The parser recovers explicitly supported array-formatting mistakes, including
+missing separators and structural curly quotes. Ambiguous quotation, incomplete
+facts, and mixed JSON schemas are rejected rather than displayed as fragments.
 
 ### External Sources API
 

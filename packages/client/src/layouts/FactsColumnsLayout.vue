@@ -6,6 +6,7 @@ import { useBackgroundStyle } from '../composables/useBackgroundStyle';
 import { useFacts } from '../composables/useFacts';
 import ProgressBar from '../components/ProgressBar.vue';
 import DynamicBackground from '../components/DynamicBackground.vue';
+import { isDynamicBackground } from '../utils/backgrounds';
 
 const props = defineProps<{
   track: Track | null;
@@ -113,21 +114,8 @@ onUnmounted(() => {
   }
 });
 
-// Background types handled by DynamicBackground component
-const dynamicBackgroundTypes: BackgroundType[] = [
-  'gradient-linear-multi',
-  'gradient-radial-corner',
-  'gradient-mesh',
-  'blur-subtle',
-  'blur-heavy',
-  'duotone',
-  'posterized',
-  'gradient-noise',
-  'blur-grain',
-];
-
 const usesDynamicBackground = computed(() =>
-  dynamicBackgroundTypes.includes(props.background)
+  isDynamicBackground(props.background)
 );
 
 // Track previous artwork for crossfade
@@ -209,7 +197,8 @@ watch(
               <p v-else-if="error && error.type === 'no-key'" class="error-message">
                 Configure API key in <a href="/admin">Admin Panel</a>
               </p>
-              <p v-else-if="error" class="error-message">{{ error.message }}</p>
+              <p v-else-if="error" class="error-message" role="status">{{ error.message }}</p>
+              <p v-else class="error-message" role="status">Facts are unavailable for this track.</p>
 
               <!-- Dot indicators -->
               <div v-if="facts.length > 1" class="fact-dots">
@@ -306,7 +295,8 @@ watch(
               <p v-else-if="error && error.type === 'no-key'" class="error-message">
                 Configure API key in <a href="/admin">Admin Panel</a>
               </p>
-              <p v-else-if="error" class="error-message">{{ error.message }}</p>
+              <p v-else-if="error" class="error-message" role="status">{{ error.message }}</p>
+              <p v-else class="error-message" role="status">Facts are unavailable for this track.</p>
 
               <!-- Dot indicators -->
               <div v-if="facts.length > 1" class="fact-dots">
