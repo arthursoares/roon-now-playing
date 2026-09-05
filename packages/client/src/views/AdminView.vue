@@ -255,7 +255,7 @@ const availableModels = computed(() => {
 
 const isCustomModel = computed(() =>
   factsConfig.value.provider === 'openrouter' &&
-  !LLM_MODELS.openrouter.includes(factsConfig.value.model as any) &&
+  !(LLM_MODELS.openrouter as readonly string[]).includes(factsConfig.value.model) &&
   factsConfig.value.model !== 'custom' &&
   factsConfig.value.model !== ''
 );
@@ -305,7 +305,7 @@ async function saveFactsConfig(): Promise<void> {
       const data = await response.json();
       factsConfigError.value = data.error || 'Failed to save configuration';
     }
-  } catch (error) {
+  } catch {
     factsConfigError.value = 'Network error';
   } finally {
     factsConfigSaving.value = false;
@@ -374,7 +374,7 @@ async function runFactsTest(): Promise<void> {
     } else {
       testError.value = data.error?.message || 'Test failed';
     }
-  } catch (error) {
+  } catch {
     testError.value = 'Network error';
   } finally {
     testRunning.value = false;

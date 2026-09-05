@@ -260,7 +260,7 @@ export class LocalLLMProvider implements LLMProvider {
       }
     } catch (error) {
       if (error instanceof Error && error.message.includes('ECONNREFUSED')) {
-        throw new Error(`Cannot connect to local LLM at ${baseUrl}. Is Ollama/LM Studio running?`);
+        throw new Error(`Cannot connect to local LLM at ${baseUrl}. Is Ollama/LM Studio running?`, { cause: error });
       }
       logger.error(`Local LLM API error: ${error}`);
       throw error;

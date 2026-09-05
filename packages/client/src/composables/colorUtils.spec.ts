@@ -52,7 +52,7 @@ class ImageDataPolyfill {
 
 beforeAll(() => {
   if (typeof globalThis.ImageData === 'undefined') {
-    (globalThis as any).ImageData = ImageDataPolyfill;
+    Object.defineProperty(globalThis, 'ImageData', { configurable: true, writable: true, value: ImageDataPolyfill });
   }
 });
 

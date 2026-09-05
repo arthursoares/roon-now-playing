@@ -1,5 +1,5 @@
 import RoonApi from 'node-roon-api';
-import RoonApiTransport, { type Zone as RoonZone } from 'node-roon-api-transport';
+import RoonApiTransport from 'node-roon-api-transport';
 import RoonApiImage from 'node-roon-api-image';
 import RoonApiStatus from 'node-roon-api-status';
 import { EventEmitter } from 'events';

@@ -62,13 +62,6 @@ watch(
   { immediate: true }
 );
 
-// Compute the effective color mode based on background type and extracted colors
-const effectiveColorMode = computed(() => {
-  if (props.background === 'white') return 'light';
-  if (props.background === 'black') return 'dark';
-  return colors.value.mode;
-});
-
 const ambientStyle = computed(() => {
   // CSS variables for ambient-specific styling (used by all background types)
   const cssVariables = {

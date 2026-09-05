@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Zone } from '@roon-screen-cover/shared';
 
-const props = defineProps<{
+defineProps<{
   zones: Zone[];
   selectedZoneId: string | null;
 }>();

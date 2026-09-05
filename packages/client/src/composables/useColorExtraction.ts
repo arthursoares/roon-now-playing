@@ -9,7 +9,6 @@ import {
   SAMPLE_SIZE,
   type ExtractedColors,
   type ExtractedPalette,
-  type HSL,
 } from './colorUtils';
 
 export type { ExtractedColors, ExtractedPalette, HSL } from './colorUtils';

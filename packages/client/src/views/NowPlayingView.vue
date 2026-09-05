@@ -18,7 +18,6 @@ const {
   saveLayoutPreference,
   saveFontPreference,
   saveBackgroundPreference,
-  clearZonePreference,
   saveEnabledLayoutsPreference,
   loadPreferences,
   reapplyUrlParams,
@@ -72,7 +71,7 @@ function handleRemoteSettings(settings: {
   reapplyUrlParams();
 }
 
-const { state: wsState, subscribeToZone, unsubscribe, updateMetadata } = useWebSocket({
+const { state: wsState, subscribeToZone, updateMetadata } = useWebSocket({
   layout,
   font,
   background,
@@ -81,7 +80,7 @@ const { state: wsState, subscribeToZone, unsubscribe, updateMetadata } = useWebS
   onRemoteSettings: handleRemoteSettings,
 });
 
-const { isLoaded: fontLoaded, getFontFamily } = useFontLoader(font);
+const { getFontFamily } = useFontLoader(font);
 
 const fontFamily = computed(() => getFontFamily(font.value));
 

@@ -7,7 +7,6 @@ import type {
   ServerZonesMessage,
   ServerNowPlayingMessage,
   ServerSeekMessage,
-  ServerConnectionMessage,
   NowPlaying,
   Zone,
   LayoutType,
@@ -27,7 +26,7 @@ import { ExternalSourceManager } from './externalSources.js';
 import { generateFriendlyName } from './nameGenerator.js';
 import { logger } from './logger.js';
 import { loadDisplaySettings } from './display-settings.js';
-import type { ClientSettingsStore, ClientSettings } from './clientSettings.js';
+import type { ClientSettingsStore } from './clientSettings.js';
 
 interface ClientState {
   ws: WebSocket;
