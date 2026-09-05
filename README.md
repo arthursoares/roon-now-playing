@@ -335,8 +335,17 @@ ollama pull llama3.1
 |--------|------|-------------|
 | `GET` | `/api/facts/config` | Get current facts configuration |
 | `POST` | `/api/facts/config` | Update facts configuration |
-| `GET` | `/api/facts/:artist/:album/:title` | Get cached facts for a track |
+| `POST` | `/api/facts` | Get or generate facts using artist, album, and title in the JSON body |
 | `POST` | `/api/facts/test` | Test facts generation with sample data |
+
+Facts generation errors return a non-success status and an `error` object with
+`type` and `message`. Unusable model output returns 502. Displays retain their
+artwork and track metadata and show an error message; failed responses are not
+cached. Local models can generate facts without an API key on both endpoints.
+
+The parser recovers explicitly supported array-formatting mistakes, including
+missing separators and structural curly quotes. Ambiguous quotation, incomplete
+facts, and mixed JSON schemas are rejected rather than displayed as fragments.
 
 ### External Sources API
 

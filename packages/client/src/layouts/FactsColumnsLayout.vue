@@ -197,7 +197,8 @@ watch(
               <p v-else-if="error && error.type === 'no-key'" class="error-message">
                 Configure API key in <a href="/admin">Admin Panel</a>
               </p>
-              <p v-else-if="error" class="error-message">{{ error.message }}</p>
+              <p v-else-if="error" class="error-message" role="status">{{ error.message }}</p>
+              <p v-else class="error-message" role="status">Facts are unavailable for this track.</p>
 
               <!-- Dot indicators -->
               <div v-if="facts.length > 1" class="fact-dots">
@@ -294,7 +295,8 @@ watch(
               <p v-else-if="error && error.type === 'no-key'" class="error-message">
                 Configure API key in <a href="/admin">Admin Panel</a>
               </p>
-              <p v-else-if="error" class="error-message">{{ error.message }}</p>
+              <p v-else-if="error" class="error-message" role="status">{{ error.message }}</p>
+              <p v-else class="error-message" role="status">Facts are unavailable for this track.</p>
 
               <!-- Dot indicators -->
               <div v-if="facts.length > 1" class="fact-dots">
