@@ -36,6 +36,7 @@ export const LAYOUTS = [
   'facts-carousel',
   'basic',
   'album-wall',
+  'album-gallery',
 ] as const;
 export type LayoutType = (typeof LAYOUTS)[number];
 

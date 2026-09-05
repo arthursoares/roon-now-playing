@@ -24,6 +24,7 @@ describe('shared configuration registries', () => {
       'facts-carousel',
       'basic',
       'album-wall',
+      'album-gallery',
     ]);
     expect(new Set(LAYOUTS).size).toBe(LAYOUTS.length);
   });

@@ -57,6 +57,7 @@ const layoutComponent = computed(() => {
     case 'basic':
       return BasicLayout;
     case 'album-wall':
+    case 'album-gallery':
       return AlbumWallLayout;
     default:
       return DetailedLayout;
@@ -89,7 +90,9 @@ function handleDoubleClick(): void {
       :artwork-url="artworkUrl"
       :zone-name="zone.display_name"
       :background="background"
-      v-bind="layout === 'album-wall' ? { albumHistory } : {}"
+      v-bind="layout === 'album-wall' || layout === 'album-gallery'
+        ? { albumHistory, galleryOnly: layout === 'album-gallery' }
+        : {}"
     />
   </div>
 </template>

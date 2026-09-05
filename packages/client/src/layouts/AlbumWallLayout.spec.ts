@@ -35,6 +35,16 @@ const history: RecentAlbum[] = [
   },
 ];
 
+const galleryHistory: RecentAlbum[] = Array.from({ length: 12 }, (_, index) => ({
+  id: index === 0 ? '["the artist","current album"]' : `["artist ${index}","album ${index}"]`,
+  artist: index === 0 ? 'The Artist' : `Artist ${index}`,
+  album: index === 0 ? 'Current Album' : index === 1
+    ? 'An Album Name Long Enough to Need Two Lines Without Losing Its Accessible Name'
+    : `Album ${index}`,
+  artwork_key: `gallery-${index}`,
+  last_played_at: 1_000 - index,
+}));
+
 describe('AlbumWallLayout', () => {
   it('keeps the current track as the hero and shows prior albums in server order', () => {
     const host = document.createElement('div');
@@ -131,7 +141,7 @@ describe('AlbumWallLayout', () => {
     app.unmount();
   });
 
-  it('applies adaptive text and progress colors to dynamic backgrounds', () => {
+  it('keeps text and progress readable over a light dynamic background', () => {
     const host = document.createElement('div');
     const app = createApp({
       render: () => h(AlbumWallLayout, {
@@ -149,9 +159,73 @@ describe('AlbumWallLayout', () => {
 
     app.mount(host);
     const layout = host.querySelector<HTMLElement>('.album-wall-layout');
+    const content = host.querySelector<HTMLElement>('.album-wall-content');
 
     expect(layout?.style.getPropertyValue('--text-color')).toBe('#1a1a1a');
     expect(layout?.style.getPropertyValue('--progress-bar-fill')).toBe('rgba(26, 26, 26, 0.7)');
+    expect(content?.classList.contains('dynamic-contrast')).toBe(true);
+    expect(content?.style.getPropertyValue('--text-color')).toBe('#ffffff');
+    expect(content?.style.getPropertyValue('--text-tertiary')).toBe('rgba(255, 255, 255, 0.88)');
+    expect(content?.style.getPropertyValue('--progress-bar-fill')).toBe('#ffffff');
+
+    app.unmount();
+  });
+
+  it('renders all twelve albums with the current tile marked and no hero', () => {
+    const host = document.createElement('div');
+    const app = createApp({
+      render: () => h(AlbumWallLayout, {
+        track,
+        state: 'playing',
+        isPlaying: true,
+        progress: 25,
+        currentTime: '1:00',
+        duration: '4:00',
+        artworkUrl: '/api/artwork/hero-key',
+        zoneName: 'Living Room',
+        background: 'black',
+        albumHistory: galleryHistory,
+        galleryOnly: true,
+      }),
+    });
+
+    app.mount(host);
+
+    expect(host.querySelector('.album-gallery-layout')).not.toBeNull();
+    expect(host.querySelector('.hero')).toBeNull();
+    expect(host.querySelectorAll('.gallery-card')).toHaveLength(12);
+    expect(host.querySelector('.current-marker')?.textContent).toBe('Now playing');
+    const longLabelCard = [...host.querySelectorAll<HTMLElement>('.gallery-card')]
+      .find((card) => card.title.startsWith('An Album Name Long Enough'));
+    expect(longLabelCard?.querySelector('.album-name')?.textContent).toContain('Without Losing Its Accessible Name');
+    expect(longLabelCard?.querySelector('img')?.alt).toContain('Without Losing Its Accessible Name');
+
+    app.unmount();
+  });
+
+  it('uses the current track as a paused gallery tile before history arrives', () => {
+    const host = document.createElement('div');
+    const app = createApp({
+      render: () => h(AlbumWallLayout, {
+        track,
+        state: 'paused',
+        isPlaying: false,
+        progress: 50,
+        currentTime: '2:00',
+        duration: '4:00',
+        artworkUrl: '/api/artwork/hero-key',
+        zoneName: 'Living Room',
+        background: 'black',
+        galleryOnly: true,
+      }),
+    });
+
+    app.mount(host);
+
+    expect(host.querySelectorAll('.gallery-card')).toHaveLength(1);
+    expect(host.querySelector('.album-name')?.textContent).toBe(track.album);
+    expect(host.querySelector('.current-marker')?.textContent).toBe('Paused');
+    expect(host.querySelector('.hero')).toBeNull();
 
     app.unmount();
   });

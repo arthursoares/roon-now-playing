@@ -6,7 +6,7 @@ import type {
   RecentAlbum,
   Track,
 } from '@roon-screen-cover/shared';
-import { getAlbumId } from '@roon-screen-cover/shared';
+import { ALBUM_HISTORY_LIMIT, getAlbumId } from '@roon-screen-cover/shared';
 import DynamicBackground from '../components/DynamicBackground.vue';
 import ProgressBar from '../components/ProgressBar.vue';
 import { useBackgroundStyle } from '../composables/useBackgroundStyle';
@@ -24,8 +24,10 @@ const props = withDefaults(defineProps<{
   zoneName: string;
   background: BackgroundType;
   albumHistory?: RecentAlbum[];
+  galleryOnly?: boolean;
 }>(), {
   albumHistory: () => [],
+  galleryOnly: false,
 });
 
 const backgroundRef = computed(() => props.background);
@@ -44,6 +46,16 @@ const rootBindings = computed(() => usesDynamicBackground.value
     }
   : { style: backgroundStyle.value }
 );
+const contentContrastStyle = computed(() => usesDynamicBackground.value
+  ? {
+      '--text-color': '#ffffff',
+      '--text-secondary': 'rgba(255, 255, 255, 0.94)',
+      '--text-tertiary': 'rgba(255, 255, 255, 0.88)',
+      '--progress-bar-bg': 'rgba(255, 255, 255, 0.28)',
+      '--progress-bar-fill': '#ffffff',
+    }
+  : undefined
+);
 
 const currentAlbumId = computed(() => props.track
   ? getAlbumId(props.track.artist, props.track.album)
@@ -53,6 +65,24 @@ const currentAlbumId = computed(() => props.track
 const previousAlbums = computed(() => props.albumHistory.filter((album) =>
   album.id !== currentAlbumId.value
 ));
+const galleryAlbums = computed<RecentAlbum[]>(() => {
+  const albums = [...props.albumHistory];
+  if (props.track && currentAlbumId.value && !albums.some((album) => album.id === currentAlbumId.value)) {
+    albums.unshift({
+      id: currentAlbumId.value,
+      artist: props.track.artist,
+      album: props.track.album,
+      artwork_key: props.track.artwork_key,
+      last_played_at: Date.now(),
+    });
+  }
+  return albums.slice(0, ALBUM_HISTORY_LIMIT);
+});
+const currentTileLabel = computed(() => {
+  if (props.isPlaying) return 'Now playing';
+  if (props.state === 'paused') return 'Paused';
+  return null;
+});
 
 const failedArtworkKeys = ref<Map<string, string | null>>(new Map());
 const heroArtworkFailed = ref(false);
@@ -74,10 +104,68 @@ function markArtworkFailed(album: RecentAlbum): void {
   <component
     :is="rootComponent"
     v-bind="rootBindings"
-    class="album-wall-layout"
+    :class="galleryOnly ? 'album-gallery-layout' : 'album-wall-layout'"
   >
-    <main class="album-wall-content">
-      <section class="hero" aria-label="Now playing">
+    <main
+      class="album-wall-content"
+      :class="{
+        'dynamic-contrast': usesDynamicBackground,
+        'album-gallery-content': galleryOnly,
+      }"
+      :style="contentContrastStyle"
+    >
+      <template v-if="galleryOnly">
+        <header class="gallery-header">
+          <div class="gallery-heading">
+            <p class="eyebrow">Album gallery</p>
+            <h1 v-if="track" class="gallery-track" :title="track.title">{{ track.title }}</h1>
+            <h1 v-else class="gallery-track">No music playing</h1>
+          </div>
+          <p v-if="track" class="gallery-context" :title="`${track.artist} — ${track.album}`">
+            {{ track.artist }} <span aria-hidden="true">·</span> {{ track.album }}
+          </p>
+          <p class="gallery-zone">{{ zoneName }}</p>
+        </header>
+
+        <section v-if="galleryAlbums.length" class="gallery-grid" aria-label="Album gallery">
+          <article
+            v-for="album in galleryAlbums"
+            :key="album.id"
+            class="gallery-card"
+            :class="{ 'current-album': album.id === currentAlbumId }"
+            :title="`${album.album} — ${album.artist}`"
+          >
+            <div class="gallery-artwork-slot">
+              <div class="album-cover-frame">
+                <img
+                  v-if="recentArtworkUrl(album) && failedArtworkKeys.get(album.id) !== album.artwork_key"
+                  :src="recentArtworkUrl(album)!"
+                  :alt="`${album.album} by ${album.artist}`"
+                  class="album-cover artwork"
+                  loading="eager"
+                  @error="markArtworkFailed(album)"
+                />
+                <div v-else class="cover-placeholder" aria-hidden="true"><span>♪</span></div>
+                <span
+                  v-if="album.id === currentAlbumId && currentTileLabel"
+                  class="current-marker"
+                >{{ currentTileLabel }}</span>
+              </div>
+            </div>
+            <div class="album-copy">
+              <p class="album-name">{{ album.album }}</p>
+              <p class="album-artist">{{ album.artist }}</p>
+            </div>
+          </article>
+        </section>
+
+        <section v-else class="empty-history gallery-empty" aria-label="Album gallery">
+          <span class="empty-mark">◎</span>
+          <p>Play an album to begin your gallery.</p>
+        </section>
+      </template>
+
+      <section v-if="!galleryOnly" class="hero" aria-label="Now playing">
         <div class="hero-artwork-frame">
           <img
             v-if="artworkUrl && !heroArtworkFailed"
@@ -113,7 +201,7 @@ function markArtworkFailed(album: RecentAlbum): void {
         </div>
       </section>
 
-      <section class="history" aria-label="Recently played albums">
+      <section v-if="!galleryOnly" class="history" aria-label="Recently played albums">
         <header>
           <p class="eyebrow">Recently played</p>
           <p v-if="previousAlbums.length" class="history-count">{{ previousAlbums.length }}</p>
@@ -154,7 +242,8 @@ function markArtworkFailed(album: RecentAlbum): void {
 </template>
 
 <style scoped>
-.album-wall-layout {
+.album-wall-layout,
+.album-gallery-layout {
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -170,6 +259,125 @@ function markArtworkFailed(album: RecentAlbum): void {
   grid-template-columns: minmax(0, 1.35fr) minmax(20rem, 0.9fr);
   padding: clamp(1.5rem, 3.4vw, 5rem);
   column-gap: clamp(2rem, 4vw, 6rem);
+}
+
+.album-wall-content.dynamic-contrast {
+  background: rgba(0, 0, 0, 0.58);
+}
+
+.album-gallery-content {
+  display: flex;
+  flex-direction: column;
+  padding: clamp(1.1rem, 2vw, 3rem);
+  gap: clamp(0.75rem, 1.2vh, 1.5rem);
+}
+
+.gallery-header {
+  flex: 0 0 auto;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: clamp(1rem, 2vw, 3rem);
+}
+
+.gallery-heading,
+.gallery-context {
+  min-width: 0;
+}
+
+.gallery-track {
+  margin-top: 0.25rem;
+  font-size: calc(clamp(1.15rem, 1.5vw, 2.6rem) * var(--font-scale, 1));
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.gallery-context,
+.gallery-zone {
+  margin: 0;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.9));
+  font-size: calc(clamp(0.72rem, 0.75vw, 1.25rem) * var(--font-scale, 1));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gallery-zone {
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.88));
+}
+
+.gallery-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: clamp(0.6rem, 1.15vw, 1.75rem);
+}
+
+.gallery-card {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.gallery-artwork-slot {
+  min-height: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  container-type: size;
+}
+
+.gallery-card .album-cover-frame {
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
+  aspect-ratio: 1;
+}
+
+.gallery-card .album-copy {
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.gallery-card .album-name {
+  font-size: calc(clamp(0.7rem, 0.72vw, 1.65rem) * var(--font-scale, 1));
+  line-height: 1.12;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.gallery-card .album-artist {
+  font-size: calc(clamp(0.62rem, 0.58vw, 1.25rem) * var(--font-scale, 1));
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.current-marker {
+  position: absolute;
+  left: clamp(0.35rem, 0.55vw, 0.8rem);
+  bottom: clamp(0.35rem, 0.55vw, 0.8rem);
+  padding: 0.28em 0.55em;
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.78);
+  font-size: calc(clamp(0.58rem, 0.5vw, 0.82rem) * var(--font-scale, 1));
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.gallery-empty {
+  flex: 1 1 auto;
 }
 
 .hero {
@@ -398,6 +606,13 @@ h1 {
   .album-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
+@media (max-aspect-ratio: 5/3) {
+  .gallery-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-rows: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (max-aspect-ratio: 6/5) {
   .album-wall-content {
     grid-template-rows: minmax(0, 27vh) minmax(0, 1fr);
@@ -424,6 +639,24 @@ h1 {
   .album-copy {
     padding-top: clamp(0.3rem, 0.5vh, 0.5rem);
   }
+
+  .album-gallery-content {
+    padding: clamp(1rem, 2vw, 1.5rem);
+  }
+
+  .gallery-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .gallery-context {
+    display: none;
+  }
+
+  .gallery-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(4, minmax(0, 1fr));
+    gap: clamp(0.45rem, 1.2vw, 0.75rem);
+  }
 }
 
 @media (max-width: 620px) {
@@ -446,10 +679,16 @@ h1 {
   .now-playing-copy { text-align: center; }
   .history { margin-top: 2.5rem; }
   .album-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  .album-gallery-content {
+    display: flex;
+    padding: 0.75rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .album-wall-layout,
+  .album-gallery-layout,
   .album-card {
     transition: none;
     animation: none;

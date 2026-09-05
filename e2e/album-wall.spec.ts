@@ -92,3 +92,58 @@ test('Album Wall clears history on zone changes and renders missing artwork', as
   await expect(page.locator('.hero-placeholder')).toBeVisible();
   await expect(page.locator('.empty-history')).toBeVisible();
 });
+
+test('Album Gallery maximizes square covers and contains long text at both font scales', async ({ page }, testInfo) => {
+  const zone = `gallery-${randomUUID()}`;
+  await seedAlbums(page, zone);
+  const zones = await (await page.request.get('http://localhost:3000/api/sources')).json();
+  const artworkKey = zones.zones.find((entry: { zone_id: string }) => entry.zone_id === zone).track.artwork_key;
+  const title = 'An exceptionally long movement title with several subtitles and a live performance dedication';
+  const album = 'The complete late-night sessions, expanded edition with archival recordings and alternate performances';
+  const artist = 'A very long ensemble name featuring several guest musicians and conductors';
+  const response = await page.request.post(`http://localhost:3000/api/sources/${zone}/now-playing`, {
+    data: { zone_name: 'Listening room', state: 'playing', title, album, artist,
+      artwork_url: `http://localhost:3000/api/artwork/${artworkKey}` },
+  });
+  expect(response.ok()).toBe(true);
+  await page.goto(`/?layout=album-gallery&zone=${zone}&background=gradient-mesh`);
+  await expect(page.locator('.album-gallery-layout')).toBeVisible();
+  await expect(page.locator('.gallery-card')).toHaveCount(12);
+  await expect(page.locator('.hero')).toHaveCount(0);
+  await expect(page.locator('.current-marker')).toHaveText('Now playing');
+  await expect(page.locator('.gallery-track')).toHaveText(title);
+  await expect(page.locator('.current-album')).toHaveAttribute('title', `${album} — ${artist}`);
+
+  for (const scale of [1, 1.5]) {
+    await page.evaluate((value) => document.documentElement.style.setProperty('--font-scale', String(value)), scale);
+    await expect.poll(() => page.locator('.gallery-card').evaluateAll((cards) => cards.every((card) => {
+      const frame = card.querySelector('.album-cover-frame')!.getBoundingClientRect();
+      const text = card.querySelector('.album-copy')!.getBoundingClientRect();
+      const artist = card.querySelector('.album-artist')!.getBoundingClientRect();
+      const bounds = card.getBoundingClientRect();
+      return Math.abs(frame.width - frame.height) <= 1 && frame.width > 40 &&
+        frame.left >= 0 && frame.right <= innerWidth + 1 && text.bottom <= innerHeight + 1 &&
+        artist.bottom <= bounds.bottom + 1;
+    })), { message: `Square covers and long labels should fit at font scale ${scale}` }).toBe(true);
+  }
+  await page.evaluate(() => document.documentElement.style.setProperty('--font-scale', '1'));
+  const directory = path.join('e2e/screenshots/album-gallery', testInfo.project.name);
+  fs.mkdirSync(directory, { recursive: true });
+  await page.screenshot({ path: path.join(directory, 'gallery.jpg'), type: 'jpeg', quality: 85, animations: 'disabled' });
+});
+
+test('Album Gallery keeps every tile visible on a landscape phone', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'TV-1080p', 'This regression supplies its own phone viewport sizes');
+  const zone = `phone-gallery-${randomUUID()}`;
+  await seedAlbums(page, zone);
+  await page.goto(`/?layout=album-gallery&zone=${zone}`);
+  await expect(page.locator('.gallery-card')).toHaveCount(12);
+  for (const viewport of [{ width: 600, height: 400 }, { width: 568, height: 320 }]) {
+    await page.setViewportSize(viewport);
+    await expect.poll(() => page.locator('.gallery-card').evaluateAll((cards) => cards.every((card) => {
+      const frame = card.querySelector('.album-cover-frame')!.getBoundingClientRect();
+      const label = card.querySelector('.album-artist')!.getBoundingClientRect();
+      return frame.width > 15 && Math.abs(frame.width - frame.height) <= 1 && label.bottom <= innerHeight + 1;
+    }))).toBe(true);
+  }
+});
