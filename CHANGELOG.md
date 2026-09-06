@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.11.0] - 2026-09-06
+
+### Added
+
+- **ChatGPT (Codex) facts provider**: Opt in to a separate runtime, connect an account by device code, and research artist/album facts with source links shown in all three facts layouts. API-key providers remain independently selectable, with no automatic fallback.
+- **Reusable album research**: Share one research job across matching tracks and displays; retain album research for 30 days and selected track facts for 72 hours. Account changes isolate cached research. Track-specific facts remain restricted to their matching title.
+- **Cache-aware Admin testing**: Get Facts uses the display cache path; Research Again and Generate Fresh Facts explicitly request fresh work. Show cache status, source links, elapsed time, and available research usage metrics.
+
+### Changed
+
+- Refresh the OpenAI model picker and defaults, migrate old app model choices to Luna, and expose reasoning and recommended output limits while retaining custom prompts, model IDs, and explicitly saved ceilings.
+- Share API-provider facts through one persistent server cache and deduplicate matching in-flight requests across displays. Bound request deadlines and discard failed or truncated responses.
+- Open independent research source pages concurrently while preserving attribution and the existing fact-pool size.
+- Remove automatic screenshot CI; keep local visual review commands and Quality, Docker, and optional Codex runtime checks.
+
+### Fixed
+
+- Keep Album Gallery dense, deduplicate album history, and place the current album first.
+- Reduce progress rendering work with transforms; preserve interpolation across redundant metadata while resetting correctly for same-title track changes.
+- Re-arm login expiry when a timer fires before its wall-clock deadline, so pending sign-in still expires without another browser request.
+
+### Upgrade notes
+
+- Keep existing configuration and artwork volumes. Old API-provider cache entries without generation-setting provenance are discarded once and may regenerate on first playback.
+- The regular Docker image does not include Codex. Build with `docker-compose.codex.yml` to enable account-backed research; preserve its separate private `codex-account` volume. See `docs/codex-device-login.md`.
+- Account controls use the existing Admin access model, with no separate Codex token. Model access depends on the connected account; source links record attribution rather than independently verifying every claim.
+
 ## [1.10.0] - 2026-09-05
 
 ### Added
