@@ -104,3 +104,118 @@ describe('facts model defaults', () => {
   });
 
 });
+
+describe('facts test retrieval', () => {
+  let app: App;
+  let host: HTMLDivElement;
+  const fetchMock = vi.fn();
+
+  function button(label: string) {
+    const element = [...host.querySelectorAll('button')].find((el) => el.textContent?.trim() === label);
+    expect(element, label).toBeDefined();
+    return element!;
+  }
+
+  async function mount(provider = 'codex') {
+    fetchMock.mockImplementation(async (url: string) => ({
+      ok: true,
+      json: async () => url === '/api/facts/config'
+        ? { provider, model: provider === 'codex' ? 'gpt-5.6-luna' : 'claude-haiku-4-5', apiKey: '', factsCount: 5, rotationInterval: 25, prompt: 'Facts' }
+        : url === '/api/codex/capabilities' ? { enabled: true, generationEnabled: true }
+          : url === '/api/sources' ? { zones: [] } : {},
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    host = document.createElement('div');
+    document.body.append(host);
+    app = createApp(AdminView);
+    app.mount(host);
+    button('Test').click();
+    await vi.waitFor(() => expect(host.querySelector('#testArtist')).not.toBeNull());
+  }
+
+  beforeEach(() => { fetchMock.mockReset(); });
+  afterEach(() => { app?.unmount(); host?.remove(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+  it.each([
+    ['codex', 'anthropic', 'Research Again'],
+    ['anthropic', 'codex', 'Generate Fresh Facts'],
+  ])('uses saved %s settings despite an unsaved %s selection', async (saved, draft, expectedLabel) => {
+    await mount(saved);
+    button('AI Facts').click();
+    await vi.waitFor(() => expect(host.querySelector(`#provider option[value="${draft}"]`)).not.toBeNull());
+    const provider = host.querySelector<HTMLSelectElement>('#provider')!;
+    provider.value = draft;
+    provider.dispatchEvent(new Event('change', { bubbles: true }));
+    await nextTick();
+    button('Test').click();
+    await nextTick();
+    expect(button(expectedLabel)).toBeDefined();
+  });
+
+  it('includes reading the response body in the displayed retrieval duration', async () => {
+    await mount();
+    let time = 1000;
+    vi.spyOn(performance, 'now').mockImplementation(() => time);
+    fetchMock.mockImplementation(async () => ({
+      ok: true,
+      json: async () => {
+        time = 1375;
+        return { facts: ['Received fact'], cached: true };
+      },
+    }));
+    button('Get Facts').click();
+    await vi.waitFor(() => expect(host.querySelector('.results-card')?.textContent).toContain('375 ms'));
+  });
+
+  it('uses the cache-aware facts endpoint for Get Facts and shows a zero-millisecond cached response', async () => {
+    await mount();
+    const now = vi.spyOn(performance, 'now').mockReturnValue(1000);
+    fetchMock.mockImplementation(async (url: string) => ({
+      ok: true,
+      json: async () => url === '/api/facts'
+        ? { facts: ['Warm cached fact'], cached: true, generatedAt: Date.now(), sources: [[{ url: 'https://musicbrainz.org/artist/example', title: 'Source' }]], research: { cache: 'track', webSearches: 0, openPages: 0 } }
+        : {},
+    }));
+
+    button('Get Facts').click();
+
+    await vi.waitFor(() => expect(host.querySelector('.results-card')?.textContent).toContain('Warm cached fact'));
+    expect(fetchMock).toHaveBeenCalledWith('/api/facts', expect.objectContaining({
+      method: 'POST', body: JSON.stringify({ artist: 'The Beatles', album: 'Abbey Road', title: 'Come Together' }),
+    }));
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/facts/test', expect.anything());
+    expect(host.querySelector('.results-card')?.textContent).toContain('track cache · 0 searches · 0 pages opened');
+    expect(host.querySelector('.results-card')?.textContent).toContain('0 ms');
+    expect(host.querySelector('.fact-sources')?.textContent).toContain('Source');
+    now.mockRestore();
+  });
+
+  it('uses the fresh test endpoint for Research Again and keeps error feedback', async () => {
+    await mount();
+    fetchMock.mockImplementation(async (url: string) => ({
+      ok: url !== '/api/facts/test',
+      json: async () => url === '/api/facts/test'
+        ? { error: { message: 'Fresh research failed' } } : {},
+    }));
+
+    button('Research Again').click();
+
+    await vi.waitFor(() => expect(host.textContent).toContain('Fresh research failed'));
+    expect(fetchMock).toHaveBeenCalledWith('/api/facts/test', expect.objectContaining({
+      method: 'POST', body: JSON.stringify({ artist: 'The Beatles', album: 'Abbey Road', title: 'Come Together' }),
+    }));
+  });
+
+  it('labels cache-aware non-Codex responses with their cached status', async () => {
+    await mount('anthropic');
+    fetchMock.mockImplementation(async (url: string) => ({
+      ok: true,
+      json: async () => url === '/api/facts' ? { facts: ['Cached provider fact'], cached: true, generatedAt: Date.now() } : {},
+    }));
+
+    button('Get Facts').click();
+
+    await vi.waitFor(() => expect(host.querySelector('.results-card')?.textContent).toContain('Cached facts'));
+    expect(button('Generate Fresh Facts')).toBeDefined();
+  });
+});

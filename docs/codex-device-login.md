@@ -40,7 +40,7 @@ Default local credential directories are excluded from git and Docker build cont
 2. Choose **Connect ChatGPT**. Open the displayed OpenAI verification link on another device and enter the code.
 3. Complete sign-in on OpenAI's page. The account panel updates to show the connected account.
 4. Select **ChatGPT (Codex)** as the AI provider, choose a model (Luna is the default), and save.
-5. Open **Test** to research a sample track. A test forces fresh research and reports source links, search/page-open counts, and latency. Normal display requests reuse cached work.
+5. Open **Test** and choose **Get Facts**. It uses the normal cache-aware display path and reports cache status, source links, search/page-open counts, and elapsed time. Choose **Research Again** only when you want fresh research that bypasses the cache.
 
 If device-code login is unavailable, enable it in your ChatGPT security settings or ask your workspace administrator to enable it. OpenAI documents this requirement in its [headless authentication guide](https://learn.chatgpt.com/docs/auth#login-on-headless-devices).
 
@@ -49,6 +49,8 @@ An attempt has a local ten-minute deadline; OpenAI may expire its code earlier. 
 ## Research and reuse
 
 The provider uses low reasoning, validates the exact selected model against the connected account's catalog, and performs one research job at a time with a bounded queue. It applies a three-minute whole-operation deadline and local response-size limits. There is no hard model output-token cap. Saved API-provider caps and credentials remain independent.
+
+Independent source pages are requested concurrently once their URLs are known, using separate single-page calls so attribution remains observable. The fact-pool size is unchanged. This can reduce sequential web waits, but fresh-research latency still depends on the model and sources; a cached retrieval is a different measurement from a fresh run.
 
 Historical research is cached for 30 days, with up to 500 records. Selected track results are cached for 72 hours, with up to 1,000 records; combined serialized entries are capped at 16 MiB. Different tracks on an album share the same research job and reuse artist/album facts. Track-specific facts are used only for their matching title. Forced research refreshes the album pool, and sibling track selections are refreshed from that pool without another model call. Cache contents survive ordinary server restarts.
 
