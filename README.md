@@ -104,7 +104,7 @@ Example: `http://localhost:3000/?zone=Office&layout=detailed&background=gradient
 | `facts-carousel` | Blurred artwork background with the rotating fact shown as large type, plus a compact now-playing chip. Sized for legibility on TVs. |
 | `basic` | Legacy-compatible layout for older browsers (iOS 12+). Artwork with title, artist, album, and progress bar. Auto-adapts to portrait/landscape. |
 | `album-wall` | A prominent current album with a gallery of recent albums from the selected zone. History persists across restarts and supports Roon and external sources. |
-| `album-gallery` | Covers-only mosaic of up to 12 recent albums. Square artwork fills the screen; the viewport clips the outer tiles. |
+| `album-gallery` | Covers-only mosaic using up to 12 recent albums. Square artwork repeats to fill a dense screen-wide grid; the viewport clips the outer tiles. |
 
 **Note:** Facts layouts require an LLM provider configured in the Admin panel. Supported providers: Anthropic, OpenAI, OpenRouter, or Local LLM (Ollama/LM Studio).
 
@@ -123,9 +123,10 @@ entries. Missing or unavailable covers show placeholders.
 Choose **Album gallery** or `/?layout=album-gallery` for a covers-only mosaic,
 without a header, captions, or badges. Each image stays intact within its square
 tile; the centered mosaic extends beyond the viewport so only the screen edges
-clip the outer covers. The arrangement adapts to screen size and shorter
-histories without repeating albums or leaving empty cells. Metadata remains in
-accessible labels and hover titles.
+clip the outer covers. The arrangement adapts to screen shape and cycles shorter
+histories through at least 40 visual slots. Each distinct album appears once in
+accessible labels and hover titles; repeated visual tiles are hidden from
+assistive technology.
 
 Album Wall retains its artwork-derived backgrounds and metadata. Its track
 titles stop at three lines, with ellipsis for artist and album labels. Dynamic
