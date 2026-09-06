@@ -1,6 +1,6 @@
 # ChatGPT sign-in for facts: design boundary
 
-Issue #33 includes sign-in research as well as API model support. The app now has an optional [device-code connection and Codex research provider](codex-device-login.md), with protected account controls and source-backed cached facts. Subscription research uses its own runtime integration; it does not substitute an OAuth token into `new OpenAI({ apiKey })`.
+Issue #33 includes sign-in research as well as API model support. The app now has an optional [device-code connection and Codex research provider](codex-device-login.md), with account controls in Admin and source-backed cached facts. Subscription research uses its own runtime integration; it does not substitute an OAuth token into `new OpenAI({ apiKey })`.
 
 ## Supported candidate
 
@@ -12,7 +12,7 @@ For a Docker/NAS deployment, prefer managed device-code login, subject to its ac
 
 1. Add an optional, supervised Codex backend using stdio and a pinned runtime verified on both container architectures and the chosen base image. This is an additional deployment dependency.
 2. Give it a private persistent credential directory. Keep tokens out of display WebSockets, public configuration responses, logs, and browser storage. Let Codex own refresh; do not import unrelated user authentication caches.
-3. Add an explicit administrator authorization boundary for login, account status, cancellation, and logout. Current facts configuration routes are not application-wide authentication. Source API keys protect source operations and should not be repurposed as this boundary.
+3. Use the existing Admin access model for account controls and provider settings. The user chose to remove the separate Codex administrator-token gate; source API keys continue to protect only source operations.
 4. Expose only the small set of account/generation operations the app needs, not raw Codex RPC. Isolate generation from the filesystem and executable tools; verify enforceable tool disabling before accepting untrusted track metadata or prompts.
 5. Start isolated generation contexts, require the facts output contract, and enforce request deadlines and bounded local response handling. A hard output-token cap is not required for the Codex provider. Preserve request sharing, configuration/account isolation, refusal/incomplete-turn handling, and cache behavior.
 6. Test login cancellation/expiry, refresh, restarts, unavailable models, exhausted quotas, and logout. Show whether requests consume subscription entitlements or metered API billing. Never fall back silently to a billed API key.

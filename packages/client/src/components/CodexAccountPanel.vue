@@ -8,8 +8,6 @@ const props = withDefaults(defineProps<{ active?: boolean }>(), { active: true }
 const emit = defineEmits<{ capabilities: [value: CodexCapabilities] }>();
 
 const capabilities = ref<CodexCapabilities | null>(null);
-const tokenInput = ref('');
-const adminToken = ref<string | null>(null);
 const accountStatus = ref<CodexAccountStatus | null>(null);
 const message = ref<string | null>(null);
 const busyAction = ref<'login' | 'cancel' | 'logout' | null>(null);
@@ -24,7 +22,6 @@ let mutationController: AbortController | null = null;
 let copiedTimer: ReturnType<typeof setTimeout> | null = null;
 
 const enabled = computed(() => capabilities.value?.enabled === true);
-const unlocked = computed(() => adminToken.value !== null);
 const safeVerificationUrl = computed(() =>
   accountStatus.value?.login?.verificationUrl === DEVICE_VERIFICATION_URL
     ? DEVICE_VERIFICATION_URL
@@ -74,21 +71,13 @@ function clearCopiedState(): void {
   codeCopied.value = false;
 }
 
-function lockControls(help: string | null = null): void {
+function resetRequests(): void {
   requestEpoch += 1;
   stopPolling();
   mutationController?.abort();
   mutationController = null;
   busyAction.value = null;
-  adminToken.value = null;
-  tokenInput.value = '';
-  accountStatus.value = null;
   clearCopiedState();
-  message.value = help;
-}
-
-function handleUnauthorized(): void {
-  lockControls('That admin token was rejected. Enter the dedicated Codex admin token to unlock account controls.');
 }
 
 function applyStatus(status: CodexAccountStatus): void {
@@ -97,8 +86,7 @@ function applyStatus(status: CodexAccountStatus): void {
 }
 
 async function refreshStatus(): Promise<void> {
-  const token = adminToken.value;
-  if (!mounted || !props.active || !enabled.value || !token || document.hidden || statusController || busyAction.value) return;
+  if (!mounted || !props.active || !enabled.value || document.hidden || statusController || busyAction.value) return;
 
   const epoch = requestEpoch;
   const currentStatusEpoch = statusEpoch;
@@ -106,16 +94,9 @@ async function refreshStatus(): Promise<void> {
   statusController = controller;
 
   try {
-    const response = await fetch('/api/codex/account', {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: controller.signal,
-    });
+    const response = await fetch('/api/codex/account', { signal: controller.signal });
     const payload = await responsePayload(response);
-    if (!mounted || requestEpoch !== epoch || statusEpoch !== currentStatusEpoch || adminToken.value !== token) return;
-    if (response.status === 401) {
-      handleUnauthorized();
-      return;
-    }
+    if (!mounted || requestEpoch !== epoch || statusEpoch !== currentStatusEpoch) return;
     if (!response.ok && !isAccountStatus(payload)) {
       message.value = errorMessage(payload, `Could not check the account (HTTP ${response.status}).`);
       return;
@@ -133,29 +114,11 @@ async function refreshStatus(): Promise<void> {
 
 function startPolling(immediate = true): void {
   stopPolling();
-  if (!mounted || !props.active || !enabled.value || !adminToken.value || document.hidden) return;
+  if (!mounted || !props.active || !enabled.value || document.hidden) return;
   if (immediate) void refreshStatus();
   pollTimer = setInterval(() => { void refreshStatus(); }, POLL_INTERVAL_MS);
 }
 
-function unlockControls(): void {
-  if (!tokenInput.value) {
-    message.value = 'Enter the dedicated admin token.';
-    return;
-  }
-  requestEpoch += 1;
-  adminToken.value = tokenInput.value;
-  tokenInput.value = '';
-  accountStatus.value = null;
-  message.value = null;
-  startPolling();
-}
-
-function getAuthorizationHeaders(): Record<string, string> {
-  return adminToken.value ? { Authorization: `Bearer ${adminToken.value}` } : {};
-}
-
-defineExpose({ getAuthorizationHeaders });
 watch(() => props.active, active => { if (active) startPolling(); else stopPolling(); });
 
 async function mutateAccount(
@@ -163,8 +126,7 @@ async function mutateAccount(
   url: string,
   body: Record<string, never> | { loginId: string },
 ): Promise<void> {
-  const token = adminToken.value;
-  if (!token || busyAction.value) return;
+  if (busyAction.value) return;
 
   requestEpoch += 1;
   const epoch = requestEpoch;
@@ -179,18 +141,13 @@ async function mutateAccount(
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
     const payload = await responsePayload(response);
-    if (!mounted || requestEpoch !== epoch || adminToken.value !== token) return;
-    if (response.status === 401) {
-      handleUnauthorized();
-      return;
-    }
+    if (!mounted || requestEpoch !== epoch) return;
     if (!response.ok && !isAccountStatus(payload)) {
       message.value = errorMessage(payload, `The request failed (HTTP ${response.status}).`);
       return;
@@ -247,13 +204,18 @@ function onVisibilityChange(): void {
 }
 
 function onPageHide(): void {
-  lockControls();
+  resetRequests();
+}
+
+function onPageShow(): void {
+  startPolling();
 }
 
 onMounted(async () => {
   mounted = true;
   document.addEventListener('visibilitychange', onVisibilityChange);
   window.addEventListener('pagehide', onPageHide);
+  window.addEventListener('pageshow', onPageShow);
   try {
     const response = await fetch('/api/codex/capabilities');
     const payload = await responsePayload(response);
@@ -262,6 +224,7 @@ onMounted(async () => {
     if (typeof candidate.enabled === 'boolean' && typeof candidate.generationEnabled === 'boolean') {
       capabilities.value = candidate as CodexCapabilities;
       emit('capabilities', capabilities.value);
+      startPolling();
     }
   } catch {
     // Capability discovery is intentionally silent so existing installations are unaffected.
@@ -272,7 +235,8 @@ onBeforeUnmount(() => {
   mounted = false;
   document.removeEventListener('visibilitychange', onVisibilityChange);
   window.removeEventListener('pagehide', onPageHide);
-  lockControls();
+  window.removeEventListener('pageshow', onPageShow);
+  resetRequests();
 });
 </script>
 
@@ -290,28 +254,7 @@ onBeforeUnmount(() => {
 
     <p v-if="message" role="alert" class="account-message">{{ message }}</p>
 
-    <form v-if="!unlocked" class="unlock-form" @submit.prevent="unlockControls">
-      <label for="codex-admin-token">Admin token</label>
-      <input
-        id="codex-admin-token"
-        v-model="tokenInput"
-        type="password"
-        autocomplete="off"
-        spellcheck="false"
-        required
-      />
-      <p>The token unlocks these controls only in this page and is forgotten when you lock or leave it.</p>
-      <button type="submit" class="primary-button">Unlock account controls</button>
-    </form>
-
-    <div v-else class="account-controls">
-      <div class="controls-heading">
-        <span>Account controls unlocked</span>
-        <button type="button" class="secondary-button" @click="lockControls()">
-          Lock account controls
-        </button>
-      </div>
-
+    <div class="account-controls">
       <div v-if="!accountStatus" role="status" class="status-row">Checking account status…</div>
 
       <div v-else-if="accountStatus.state === 'signed-out'" class="account-state">
@@ -384,7 +327,6 @@ header h2 {
 }
 
 header p,
-.unlock-form p,
 .account-state p {
   margin: 0;
   color: var(--text-muted, #9ca3af);
@@ -402,7 +344,6 @@ header p,
   font-size: 13px;
 }
 
-.unlock-form,
 .account-controls,
 .account-state {
   display: flex;
@@ -410,38 +351,11 @@ header p,
   gap: 12px;
 }
 
-.unlock-form label {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.unlock-form input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 11px 12px;
-  border: 1px solid var(--border-default, #3f3f46);
-  border-radius: var(--radius-md, 8px);
-  background: var(--bg-surface, #18181b);
-  color: inherit;
-  font: inherit;
-}
-
-.unlock-form input:focus {
-  border-color: var(--accent-primary, #f59e0b);
-  outline: none;
-}
-
-.controls-heading,
 .device-code-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-}
-
-.controls-heading span {
-  font-size: 13px;
-  font-weight: 600;
 }
 
 .primary-button,

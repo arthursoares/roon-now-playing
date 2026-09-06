@@ -60,7 +60,7 @@ The [recorded live smoke results](evaluations/2026-09-06-facts-luna.md) show the
 
 ## ChatGPT subscription research
 
-Use the optional [device-code integration](codex-device-login.md), then select **ChatGPT (Codex)** in AI Facts. This provider uses hosted web search and low reasoning with the selected account-accessible model. It does not use an API key or impose a hard output-token cap. Changing active subscription settings or running a fresh Test requires the dedicated administrator token; displays never receive that token.
+Use the optional [device-code integration](codex-device-login.md), then select **ChatGPT (Codex)** in AI Facts. This provider uses hosted web search and low reasoning with the selected account-accessible model. It does not use an API key or impose a hard output-token cap. Account controls, settings, and fresh research tests use the existing Admin access model, with no separate token step. Displays never receive OAuth credentials.
 
 The first track can trigger a larger reusable album research pool. Subsequent tracks select eligible artist/album facts locally, with track facts restricted to their exact matching title. Identical album misses share a job even across different tracks and displays. Research lasts 30 days and selected track results 72 hours, bounded separately and persisted atomically. A forced refresh replaces the album pool and invalidates stale sibling selections using a content revision, including when timestamps coincide.
 

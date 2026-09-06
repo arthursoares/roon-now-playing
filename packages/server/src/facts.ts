@@ -8,7 +8,7 @@ import { logger } from './logger.js';
 import { OutputLimitError } from './llmErrors.js';
 import type { CodexFactsService } from './codexFacts.js';
 import { CodexResearchError } from './codexResearchTypes.js';
-import { createCodexAuthorization } from './routes/codex.js';
+import { requireCodexSameOrigin } from './routes/codex.js';
 
 const MAX_METADATA_LENGTH = 500;
 
@@ -62,13 +62,11 @@ function sendGenerationError(res: Response, error: unknown, context: string): vo
 
 export function createFactsRouter(options: {
   codexFacts?: Pick<CodexFactsService, 'generate' | 'invalidate'>;
-  codexAdminToken?: string;
 } = {}): Router {
   const router = Router();
   const configStore = new FactsConfigStore();
   const cache = new FactsCache();
   const inFlight = new Map<string, Promise<GeneratedFacts>>();
-  const authorizeCodex = createCodexAuthorization(options.codexAdminToken);
 
   router.post('/facts', async (req, res) => {
     const metadata = validateMetadata(req.body);
@@ -166,10 +164,8 @@ export function createFactsRouter(options: {
       res.status(503).json({ error: 'ChatGPT research is not enabled on this server.' });
       return;
     }
-    // An explicitly disabled runtime can be recovered by selecting an API provider.
-    const recoveringDisabledRuntime = !options.codexFacts && updates.provider !== undefined && updates.provider !== 'codex';
-    if ((previous.provider === 'codex' || updates.provider === 'codex') && !recoveringDisabledRuntime
-      && !authorizeCodex(req, res)) return;
+    if ((previous.provider === 'codex' || updates.provider === 'codex')
+      && !requireCodexSameOrigin(req, res)) return;
     if (updates.apiKey?.includes('••••')) delete updates.apiKey;
     try {
       configStore.update(updates);
@@ -195,7 +191,7 @@ export function createFactsRouter(options: {
 
     const config = { ...configStore.get() };
     if (config.provider === 'codex') {
-      if (!authorizeCodex(req, res)) return;
+      if (!requireCodexSameOrigin(req, res)) return;
       const startedAt = Date.now();
       try {
         if (!options.codexFacts) throw new CodexResearchError('unavailable');

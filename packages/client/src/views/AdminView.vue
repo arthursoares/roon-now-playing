@@ -59,8 +59,6 @@ const showApiKey = ref(false);
 const showAdvanced = ref(false);
 const factsConfigError = ref<string | null>(null);
 const factsConfigSuccess = ref(false);
-const savedFactsProvider = ref<FactsConfig['provider']>('anthropic');
-const codexAccountPanel = ref<InstanceType<typeof CodexAccountPanel> | null>(null);
 const codexCapabilities = ref<CodexCapabilities | null>(null);
 const availableProviders = computed(() => LLM_PROVIDERS.filter(provider => provider !== 'codex'
   || codexCapabilities.value?.generationEnabled === true || factsConfig.value.provider === 'codex'));
@@ -365,7 +363,6 @@ async function loadFactsConfig(): Promise<void> {
         ...config,
         maxOutputTokens: config.maxOutputTokens ?? getRecommendedFactsOutputTokens(config.provider ?? factsConfig.value.provider, config.model ?? factsConfig.value.model),
       };
-      savedFactsProvider.value = factsConfig.value.provider;
     }
   } catch (error) {
     console.error('Failed to load facts config:', error);
@@ -380,21 +377,13 @@ async function saveFactsConfig(): Promise<void> {
   factsConfigSuccess.value = false;
 
   try {
-    const accountHeaders = codexAccountPanel.value?.getAuthorizationHeaders() ?? {};
-    const requiresAccount = factsConfig.value.provider === 'codex'
-      || (savedFactsProvider.value === 'codex' && codexCapabilities.value?.enabled === true);
-    if (requiresAccount && !accountHeaders.Authorization) {
-      factsConfigError.value = 'Unlock the ChatGPT account controls before changing subscription settings.';
-      return;
-    }
     const response = await fetch('/api/facts/config', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(requiresAccount ? accountHeaders : {}) },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(factsConfig.value),
     });
 
     if (response.ok) {
-      savedFactsProvider.value = factsConfig.value.provider;
       factsConfigSuccess.value = true;
       setTimeout(() => {
         factsConfigSuccess.value = false;
@@ -459,14 +448,9 @@ async function runFactsTest(): Promise<void> {
   }
 
   try {
-    const accountHeaders = codexAccountPanel.value?.getAuthorizationHeaders() ?? {};
-    if (savedFactsProvider.value === 'codex' && !accountHeaders.Authorization) {
-      testError.value = 'Unlock the ChatGPT account controls in AI Facts before starting a research test.';
-      return;
-    }
     const response = await fetch('/api/facts/test', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(savedFactsProvider.value === 'codex' ? accountHeaders : {}) },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ artist, album, title }),
     });
 
@@ -944,7 +928,7 @@ onMounted(() => {
       </section>
 
       <!-- Facts Configuration Section -->
-      <section v-show="activeSection === 'facts'" class="content-section">
+      <section v-if="activeSection === 'facts'" class="content-section">
         <header class="section-header">
           <div class="section-title">
             <h1>AI Facts Configuration</h1>
@@ -959,7 +943,7 @@ onMounted(() => {
 
         <div v-else class="config-layout">
           <div class="config-main">
-            <CodexAccountPanel ref="codexAccountPanel" :active="activeSection === 'facts' || activeSection === 'test'" @capabilities="codexCapabilities = $event" />
+            <CodexAccountPanel :active="activeSection === 'facts' || activeSection === 'test'" @capabilities="codexCapabilities = $event" />
             <!-- Provider Card -->
             <div class="config-card">
               <h2 class="card-title">AI Provider</h2>

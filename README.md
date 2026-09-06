@@ -281,7 +281,7 @@ The facts feature supports multiple LLM providers for generating music facts:
 - Sign in by approving a device code on your phone or computer, then explicitly select this provider in Admin.
 - Researches web sources and caches attributed artist/album facts for reuse across tracks, with source links in all facts layouts.
 - Uses low reasoning with an account-accessible model (Luna by default), without a hard output-token cap or automatic API-key fallback.
-- Requires the optional Codex runtime and dedicated administrator token. See [setup and verification](docs/codex-device-login.md).
+- Requires the optional Codex runtime. Account controls use the existing Admin page, with no separate token. See [setup and verification](docs/codex-device-login.md).
 
 ### OpenRouter
 - Access 200+ models through a unified API

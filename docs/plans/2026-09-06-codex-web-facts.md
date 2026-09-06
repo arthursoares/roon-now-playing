@@ -4,6 +4,8 @@
 
 The requested Codex provider will use web sources and cache the research. A hard model output-token cap is **not required** for this provider. Existing API-provider token caps remain unchanged. Request deadlines, bounded local response handling, request sharing, and account cancellation still apply.
 
+Account controls use the existing Admin access model. The separate Codex administrator-token gate was removed at the user's request; it added a step that API-key settings did not require.
+
 This design for issue #33 is now implemented by the optional Codex provider; see [setup and verification](../codex-device-login.md). The investigation below used code review and offline protocol fixtures, with no authenticated search or model calls. Real-account validation remains separate from those fixtures.
 
 ## Current efficiency
@@ -61,7 +63,7 @@ For the first adapter, collect observed HTTPS open-page URLs and accept final so
 
 1. Add a narrow internal generation interface using the existing supervised runtime and explicit account identity, without exposing raw RPC or process-control methods.
 2. Add source-aware research records and in-flight sharing before changing request granularity. Lock same-album/different-track behavior and track-scope exclusions with regressions.
-3. Wire the Codex provider and administrator-authorized configuration into the existing facts route, retaining API providers and their explicit caps independently.
+3. Wire the Codex provider and its configuration into the existing Admin/facts routes, retaining API providers and their explicit caps independently.
 4. Show source links with generated facts and preserve attribution through caching, layout changes, and errors.
 5. Test malformed output, missing/foreign source URLs, incomplete turns, account changes/logout, simultaneous displays, and stale tracks.
 6. After account approval, compare first-track latency, subsequent-track latency, research turns, web actions, cache hit rates, model token usage when exposed, and manually checked source support over representative albums.

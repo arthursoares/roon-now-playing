@@ -8,14 +8,13 @@ The server displays a verification link and one-time code. Open the link on your
 
 The regular image stays unchanged. Build the optional `codex` target, which includes the pinned official `@openai/codex@0.153.4` runtime. Its npm package selects the Linux musl binary for amd64 or arm64. This adds a substantial runtime dependency only to the optional image.
 
-From this repository checkout, create a dedicated account-administrator token and start with the override:
+From this repository checkout, start with the override:
 
 ```sh
-export CODEX_ADMIN_TOKEN="$(openssl rand -hex 32)"
 docker compose -f docker-compose.yml -f docker-compose.codex.yml up -d --build
 ```
 
-Keep that token in your deployment's secret configuration for subsequent restarts. Enter the same token in the account panel to unlock its controls. It is separate from source API keys and OpenAI API keys; it protects Codex account controls, subscription-provider settings, and fresh research tests, not the whole Admin page. Use HTTPS when administering over an untrusted network.
+Account controls, provider settings, and research tests use the app's existing Admin access model, just like API-key settings. There is no separate Codex administrator token or unlock step.
 
 If using a reverse proxy, preserve the browser's original `Host` header (including a non-default port). Account endpoints check browser origins against it. The development proxy preserves this header for account routes.
 
@@ -28,7 +27,6 @@ Install the pinned Codex runtime on the server, then configure these environment
 | Variable | Meaning |
 | --- | --- |
 | `CODEX_ENABLED=true` | Make account connection and the Codex provider available. Defaults to disabled. |
-| `CODEX_ADMIN_TOKEN` | Dedicated random bearer token; 32–256 non-space ASCII characters. Missing or invalid values disable the integration. |
 | `CODEX_BINARY` | Optional trusted executable path; defaults to `codex` on the server's PATH. |
 | `CODEX_ACCOUNT_DIR` | Optional private persistent directory; defaults to `DATA_DIR/codex-account` (`./config/codex-account` without DATA_DIR). |
 
@@ -39,15 +37,14 @@ Default local credential directories are excluded from git and Docker build cont
 ## Sign in
 
 1. Open `/admin`, select **AI Facts**, and find **ChatGPT account**.
-2. Enter the dedicated administrator token and choose **Unlock account controls**.
-3. Choose **Connect ChatGPT**. Open the displayed OpenAI verification link on another device and enter the code.
-4. Complete sign-in on OpenAI's page. The account panel updates to show the connected account.
-5. Select **ChatGPT (Codex)** as the AI provider, choose a model (Luna is the default), and save. The administrator token must still be unlocked for this change.
-6. Open **Test** within the same Admin page to research a sample track. A test forces fresh research and reports source links, search/page-open counts, and latency. Normal display requests reuse cached work.
+2. Choose **Connect ChatGPT**. Open the displayed OpenAI verification link on another device and enter the code.
+3. Complete sign-in on OpenAI's page. The account panel updates to show the connected account.
+4. Select **ChatGPT (Codex)** as the AI provider, choose a model (Luna is the default), and save.
+5. Open **Test** to research a sample track. A test forces fresh research and reports source links, search/page-open counts, and latency. Normal display requests reuse cached work.
 
 If device-code login is unavailable, enable it in your ChatGPT security settings or ask your workspace administrator to enable it. OpenAI documents this requirement in its [headless authentication guide](https://learn.chatgpt.com/docs/auth#login-on-headless-devices).
 
-An attempt has a local ten-minute deadline; OpenAI may expire its code earlier. Cancel and request a new code if needed. Leaving the Admin page or locking the controls forgets the browser's administrator token but does not cancel the server's pending login or sign out the account. Moving between AI Facts and Test within Admin retains it. Unlock again to resume viewing the current state. **Sign out** ends the saved connection and cancels its active research.
+An attempt has a local ten-minute deadline; OpenAI may expire its code earlier. Cancel and request a new code if needed. Leaving the Admin page does not cancel the server's pending login or sign out the account. Return to AI Facts to see its current state. **Sign out** ends the saved connection and cancels its active research.
 
 ## Research and reuse
 
@@ -59,7 +56,7 @@ Facts retain source links through the cache and all three facts layouts. Links m
 
 ## Account API and validation
 
-`GET /api/codex/capabilities` exposes only enablement flags. Account status and login/cancel/logout endpoints require the dedicated bearer token, return uncacheable responses, and reject foreign browser origins. The browser keeps its token only in component memory. Tokens are never sent to display WebSockets or persisted in browser storage.
+`GET /api/codex/capabilities` exposes only enablement flags. Account status and login/cancel/logout endpoints return uncacheable responses and reject foreign browser origins. OAuth credentials stay in the server's private storage; they are never sent to display WebSockets or persisted in browser storage.
 
 The backend exposes narrow account and research operations through stdio App Server, with no raw RPC or process-control HTTP endpoint. Research uses ephemeral isolated threads, private homes, empty runtime workspaces, disabled agents/skills, and the restricted hosted-web tool configuration. Protocol errors and child stderr are not returned to browsers. Device verification links must match the documented OpenAI HTTPS endpoint.
 
