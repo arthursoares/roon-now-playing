@@ -18,22 +18,72 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ref } from 'vue';
+import { createApp, defineComponent, nextTick, ref, type App } from 'vue';
 import type { NowPlaying } from '@roon-screen-cover/shared';
 import { useNowPlaying } from './useNowPlaying';
 
 describe('useNowPlaying', () => {
+  let app: App<Element> | undefined;
   beforeEach(() => {
     vi.useFakeTimers();
   });
 
   afterEach(() => {
+    app?.unmount();
+    app = undefined;
     vi.useRealTimers();
+  });
+
+  function mountNowPlaying(getNowPlaying: () => NowPlaying | null) {
+    let result!: ReturnType<typeof useNowPlaying>;
+    app = createApp(defineComponent({
+      setup() {
+        result = useNowPlaying(getNowPlaying);
+        return () => null;
+      },
+    }));
+    app.mount(document.createElement('div'));
+    return result;
+  }
+
+  it.each([
+    { artist: 'Different artist' },
+    { album: 'Different album' },
+    { duration_seconds: 200 },
+  ])('resets same-title tracks when their identity changes: %j', async (change) => {
+    const nowPlaying = ref<NowPlaying>({
+      zone_id: '123', state: 'playing', seek_position: 0,
+      track: { title: 'Intro', artist: 'Artist', album: 'Album', duration_seconds: 100, artwork_key: null },
+    });
+    const { seekPosition } = mountNowPlaying(() => nowPlaying.value);
+    vi.advanceTimersByTime(2000);
+    expect(seekPosition.value).toBe(2);
+
+    nowPlaying.value = { ...nowPlaying.value, track: { ...nowPlaying.value.track!, ...change } };
+    await nextTick();
+    expect(seekPosition.value).toBe(0);
+    vi.advanceTimersByTime(100);
+    expect(seekPosition.value).toBeCloseTo(0.1);
+  });
+
+  it('keeps interpolation when identical track metadata or delayed artwork arrives', async () => {
+    const nowPlaying = ref<NowPlaying>({
+      zone_id: '123', state: 'playing', seek_position: 0,
+      track: { title: 'Intro', artist: 'Artist', album: 'Album', duration_seconds: 100, artwork_key: null },
+    });
+    const { seekPosition } = mountNowPlaying(() => nowPlaying.value);
+    vi.advanceTimersByTime(2000);
+    nowPlaying.value = { ...nowPlaying.value, track: { ...nowPlaying.value.track! } };
+    await nextTick();
+    expect(seekPosition.value).toBe(2);
+    nowPlaying.value = { ...nowPlaying.value, track: { ...nowPlaying.value.track!, artwork_key: 'arrived-later' } };
+    await nextTick();
+    expect(seekPosition.value).toBe(2);
   });
 
   it('should return null track when nowPlaying is null', () => {
     const nowPlaying = ref<NowPlaying | null>(null);
-    const { track } = useNowPlaying(() => nowPlaying.value);
+    const { track } = mountNowPlaying(() => nowPlaying.value);
 
     expect(track.value).toBeNull();
   });
@@ -52,7 +102,7 @@ describe('useNowPlaying', () => {
       seek_position: 0,
     });
 
-    const { track } = useNowPlaying(() => nowPlaying.value);
+    const { track } = mountNowPlaying(() => nowPlaying.value);
 
     expect(track.value).toEqual({
       title: 'Test Song',
@@ -71,7 +121,7 @@ describe('useNowPlaying', () => {
       seek_position: 0,
     });
 
-    const { isPlaying } = useNowPlaying(() => nowPlaying.value);
+    const { isPlaying } = mountNowPlaying(() => nowPlaying.value);
 
     expect(isPlaying.value).toBe(true);
 
@@ -96,7 +146,7 @@ describe('useNowPlaying', () => {
       seek_position: 25,
     });
 
-    const { progress } = useNowPlaying(() => nowPlaying.value);
+    const { progress } = mountNowPlaying(() => nowPlaying.value);
 
     expect(progress.value).toBe(25);
   });
@@ -115,7 +165,7 @@ describe('useNowPlaying', () => {
       seek_position: 50,
     });
 
-    const { progress } = useNowPlaying(() => nowPlaying.value);
+    const { progress } = mountNowPlaying(() => nowPlaying.value);
 
     expect(progress.value).toBe(0);
   });
@@ -134,7 +184,7 @@ describe('useNowPlaying', () => {
       seek_position: 125, // 2:05
     });
 
-    const { currentTimeFormatted } = useNowPlaying(() => nowPlaying.value);
+    const { currentTimeFormatted } = mountNowPlaying(() => nowPlaying.value);
 
     expect(currentTimeFormatted.value).toBe('2:05');
   });
@@ -153,7 +203,7 @@ describe('useNowPlaying', () => {
       seek_position: 0,
     });
 
-    const { durationFormatted } = useNowPlaying(() => nowPlaying.value);
+    const { durationFormatted } = mountNowPlaying(() => nowPlaying.value);
 
     expect(durationFormatted.value).toBe('4:05');
   });
@@ -172,7 +222,7 @@ describe('useNowPlaying', () => {
       seek_position: 0,
     });
 
-    const { artworkUrl } = useNowPlaying(() => nowPlaying.value);
+    const { artworkUrl } = mountNowPlaying(() => nowPlaying.value);
 
     expect(artworkUrl.value).toBe('/api/artwork/xyz789');
   });
@@ -191,7 +241,7 @@ describe('useNowPlaying', () => {
       seek_position: 0,
     });
 
-    const { artworkUrl } = useNowPlaying(() => nowPlaying.value);
+    const { artworkUrl } = mountNowPlaying(() => nowPlaying.value);
 
     expect(artworkUrl.value).toBeNull();
   });
@@ -204,7 +254,7 @@ describe('useNowPlaying', () => {
       seek_position: 0,
     });
 
-    const { artworkUrl } = useNowPlaying(() => nowPlaying.value);
+    const { artworkUrl } = mountNowPlaying(() => nowPlaying.value);
 
     expect(artworkUrl.value).toBeNull();
   });
@@ -223,14 +273,14 @@ describe('useNowPlaying', () => {
       seek_position: 150, // Over duration
     });
 
-    const { progress } = useNowPlaying(() => nowPlaying.value);
+    const { progress } = mountNowPlaying(() => nowPlaying.value);
 
     expect(progress.value).toBe(100);
   });
 
   it('should return stopped state when nowPlaying is null', () => {
     const nowPlaying = ref<NowPlaying | null>(null);
-    const { state, isPlaying } = useNowPlaying(() => nowPlaying.value);
+    const { state, isPlaying } = mountNowPlaying(() => nowPlaying.value);
 
     expect(state.value).toBe('stopped');
     expect(isPlaying.value).toBe(false);
@@ -244,7 +294,7 @@ describe('useNowPlaying', () => {
       seek_position: 0,
     });
 
-    const { duration, durationFormatted } = useNowPlaying(() => nowPlaying.value);
+    const { duration, durationFormatted } = mountNowPlaying(() => nowPlaying.value);
 
     expect(duration.value).toBe(0);
     expect(durationFormatted.value).toBe('0:00');

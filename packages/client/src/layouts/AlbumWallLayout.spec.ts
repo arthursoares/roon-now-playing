@@ -59,7 +59,7 @@ describe('AlbumWallLayout', () => {
         artworkUrl: '/api/artwork/hero-key',
         zoneName: 'Living Room',
         background: 'black',
-        albumHistory: history,
+        albumHistory: [history[0], history[1], history[1], history[2]],
       }),
     });
 
@@ -171,7 +171,7 @@ describe('AlbumWallLayout', () => {
     app.unmount();
   });
 
-  it('renders all twelve covers with accessible current and album metadata but no visible copy', () => {
+  it('repeats all twelve covers into a dense mosaic without repeating accessible metadata', () => {
     const host = document.createElement('div');
     const app = createApp({
       render: () => h(AlbumWallLayout, {
@@ -198,8 +198,13 @@ describe('AlbumWallLayout', () => {
 
     expect(host.querySelector('.album-gallery-layout')).not.toBeNull();
     expect(host.querySelector('.hero')).toBeNull();
-    expect(host.querySelectorAll('.gallery-card')).toHaveLength(12);
-    expect(new Set([...host.querySelectorAll<HTMLElement>('.gallery-card')].map((card) => card.title)).size).toBe(12);
+    const allCards = host.querySelectorAll('.gallery-card');
+    expect(allCards.length).toBeGreaterThanOrEqual(40);
+    const accessibleCards = [...host.querySelectorAll<HTMLElement>('.gallery-card:not([aria-hidden="true"])')];
+    expect(accessibleCards).toHaveLength(12);
+    expect(new Set(accessibleCards.map((card) => card.title)).size).toBe(12);
+    expect(host.querySelectorAll('.gallery-card[aria-hidden="true"]')).toHaveLength(allCards.length - 12);
+    expect(host.querySelector('.gallery-card[aria-hidden="true"] img')?.getAttribute('alt')).toBe('');
     expect(host.querySelector('.gallery-card img[src="/api/artwork/gallery-11"]')).not.toBeNull();
     expect(host.querySelector('.gallery-card[aria-current="true"]')).not.toBeNull();
     expect(host.querySelector('.gallery-track')).toBeNull();
@@ -231,11 +236,91 @@ describe('AlbumWallLayout', () => {
 
     app.mount(host);
 
-    expect(host.querySelectorAll('.gallery-card')).toHaveLength(1);
-    expect(host.querySelector('.gallery-card')?.getAttribute('aria-label')).toContain(track.album.trim());
-    expect(host.querySelector('.gallery-card')?.getAttribute('aria-current')).toBe('true');
+    expect(host.querySelectorAll('.gallery-card').length).toBeGreaterThanOrEqual(40);
+    expect(host.querySelectorAll('.gallery-card:not([aria-hidden="true"])')).toHaveLength(1);
+    expect(host.querySelector('.gallery-card:not([aria-hidden="true"])')?.getAttribute('aria-label')).toContain(track.album.trim());
+    expect(host.querySelector('.gallery-card[aria-current="true"]')?.getAttribute('aria-hidden')).toBeNull();
     expect(host.querySelector('.album-name')).toBeNull();
     expect(host.querySelector('.hero')).toBeNull();
+
+    app.unmount();
+  });
+
+  it('prepends a missing current album, keeps twelve distinct accessible albums, and drops the oldest', () => {
+    const currentTrack = {
+      ...track,
+      artist: 'Just Arrived',
+      album: 'Brand New Album',
+      artwork_key: 'brand-new',
+    };
+    const host = document.createElement('div');
+    const app = createApp({
+      render: () => h(AlbumWallLayout, {
+        track: currentTrack,
+        state: 'playing',
+        isPlaying: true,
+        progress: 0,
+        currentTime: '0:00',
+        duration: '4:00',
+        artworkUrl: '/api/artwork/brand-new',
+        zoneName: 'Living Room',
+        background: 'black',
+        albumHistory: galleryHistory,
+        galleryOnly: true,
+      }),
+    });
+
+    app.mount(host);
+
+    const accessibleCards = [...host.querySelectorAll<HTMLElement>('.gallery-card:not([aria-hidden="true"])')];
+    expect(accessibleCards).toHaveLength(12);
+    expect(accessibleCards[0].getAttribute('aria-current')).toBe('true');
+    expect(accessibleCards[0].querySelector('img')?.getAttribute('src')).toBe('/api/artwork/brand-new');
+    expect(host.querySelector('.gallery-card img[src="/api/artwork/gallery-11"]')).toBeNull();
+
+    app.unmount();
+  });
+
+  it('moves the current history album first and updates it before refreshed history arrives', async () => {
+    const currentTrack = ref<Track>({
+      ...track,
+      artist: galleryHistory[5].artist,
+      album: galleryHistory[5].album,
+      artwork_key: galleryHistory[5].artwork_key,
+    });
+    const host = document.createElement('div');
+    const app = createApp({
+      render: () => h(AlbumWallLayout, {
+        track: currentTrack.value,
+        state: 'playing',
+        isPlaying: true,
+        progress: 0,
+        currentTime: '0:00',
+        duration: '4:00',
+        artworkUrl: currentTrack.value.artwork_key ? `/api/artwork/${currentTrack.value.artwork_key}` : null,
+        zoneName: 'Living Room',
+        background: 'black',
+        albumHistory: galleryHistory,
+        galleryOnly: true,
+      }),
+    });
+
+    app.mount(host);
+    expect(host.querySelector('.gallery-card')?.getAttribute('aria-current')).toBe('true');
+    expect(host.querySelector('.gallery-card img')?.getAttribute('src')).toBe('/api/artwork/gallery-5');
+
+    currentTrack.value = {
+      ...track,
+      artist: galleryHistory[8].artist,
+      album: galleryHistory[8].album,
+      artwork_key: galleryHistory[8].artwork_key,
+    };
+    await nextTick();
+
+    const firstCard = host.querySelector<HTMLElement>('.gallery-card');
+    expect(firstCard?.getAttribute('aria-current')).toBe('true');
+    expect(firstCard?.querySelector('img')?.getAttribute('src')).toBe('/api/artwork/gallery-8');
+    expect(host.querySelectorAll('.gallery-card[aria-current="true"]')).toHaveLength(1);
 
     app.unmount();
   });

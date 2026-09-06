@@ -11,11 +11,17 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { CodexAuthService } from '../dist/codexAuth.js';
+import { setTimeout as delay } from 'node:timers/promises';
 
 const source = 'https://example.com/source';
+const secondSource = 'https://example.com/second-source';
+let activeWebCalls = 0;
+let maxConcurrentWebCalls = 0;
+let releasePageReads;
+const pageReadsReady = new Promise(resolve => { releasePageReads = resolve; });
 const finalText = JSON.stringify({
-  facts: [{ text: 'The fixture album was recorded in a studio.', scope: 'album', trackTitle: null, sourceUrls: [source] }],
-  sources: [{ url: source, title: 'Offline fixture source' }],
+  facts: [{ text: 'The fixture album was recorded in a studio.', scope: 'album', trackTitle: null, sourceUrls: [source, secondSource] }],
+  sources: [{ url: source, title: 'Offline fixture source' }, { url: secondSource, title: 'Second fixture source' }],
 });
 let responses = 0;
 let searches = 0;
@@ -35,8 +41,15 @@ const provider = createServer(async (req, res) => {
     const body = JSON.parse(Buffer.concat(chunks).toString());
     if (req.url === '/v1/alpha/search') {
       searches += 1;
+      activeWebCalls += 1;
+      maxConcurrentWebCalls = Math.max(maxConcurrentWebCalls, activeWebCalls);
+      // Hold the first page until the second arrives, avoiding timing thresholds.
+      // The timeout lets a serial implementation fail cleanly instead of hanging.
+      if (searches === 3) releasePageReads();
+      if (searches >= 2) await Promise.race([pageReadsReady, delay(5_000, undefined, { ref: false })]);
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ output: `Offline music history. Source: ${source}`, results: [{ url: source, title: 'Offline fixture source' }] }));
+      res.end(JSON.stringify({ output: `Offline music history. Sources: ${source} and ${secondSource}`, results: [{ url: source, title: 'Offline fixture source' }, { url: secondSource, title: 'Second fixture source' }] }));
+      activeWebCalls -= 1;
       return;
     }
     assert.equal(req.url, '/v1/responses');
@@ -50,7 +63,7 @@ const provider = createServer(async (req, res) => {
         "const names = ALL_TOOLS.map(tool => tool.name).sort();",
         "if (JSON.stringify(names) !== JSON.stringify(['skills__list','skills__read','web__run'])) throw new Error('Unexpected tool inventory');",
         "text(await tools.web__run({search_query:[{q:'offline fixture album history'}],response_length:'short'}));",
-        `text(await tools.web__run({open:[{ref_id:${JSON.stringify(source)}}],response_length:'short'}));`,
+        `const opened = await Promise.all([tools.web__run({open:[{ref_id:${JSON.stringify(source)}}],response_length:'short'}),tools.web__run({open:[{ref_id:${JSON.stringify(secondSource)}}],response_length:'short'})]); opened.forEach(value => text(value));`,
       ].join('\n'),
     } : {
       type: 'message', id: 'msg_fixture', role: 'assistant', phase: 'final_answer', status: 'completed',
@@ -129,16 +142,18 @@ try {
   });
   assert.ifError(fixtureFailure);
   assert.equal(responses, 2);
-  assert.equal(searches, 2);
+  assert.equal(searches, 3);
+  assert.equal(maxConcurrentWebCalls, 2);
+  assert.equal(result.sources.length, 2);
   assert.equal(result.facts.length, 1);
   assert.equal(result.sources[0].url, source);
   assert.equal(result.webSearches, 1);
-  assert.equal(result.openPages, 1);
+  assert.equal(result.openPages, 2);
   assert.equal(result.inputTokens, 24);
   assert.equal(result.outputTokens, 12);
   assert.deepEqual(requestContract, { effort: 'low', format: 'json_schema' });
   assert.equal(rpcMethods.some(method => method.startsWith('account/login')), false);
-  process.stdout.write('Codex research runtime passed: restricted tools, source events, structured facts, cumulative usage, and cleanup. Auth and provider responses were mocked; no external model request occurred.\n');
+  process.stdout.write('Codex research runtime passed: restricted tools, parallel source reads, source events, structured facts, cumulative usage, and cleanup. Auth and provider responses were mocked; no external model request occurred.\n');
 } finally {
   await service.dispose();
   await new Promise(resolve => provider.close(resolve));

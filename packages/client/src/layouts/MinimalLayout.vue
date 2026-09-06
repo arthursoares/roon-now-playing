@@ -4,6 +4,7 @@ import type { Track, PlaybackState, BackgroundType } from '@roon-screen-cover/sh
 import DynamicBackground from '../components/DynamicBackground.vue';
 import { useColorExtraction } from '../composables/useColorExtraction';
 import { isDynamicBackground } from '../utils/backgrounds';
+import { getProgressTransform } from '../utils/progress';
 
 const props = defineProps<{
   track: Track | null;
@@ -45,7 +46,7 @@ const usesDynamicBackground = computed(() =>
       </div>
 
       <div class="progress-line">
-        <div class="progress-fill" :style="{ width: `${progress}%` }"></div>
+        <div class="progress-fill" :style="{ transform: getProgressTransform(progress) }"></div>
       </div>
     </div>
   </DynamicBackground>
@@ -76,7 +77,7 @@ const usesDynamicBackground = computed(() =>
       </div>
 
       <div class="progress-line">
-        <div class="progress-fill" :style="{ width: `${progress}%` }"></div>
+        <div class="progress-fill" :style="{ transform: getProgressTransform(progress) }"></div>
       </div>
     </div>
   </div>
@@ -190,9 +191,12 @@ const usesDynamicBackground = computed(() =>
 }
 
 .progress-fill {
+  width: 100%;
   height: 100%;
   background: rgba(255, 255, 255, 0.9);
-  transition: width 0.1s linear;
+  transform-origin: left center;
+  transition: transform 0.1s linear;
+  will-change: transform;
 }
 
 /* Container Query Typography Scaling */
