@@ -59,4 +59,4 @@ A local smoke check with the actual Codex 0.153.4 binary verified initialization
 
 A second isolated check successfully issued and cancelled a real OpenAI device code without approving an account or requesting generation. The runtime created private SQLite state/log files; a literal scan of the files present during that attempt found no copy of the device code. The temporary profile was removed afterward. This is evidence for that specific attempt, not a guarantee about every runtime log path or authenticated-account event; keep the entire persistent volume private.
 
-The generation limits and isolation investigation remain documented in [the sign-in design and protocol findings](facts-openai-signin.md). Connecting an account does not bypass those outstanding requirements or silently switch facts billing.
+The next provider will use [web sources and cached research](plans/2026-09-06-codex-web-facts.md); it does not require a hard output-token cap. The [sign-in design and protocol findings](facts-openai-signin.md) record the remaining generation work. Connecting an account does not enable that provider or silently switch facts billing.

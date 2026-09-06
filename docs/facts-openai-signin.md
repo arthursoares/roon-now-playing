@@ -14,10 +14,10 @@ For a Docker/NAS deployment, prefer managed device-code login, subject to its ac
 2. Give it a private persistent credential directory. Keep tokens out of display WebSockets, public configuration responses, logs, and browser storage. Let Codex own refresh; do not import unrelated user authentication caches.
 3. Add an explicit administrator authorization boundary for login, account status, cancellation, and logout. Current facts configuration routes are not application-wide authentication. Source API keys protect source operations and should not be repurposed as this boundary.
 4. Expose only the small set of account/generation operations the app needs, not raw Codex RPC. Isolate generation from the filesystem and executable tools; verify enforceable tool disabling before accepting untrusted track metadata or prompts.
-5. Start isolated generation contexts, require the facts output contract, and verify enforceable output/time limits. Preserve request sharing, configuration/account isolation, refusal/truncation handling, and cache behavior.
+5. Start isolated generation contexts, require the facts output contract, and enforce request deadlines and bounded local response handling. A hard output-token cap is not required for the Codex provider. Preserve request sharing, configuration/account isolation, refusal/incomplete-turn handling, and cache behavior.
 6. Test login cancellation/expiry, refresh, restarts, unavailable models, exhausted quotas, and logout. Show whether requests consume subscription entitlements or metered API billing. Never fall back silently to a billed API key.
 
-API-key Luna remains usable independently. The tested configurations in the offline spike below did not satisfy the proposed bounded, tool-free generation contract, and no supported configuration establishing that contract was found. Production sign-in generation remains gated; an experimental mode would require a separate product decision and additional isolation work.
+API-key Luna remains usable independently. The initial offline spike below did not establish the originally proposed tool-free generation contract. A subsequent investigation identified a restricted web-search capability configuration, and the requested design now uses web sources and cached research without requiring a hard output-token cap. See [the follow-up research design and evidence](plans/2026-09-06-codex-web-facts.md). The generation adapter and authenticated source behavior still need implementation and verification.
 
 ## Offline protocol spike: Codex 0.153.4, 2026-09-06
 
