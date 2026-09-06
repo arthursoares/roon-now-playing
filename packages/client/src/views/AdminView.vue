@@ -59,6 +59,7 @@ const showApiKey = ref(false);
 const showAdvanced = ref(false);
 const factsConfigError = ref<string | null>(null);
 const factsConfigSuccess = ref(false);
+const savedFactsProvider = ref<FactsConfig['provider'] | null>(null);
 const codexCapabilities = ref<CodexCapabilities | null>(null);
 const availableProviders = computed(() => LLM_PROVIDERS.filter(provider => provider !== 'codex'
   || codexCapabilities.value?.generationEnabled === true || factsConfig.value.provider === 'codex'));
@@ -73,6 +74,8 @@ const testError = ref<string | null>(null);
 const testDuration = ref<number | null>(null);
 const testSources = ref<FactSource[][]>([]);
 const testResearch = ref<FactsResearchMetrics | null>(null);
+const testCached = ref<boolean | null>(null);
+const testFreshActionLabel = computed(() => savedFactsProvider.value === 'codex' ? 'Research Again' : 'Generate Fresh Facts');
 
 // External sources state
 interface SourcesConfig {
@@ -363,6 +366,7 @@ async function loadFactsConfig(): Promise<void> {
         ...config,
         maxOutputTokens: config.maxOutputTokens ?? getRecommendedFactsOutputTokens(config.provider ?? factsConfig.value.provider, config.model ?? factsConfig.value.model),
       };
+      savedFactsProvider.value = factsConfig.value.provider;
     }
   } catch (error) {
     console.error('Failed to load facts config:', error);
@@ -377,13 +381,15 @@ async function saveFactsConfig(): Promise<void> {
   factsConfigSuccess.value = false;
 
   try {
+    const submittedConfig = { ...factsConfig.value };
     const response = await fetch('/api/facts/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(factsConfig.value),
+      body: JSON.stringify(submittedConfig),
     });
 
     if (response.ok) {
+      savedFactsProvider.value = submittedConfig.provider;
       factsConfigSuccess.value = true;
       setTimeout(() => {
         factsConfigSuccess.value = false;
@@ -429,13 +435,27 @@ function getProviderDisplayName(provider: string): string {
   }
 }
 
-async function runFactsTest(): Promise<void> {
+function formatTestDuration(durationMs: number | null): string | null {
+  if (durationMs === null) return null;
+  return durationMs < 1000 ? `${Math.round(durationMs)} ms` : `${(durationMs / 1000).toFixed(1)}s`;
+}
+
+function getTestCacheStatus(): string {
+  if (testResearch.value) {
+    return `${testResearch.value.cache === 'miss' ? 'Fresh research' : `${testResearch.value.cache} cache`} · ${testResearch.value.webSearches} searches · ${testResearch.value.openPages} pages opened`;
+  }
+  return testCached.value ? 'Cached facts' : 'Fresh facts';
+}
+
+async function runFactsTest(force = false): Promise<void> {
+  if (testRunning.value) return;
   testRunning.value = true;
   testResult.value = null;
   testError.value = null;
   testDuration.value = null;
   testSources.value = [];
   testResearch.value = null;
+  testCached.value = null;
 
   const artist = testArtist.value;
   const album = testAlbum.value;
@@ -448,19 +468,21 @@ async function runFactsTest(): Promise<void> {
   }
 
   try {
-    const response = await fetch('/api/facts/test', {
+    const startedAt = performance.now();
+    const response = await fetch(force ? '/api/facts/test' : '/api/facts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ artist, album, title }),
     });
-
     const data = await response.json();
+    const durationMs = performance.now() - startedAt;
 
     if (response.ok) {
       testResult.value = data.facts;
-      testDuration.value = data.durationMs;
+      testDuration.value = durationMs;
       testSources.value = Array.isArray(data.sources) ? data.sources : [];
       testResearch.value = data.research ?? null;
+      testCached.value = data.cached === true;
     } else {
       testError.value = data.message || data.error?.message || (typeof data.error === 'string' ? data.error : 'Test failed');
     }
@@ -1232,18 +1254,29 @@ onMounted(() => {
               <input id="testTitle" type="text" v-model="testTitle" placeholder="e.g. Come Together" />
             </div>
 
-            <button
-              type="button"
-              class="btn-primary btn-test"
-              :disabled="testRunning || !testArtist || !testAlbum || !testTitle"
-              @click="runFactsTest"
-            >
-              <svg v-if="!testRunning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polygon points="5 3 19 12 5 21 5 3"/>
-              </svg>
-              <span v-if="testRunning" class="loading-dots">Generating</span>
-              <span v-else>Generate Facts</span>
-            </button>
+            <p class="test-help">Uses saved provider settings. Get Facts reuses cached results when available. Fresh research bypasses the cache and can take longer.</p>
+            <div class="test-actions">
+              <button
+                type="button"
+                class="btn-primary btn-test"
+                :disabled="testRunning || !savedFactsProvider || !testArtist || !testAlbum || !testTitle"
+                @click="runFactsTest(false)"
+              >
+                <svg v-if="!testRunning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+                <span v-if="testRunning" class="loading-dots">Getting Facts</span>
+                <span v-else>Get Facts</span>
+              </button>
+              <button
+                type="button"
+                class="btn-secondary btn-test"
+                :disabled="testRunning || !savedFactsProvider || !testArtist || !testAlbum || !testTitle"
+                @click="runFactsTest(true)"
+              >
+                {{ testFreshActionLabel }}
+              </button>
+            </div>
           </div>
 
           <div class="test-results">
@@ -1261,8 +1294,8 @@ onMounted(() => {
                 <h3>Generated Facts</h3>
                 <div class="results-meta">
                   <span class="result-count">{{ testResult.length }} facts</span>
-                  <span v-if="testDuration" class="result-time">{{ (testDuration / 1000).toFixed(1) }}s</span>
-                  <span v-if="testResearch" class="result-time">{{ testResearch.cache === 'miss' ? 'Fresh research' : `${testResearch.cache} cache` }} · {{ testResearch.webSearches }} searches · {{ testResearch.openPages }} pages opened</span>
+                  <span v-if="testDuration !== null" class="result-time">{{ formatTestDuration(testDuration) }}</span>
+                  <span class="result-time result-cache-status">{{ getTestCacheStatus() }}</span>
                 </div>
               </header>
 
@@ -2499,6 +2532,22 @@ onMounted(() => {
 
 .btn-test {
   margin-top: 8px;
+}
+
+.test-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.test-actions .btn-test {
+  flex: 1;
+}
+
+.test-help {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .test-results {
