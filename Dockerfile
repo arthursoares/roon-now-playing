@@ -58,3 +58,13 @@ EXPOSE 3000
 
 # Run the server
 CMD ["node", "packages/server/dist/index.js"]
+
+# Optional account-connection runtime. npm selects the matching official musl
+# binary for linux/amd64 or linux/arm64; optional dependencies are required.
+FROM production AS codex
+RUN npm install --global @openai/codex@0.153.4 \
+    && codex --version \
+    && npm cache clean --force
+
+# Preserve the regular image unless --target codex is requested explicitly.
+FROM production AS final

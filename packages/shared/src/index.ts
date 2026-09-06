@@ -478,3 +478,5 @@ export type ServerMessage =
   | ServerRemoteSettingsMessage
   | ServerClientResetMessage
   | DisplaySettingsUpdateMessage;
+
+export type { CodexAccountStatus, CodexCapabilities } from './codex.js';

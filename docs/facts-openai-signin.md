@@ -1,6 +1,6 @@
 # ChatGPT sign-in for facts: design boundary
 
-Issue #33 includes sign-in research as well as API model support. The API-key facts path remains the implementation for this branch. ChatGPT subscription login is technically supported through Codex App Server, but is a separate provider/runtime integration, not a token substituted into `new OpenAI({ apiKey })`.
+Issue #33 includes sign-in research as well as API model support. The app now has an optional [device-code account connection](codex-device-login.md), with protected status, cancellation, and logout controls. Facts generation still uses the API-key provider. ChatGPT subscription generation remains a separate runtime integration, not a token substituted into `new OpenAI({ apiKey })`.
 
 ## Supported candidate
 
@@ -8,7 +8,7 @@ Issue #33 includes sign-in research as well as API model support. The API-key fa
 
 For a Docker/NAS deployment, prefer managed device-code login, subject to its account/workspace setting. Browser callbacks run on the host running Codex, which may be different from the phone or laptop used to administer the display. The [authentication guide](https://learn.chatgpt.com/docs/auth) documents these flows and their credential-storage behavior.
 
-## Requirements before implementation
+## Requirements for subscription facts generation
 
 1. Add an optional, supervised Codex backend using stdio and a pinned runtime verified on both container architectures and the chosen base image. This is an additional deployment dependency.
 2. Give it a private persistent credential directory. Keep tokens out of display WebSockets, public configuration responses, logs, and browser storage. Let Codex own refresh; do not import unrelated user authentication caches.
@@ -45,7 +45,7 @@ The [configuration schema](https://learn.chatgpt.com/docs/config-schema.json) pr
 - Correlate notifications by thread and turn. Collect final agent output and require `turn/completed` with `turn.status === "completed"`; commentary, a retryable `error`, and an individual item completion are not success. Validate the resulting facts contract separately.
 - Handle nullable or absent login IDs in completion notifications, and both `canceled` and `notFound` cancellation results. `account/logout` takes no parameters (or `null`). Never expose the raw RPC interface to browsers.
 
-Remaining validation: actual OAuth completion/refresh and restart persistence; authenticated Luna availability and quotas; upstream reasoning-effort acceptance; enforceable isolation against adversarial inputs; an enforceable generation budget; and Alpine Linux amd64/arm64 runtime compatibility. No production Codex provider or login UI is included in this change.
+Remaining validation from this spike: actual OAuth completion/refresh and restart persistence; authenticated Luna availability and quotas; upstream reasoning-effort acceptance; enforceable isolation against adversarial inputs; an enforceable generation budget; and Alpine Linux amd64/arm64 runtime compatibility. The subsequent account-connection implementation is documented separately; the spike itself did not implement a provider or login UI.
 
 ## Current documented Codex model catalog
 

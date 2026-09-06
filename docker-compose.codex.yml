@@ -1,0 +1,16 @@
+# Opt-in account connection. Build with both this file and docker-compose.yml.
+services:
+  roon-now-playing:
+    image: roon-now-playing:codex-local
+    build:
+      context: .
+      target: codex
+    environment:
+      CODEX_ENABLED: 'true'
+      CODEX_ADMIN_TOKEN: ${CODEX_ADMIN_TOKEN:?Set a dedicated account administrator token}
+      CODEX_ACCOUNT_DIR: /app/codex-account
+    volumes:
+      - codex-account:/app/codex-account
+
+volumes:
+  codex-account:

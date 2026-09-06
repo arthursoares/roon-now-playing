@@ -15,6 +15,8 @@ import { SourcesConfigStore } from './sourcesConfig.js';
 import { createSourcesRouter } from './routes/sources.js';
 import { cacheBase64Artwork, cacheExternalArtwork } from './artwork.js';
 import { AlbumHistoryStore } from './albumHistory.js';
+import { CodexAuthService } from './codexAuth.js';
+import { createCodexAccountRouter, isValidCodexAdminToken } from './routes/codex.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,6 +27,17 @@ const HOST = process.env.HOST || '0.0.0.0';
 async function main(): Promise<void> {
   const app = express();
   const server = createServer(app);
+  const codexAdminToken = process.env.CODEX_ADMIN_TOKEN;
+  const codexRequested = process.env.CODEX_ENABLED === 'true';
+  const codexAuth = codexRequested && isValidCodexAdminToken(codexAdminToken)
+    ? new CodexAuthService({
+      homeDir: path.resolve(process.env.CODEX_ACCOUNT_DIR || path.join(process.env.DATA_DIR || './config', 'codex-account')),
+      binaryPath: process.env.CODEX_BINARY || 'codex',
+    })
+    : null;
+  if (codexRequested && !codexAuth) {
+    logger.warn('ChatGPT account connection disabled: configure a dedicated CODEX_ADMIN_TOKEN (32-256 non-space ASCII characters).');
+  }
 
   // Initialize Roon client
   const roonClient = getRoonClient();
@@ -69,6 +82,7 @@ async function main(): Promise<void> {
   app.use('/api/admin', createAdminRouter(wsManager));
   app.use('/api', createFactsRouter());
   app.use('/api/sources', createSourcesRouter(externalSourceManager, sourcesConfigStore));
+  app.use('/api/codex', createCodexAccountRouter({ service: codexAuth, adminToken: codexAdminToken }));
 
   // Zones endpoint
   app.get('/api/zones', (_req, res) => {
@@ -136,21 +150,19 @@ async function main(): Promise<void> {
   });
 
   // Graceful shutdown
-  process.on('SIGTERM', () => {
-    logger.info('SIGTERM received, shutting down...');
+  let shuttingDown = false;
+  const shutdown = async (signal: string): Promise<void> => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    logger.info(`${signal} received, shutting down...`);
+    await codexAuth?.dispose();
     server.close(() => {
       logger.info('Server closed');
       process.exit(0);
     });
-  });
-
-  process.on('SIGINT', () => {
-    logger.info('SIGINT received, shutting down...');
-    server.close(() => {
-      logger.info('Server closed');
-      process.exit(0);
-    });
-  });
+  };
+  process.on('SIGTERM', () => { void shutdown('SIGTERM'); });
+  process.on('SIGINT', () => { void shutdown('SIGINT'); });
 }
 
 main().catch((error) => {

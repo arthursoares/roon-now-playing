@@ -26,6 +26,11 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      '/api/codex': {
+        target: 'http://localhost:3000',
+        // Account routes compare the browser Origin with the original Host.
+        changeOrigin: false,
+      },
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
