@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue';
 import { useWebSocket } from '../composables/useWebSocket';
+import CodexAccountPanel from '../components/CodexAccountPanel.vue';
 import {
   LAYOUTS,
   FONTS,
@@ -928,6 +929,7 @@ onMounted(() => {
 
         <div v-else class="config-layout">
           <div class="config-main">
+            <CodexAccountPanel />
             <!-- Provider Card -->
             <div class="config-card">
               <h2 class="card-title">AI Provider</h2>

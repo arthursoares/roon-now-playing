@@ -60,7 +60,7 @@ The [recorded live smoke results](evaluations/2026-09-06-facts-luna.md) show the
 
 ## Sign-in scope
 
-This implementation retains API-key authentication. ChatGPT subscription sign-in requires an additional integration; see [the separate design](facts-openai-signin.md). API billing is independent of a ChatGPT subscription.
+Facts generation retains API-key authentication. Optional [device-code account connection](codex-device-login.md) now supports ChatGPT sign-in, status, cancellation, and logout. Generating facts through that subscription remains separate work; see [the design and runtime findings](facts-openai-signin.md). API billing is independent of a ChatGPT subscription.
 
 ## Official references
 

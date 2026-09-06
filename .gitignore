@@ -49,6 +49,9 @@ config.json
 packages/server/config/*.json
 !packages/server/config/*.example.json
 
+# Private Codex account storage (local and root-start defaults)
+**/config/codex-account/
+
 # Stray screenshots
 /*.png
 

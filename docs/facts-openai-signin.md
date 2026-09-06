@@ -1,6 +1,6 @@
 # ChatGPT sign-in for facts: design boundary
 
-Issue #33 includes sign-in research as well as API model support. The API-key facts path remains the implementation for this branch. ChatGPT subscription login is technically supported through Codex App Server, but is a separate provider/runtime integration, not a token substituted into `new OpenAI({ apiKey })`.
+Issue #33 includes sign-in research as well as API model support. The app now has an optional [device-code account connection](codex-device-login.md), with protected status, cancellation, and logout controls. Facts generation still uses the API-key provider. ChatGPT subscription generation remains a separate runtime integration, not a token substituted into `new OpenAI({ apiKey })`.
 
 ## Supported candidate
 
@@ -8,16 +8,16 @@ Issue #33 includes sign-in research as well as API model support. The API-key fa
 
 For a Docker/NAS deployment, prefer managed device-code login, subject to its account/workspace setting. Browser callbacks run on the host running Codex, which may be different from the phone or laptop used to administer the display. The [authentication guide](https://learn.chatgpt.com/docs/auth) documents these flows and their credential-storage behavior.
 
-## Requirements before implementation
+## Requirements for subscription facts generation
 
 1. Add an optional, supervised Codex backend using stdio and a pinned runtime verified on both container architectures and the chosen base image. This is an additional deployment dependency.
 2. Give it a private persistent credential directory. Keep tokens out of display WebSockets, public configuration responses, logs, and browser storage. Let Codex own refresh; do not import unrelated user authentication caches.
 3. Add an explicit administrator authorization boundary for login, account status, cancellation, and logout. Current facts configuration routes are not application-wide authentication. Source API keys protect source operations and should not be repurposed as this boundary.
 4. Expose only the small set of account/generation operations the app needs, not raw Codex RPC. Isolate generation from the filesystem and executable tools; verify enforceable tool disabling before accepting untrusted track metadata or prompts.
-5. Start isolated generation contexts, require the facts output contract, and verify enforceable output/time limits. Preserve request sharing, configuration/account isolation, refusal/truncation handling, and cache behavior.
+5. Start isolated generation contexts, require the facts output contract, and enforce request deadlines and bounded local response handling. A hard output-token cap is not required for the Codex provider. Preserve request sharing, configuration/account isolation, refusal/incomplete-turn handling, and cache behavior.
 6. Test login cancellation/expiry, refresh, restarts, unavailable models, exhausted quotas, and logout. Show whether requests consume subscription entitlements or metered API billing. Never fall back silently to a billed API key.
 
-API-key Luna remains usable independently. The tested configurations in the offline spike below did not satisfy the proposed bounded, tool-free generation contract, and no supported configuration establishing that contract was found. Production sign-in generation remains gated; an experimental mode would require a separate product decision and additional isolation work.
+API-key Luna remains usable independently. The initial offline spike below did not establish the originally proposed tool-free generation contract. A subsequent investigation identified a restricted web-search capability configuration, and the requested design now uses web sources and cached research without requiring a hard output-token cap. See [the follow-up research design and evidence](plans/2026-09-06-codex-web-facts.md). The generation adapter and authenticated source behavior still need implementation and verification.
 
 ## Offline protocol spike: Codex 0.153.4, 2026-09-06
 
@@ -45,7 +45,7 @@ The [configuration schema](https://learn.chatgpt.com/docs/config-schema.json) pr
 - Correlate notifications by thread and turn. Collect final agent output and require `turn/completed` with `turn.status === "completed"`; commentary, a retryable `error`, and an individual item completion are not success. Validate the resulting facts contract separately.
 - Handle nullable or absent login IDs in completion notifications, and both `canceled` and `notFound` cancellation results. `account/logout` takes no parameters (or `null`). Never expose the raw RPC interface to browsers.
 
-Remaining validation: actual OAuth completion/refresh and restart persistence; authenticated Luna availability and quotas; upstream reasoning-effort acceptance; enforceable isolation against adversarial inputs; an enforceable generation budget; and Alpine Linux amd64/arm64 runtime compatibility. No production Codex provider or login UI is included in this change.
+Remaining validation from this spike: actual OAuth completion/refresh and restart persistence; authenticated Luna availability and quotas; upstream reasoning-effort acceptance; enforceable isolation against adversarial inputs; an enforceable generation budget; and Alpine Linux amd64/arm64 runtime compatibility. The subsequent account-connection implementation is documented separately; the spike itself did not implement a provider or login UI.
 
 ## Current documented Codex model catalog
 

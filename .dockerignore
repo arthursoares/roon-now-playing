@@ -1,0 +1,16 @@
+# Keep credentials and mutable runtime state out of images and build caches.
+.env
+.env.*
+config/
+packages/server/config/
+**/codex-account/
+packages/server/cache/
+
+# Build dependencies and outputs inside the target architecture's image.
+.git/
+**/node_modules/
+**/dist/
+**/*.tsbuildinfo
+test-results/
+playwright-report/
+e2e/screenshots/
