@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import type { Track, PlaybackState, BackgroundType } from '@roon-screen-cover/shared';
 import { useFacts } from '../composables/useFacts';
+import { getProgressTransform } from '../utils/progress';
 
 const props = defineProps<{
   track: Track | null;
@@ -104,7 +105,7 @@ watch(
 
         <!-- Progress line -->
         <div v-if="track" class="progress-line">
-          <div class="progress-fill" :style="{ width: `${progress}%` }" />
+          <div class="progress-fill" :style="{ transform: getProgressTransform(progress) }" />
         </div>
       </div>
     </div>
@@ -309,9 +310,12 @@ watch(
 }
 
 .progress-fill {
+  width: 100%;
   height: 100%;
   background: rgba(255, 255, 255, 0.9);
-  transition: width 0.1s linear;
+  transform-origin: left center;
+  transition: transform 0.1s linear;
+  will-change: transform;
 }
 
 @media (max-width: 899px) {

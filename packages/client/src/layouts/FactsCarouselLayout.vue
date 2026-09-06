@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import type { Track, PlaybackState, BackgroundType } from '@roon-screen-cover/shared';
 import { useFacts } from '../composables/useFacts';
+import { getProgressTransform } from '../utils/progress';
 
 const props = defineProps<{
   track: Track | null;
@@ -104,7 +105,7 @@ watch(
             <span class="np-artist">{{ track.artist }}</span>
           </div>
           <div class="progress-line">
-            <div class="progress-fill" :style="{ width: `${progress}%` }" />
+            <div class="progress-fill" :style="{ transform: getProgressTransform(progress) }" />
           </div>
           <div class="np-meta">
             <span class="zone-name">{{ zoneName }}</span>
@@ -310,9 +311,12 @@ watch(
 }
 
 .progress-fill {
+  width: 100%;
   height: 100%;
   background: rgba(255, 255, 255, 0.92);
-  transition: width 0.1s linear;
+  transform-origin: left center;
+  transition: transform 0.1s linear;
+  will-change: transform;
 }
 
 .np-meta {

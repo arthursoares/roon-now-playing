@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { getProgressTransform } from '../utils/progress';
 
 const props = defineProps<{
   progress: number;
@@ -9,7 +10,7 @@ const props = defineProps<{
 }>();
 
 const progressStyle = computed(() => ({
-  width: `${props.progress}%`,
+  transform: getProgressTransform(props.progress),
 }));
 </script>
 
@@ -47,9 +48,13 @@ const progressStyle = computed(() => ({
 }
 
 .progress-fill {
+  width: 100%;
   height: 100%;
   background: var(--progress-bar-fill, rgba(255, 255, 255, 0.9));
   border-radius: 2px;
-  transition: width 0.1s linear;
+  -webkit-transform-origin: left center;
+  transform-origin: left center;
+  transition: transform 0.1s linear;
+  will-change: transform;
 }
 </style>
