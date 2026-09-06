@@ -491,12 +491,11 @@ test.describe('Screenshot Capture for PR Validation', () => {
  *   - TV-4K (3840×2160)
  *
  * Run locally:   pnpm test:e2e:matrix   →   npx playwright show-report
- * In CI:         the "Visual Approval Matrix" workflow uploads the report as a
- *                downloadable artifact on every pull request.
+ * Visual review is local; the automated screenshot CI workflow was removed.
  */
 test.describe('Matrix', () => {
   // Selective runs: set MATRIX_LAYOUTS=detailed,basic to render only those layouts
-  // (CI derives this from the layouts a PR actually changed). Empty → full matrix.
+  // An empty value renders the full matrix.
   const requested = (process.env.MATRIX_LAYOUTS || '')
     .split(',')
     .map((s) => s.trim())

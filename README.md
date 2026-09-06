@@ -543,21 +543,14 @@ unreadable`. Selections persist in the browser.
 `e2e/screenshots/matrix/_review/` plus [`e2e/visual-review-prompt.md`](e2e/visual-review-prompt.md)
 to a vision-capable model for a ranked findings table.
 
-#### CI: selective by default, full on demand
+#### Local visual review
 
-The `Visual Approval Matrix` workflow is intentionally **not** run on every PR:
+The automated screenshot CI workflow has been removed. Use the local Playwright
+commands above when reviewing layout changes. Quality, Docker, and Codex runtime
+checks continue in CI.
 
-- **On PRs** it triggers only when UI-affecting paths change, and renders **only
-  the layouts the PR touched** (global changes — design tokens, shared types,
-  background/color composables — render the full set). It uploads the small
-  contact-sheet `visual-review-pack` artifact and posts a sticky PR comment.
-- **Full run on demand:** Actions → *Visual Approval Matrix* → *Run workflow*
-  (optionally scope to specific layouts).
-
-Frames are JPEG and only the montages are uploaded (not raw frames or the HTML
-report), so the artifact stays in the low-MB range. Mock playback uses the
-bundled `assets/artwork_radiohead-in_rainbows.jpg` cover so palette-extracted
-gradients render true to production.
+Mock playback uses the bundled `assets/artwork_radiohead-in_rainbows.jpg` cover
+so palette-extracted gradients render true to production.
 
 ## Project Structure
 
@@ -604,7 +597,9 @@ roon-now-playing/
 │               └── colorUtils.ts
 ├── .github/workflows/
 │   ├── docker-publish.yml
-│   └── visual-matrix.yml    # PR visual approval matrix
+│   ├── codex-runtime.yml
+│   ├── quality.yml
+│   └── pages.yml
 ├── e2e/                     # Playwright visual tests (matrix + constraints)
 ├── Dockerfile
 ├── docker-compose.yml
