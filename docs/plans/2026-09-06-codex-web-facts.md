@@ -4,7 +4,7 @@
 
 The requested Codex provider will use web sources and cache the research. A hard model output-token cap is **not required** for this provider. Existing API-provider token caps remain unchanged. Request deadlines, bounded local response handling, request sharing, and account cancellation still apply.
 
-This is the follow-up design for issue #33. The account-connection implementation does not yet generate facts. The investigation below used code review and offline protocol fixtures, with no authenticated search or model calls.
+This design for issue #33 is now implemented by the optional Codex provider; see [setup and verification](../codex-device-login.md). The investigation below used code review and offline protocol fixtures, with no authenticated search or model calls. Real-account validation remains separate from those fixtures.
 
 ## Current efficiency
 

@@ -8,6 +8,7 @@ import path from 'node:path';
 import { PassThrough, Writable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CodexAuthService, type CodexAuthServiceOptions } from './codexAuth.js';
+import type { CodexResearchRequest } from './codexResearchTypes.js';
 
 interface RequestMessage {
   id?: number;
@@ -38,6 +39,17 @@ class FakeAppServer extends EventEmitter {
   errors = new Map<string, unknown>();
   exitOnKill = true;
   errorOnKill = false;
+  modelPages = new Map<string, unknown>([[
+    '',
+    {
+      data: [{
+        model: 'gpt-5.6-luna',
+        supportedReasoningEfforts: [{ reasoningEffort: 'low', description: 'Low' }],
+      }],
+      nextCursor: null,
+    },
+  ]]);
+  researchNotifications: Array<{ method: string; params: unknown }> = [];
 
   constructor() {
     super();
@@ -73,6 +85,18 @@ class FakeAppServer extends EventEmitter {
     return this.requests.filter((request) => request.method === method).length;
   }
 
+  respondToLatest(method: string, result: unknown): void {
+    let request: RequestMessage | undefined;
+    for (let index = this.requests.length - 1; index >= 0; index -= 1) {
+      if (this.requests[index].method === method) {
+        request = this.requests[index];
+        break;
+      }
+    }
+    if (request?.id === undefined) throw new Error(`No ${method} request to answer`);
+    this.respond({ id: request.id, result });
+  }
+
   private handle(request: RequestMessage): void {
     if (request.id === undefined || this.hold.has(request.method)) return;
     const error = this.errors.get(request.method);
@@ -96,6 +120,22 @@ class FakeAppServer extends EventEmitter {
       case 'account/logout':
         this.account = null;
         this.respond({ id: request.id, result: {} });
+        break;
+      case 'model/list':
+        this.respond({ id: request.id, result: this.modelPages.get(String(request.params?.cursor ?? '')) });
+        break;
+      case 'thread/start':
+        this.respond({ id: request.id, result: { thread: { id: 'thread-1' } } });
+        break;
+      case 'turn/start':
+        this.respond({ id: request.id, result: { turn: { id: 'turn-1', status: 'inProgress', items: [] } } });
+        for (const notification of this.researchNotifications) this.notify(notification.method, notification.params);
+        break;
+      case 'turn/interrupt':
+        this.respond({ id: request.id, result: {} });
+        break;
+      case 'thread/unsubscribe':
+        this.respond({ id: request.id, result: { status: 'unsubscribed' } });
         break;
     }
   }
@@ -479,6 +519,238 @@ describe('CodexAuthService', () => {
     expect((await service.getStatus()).state).toBe('signed-out');
   });
 
+  it('enables only the pinned web-research surface when generation is requested', async () => {
+    const server = new FakeAppServer();
+    server.account = { type: 'chatgpt', email: 'listener@example.com', planType: 'plus' };
+    const service = createService([server], { generationEnabled: true });
+
+    expect(await service.getStatus()).toMatchObject({ state: 'signed-in', generationEnabled: true });
+    expect(server.requests.find(({ method }) => method === 'initialize')?.params).toMatchObject({
+      capabilities: { experimentalApi: true },
+    });
+    const config = fs.readFileSync(path.join(homeDir, 'codex-home', 'config.toml'), 'utf8');
+    expect(config).toContain('web_search = "live"');
+    expect(config).toContain('[agents]\nenabled = false');
+    expect(config).toContain('[skills]\ninclude_instructions = false');
+    expect(config).toContain('[skills.bundled]\nenabled = false');
+    for (const feature of [
+      'apps', 'plugins', 'hooks', 'shell_snapshot', 'shell_tool', 'unified_exec', 'multi_agent',
+      'multi_agent_v2', 'code_mode', 'browser_use', 'browser_use_external', 'computer_use',
+      'image_generation', 'in_app_browser', 'view_image', 'memories', 'skill_search',
+      'skill_mcp_dependency_install', 'workspace_dependencies', 'goals', 'sleep_tool',
+      'tool_suggest', 'recommended_plugins', 'enable_request_compression',
+    ]) expect(config).toContain(`${feature} = false`);
+    expect(config).not.toContain('code_mode_host');
+    expect(config).not.toContain('model_provider');
+    expect(config).not.toContain('supports_standalone_web_search');
+  });
+
+  it('persists an opaque account namespace without storing the account email', async () => {
+    const first = new FakeAppServer();
+    first.account = { type: 'chatgpt', email: 'Listener@Example.com', planType: 'plus' };
+    const service = createService([first], { generationEnabled: true });
+    const firstKey = await service.getResearchAccountKey();
+    await service.dispose();
+
+    const second = new FakeAppServer();
+    second.account = { type: 'chatgpt', email: 'listener@example.com', planType: 'plus' };
+    const restarted = createService([second], { generationEnabled: true });
+    expect(await restarted.getResearchAccountKey()).toBe(firstKey);
+    const metadataPath = path.join(homeDir, 'research-account.json');
+    expect(fs.statSync(metadataPath).mode & 0o777).toBe(0o600);
+    expect(fs.readFileSync(metadataPath, 'utf8').toLowerCase()).not.toContain('listener@example.com');
+  });
+
+  it('rotates the research namespace after logout and an actual account change', async () => {
+    const first = new FakeAppServer();
+    first.account = { type: 'chatgpt', email: 'first@example.com', planType: 'plus' };
+    const second = new FakeAppServer();
+    second.account = { type: 'chatgpt', email: 'first@example.com', planType: 'plus' };
+    const service = createService([first, second], { generationEnabled: true });
+    const firstKey = await service.getResearchAccountKey();
+    await service.logout();
+    const afterLogout = await service.getResearchAccountKey();
+    expect(afterLogout).not.toBe(firstKey);
+    second.account = { type: 'chatgpt', email: 'second@example.com', planType: 'plus' };
+    expect(await service.getResearchAccountKey()).not.toBe(afterLogout);
+  });
+
+  it.each([
+    ['disabled generation', false, { type: 'chatgpt', email: 'listener@example.com', planType: 'plus' }, 'unavailable'],
+    ['signed out', true, null, 'not-connected'],
+    ['account without identity', true, { type: 'chatgpt', email: null, planType: 'team' }, 'not-connected'],
+  ])('rejects account keys for %s', async (_name, generationEnabled, account, code) => {
+    const server = new FakeAppServer();
+    server.account = account;
+    const service = createService([server], { generationEnabled });
+    await expect(service.getResearchAccountKey()).rejects.toMatchObject({ name: 'CodexResearchError', code });
+  });
+
+  it('paginates the model catalog and requires the exact model with low reasoning', async () => {
+    const server = researchServer();
+    server.modelPages = new Map([
+      ['', { data: [{ model: 'other', supportedReasoningEfforts: [{ reasoningEffort: 'low' }] }], nextCursor: 'next' }],
+      ['next', { data: [{ model: 'gpt-5.6-luna', supportedReasoningEfforts: [{ reasoningEffort: 'low' }] }], nextCursor: null }],
+    ]);
+    server.researchNotifications = successfulResearchNotifications();
+    const service = createService([server], { generationEnabled: true });
+    const key = await service.getResearchAccountKey();
+    await service.research(researchRequest(key));
+    expect(server.requests.filter(({ method }) => method === 'model/list').map(({ params }) => params)).toEqual([
+      { cursor: null, limit: 100, includeHidden: true },
+      { cursor: 'next', limit: 100, includeHidden: true },
+    ]);
+
+    const unsupported = researchServer();
+    unsupported.modelPages.set('', { data: [{ model: 'gpt-5.6-luna', supportedReasoningEfforts: [{ reasoningEffort: 'medium' }] }], nextCursor: null });
+    const unsupportedService = createService([unsupported], { generationEnabled: true });
+    const unsupportedKey = await unsupportedService.getResearchAccountKey();
+    await expect(unsupportedService.research(researchRequest(unsupportedKey))).rejects.toMatchObject({
+      name: 'CodexResearchError', code: 'model-unavailable',
+    });
+    expect(unsupported.count('thread/start')).toBe(0);
+  });
+
+  it('runs an isolated low-effort ephemeral turn and accepts early sourced completion events', async () => {
+    const server = researchServer();
+    server.researchNotifications = successfulResearchNotifications();
+    const service = createService([server], { generationEnabled: true });
+    const key = await service.getResearchAccountKey();
+
+    await expect(service.research(researchRequest(key))).resolves.toEqual({
+      facts: [{ text: 'A sourced fact.', scope: 'album', trackTitle: null, sourceUrls: ['https://example.com/source'] }],
+      sources: [{ url: 'https://example.com/source', title: 'Source' }],
+      webSearches: 1, openPages: 1, durationMs: 321, inputTokens: 42, outputTokens: 17,
+    });
+    expect(server.requests.find(({ method }) => method === 'thread/start')?.params).toMatchObject({
+      model: 'gpt-5.6-luna', cwd: path.join(homeDir, 'workspace'), ephemeral: true,
+      environments: [], runtimeWorkspaceRoots: [], sandbox: 'read-only', approvalPolicy: 'never',
+    });
+    const turn = server.requests.find(({ method }) => method === 'turn/start')?.params;
+    expect(turn).toMatchObject({ threadId: 'thread-1', effort: 'low' });
+    expect(JSON.stringify(turn)).not.toMatch(/max[_A-Z]?output|max[_A-Z]?token|tokenLimit/i);
+    expect(server.count('thread/unsubscribe')).toBe(1);
+    expect(server.count('turn/interrupt')).toBe(0);
+  });
+
+  it('transmits the largest accepted JSON-heavy prompt with the bounded generation frame', async () => {
+    const server = researchServer();
+    server.researchNotifications = successfulResearchNotifications();
+    const service = createService([server], { generationEnabled: true });
+    const key = await service.getResearchAccountKey();
+    const prompt = '"'.repeat(50_000);
+
+    await expect(service.research(researchRequest(key, { prompt }))).resolves.toMatchObject({
+      facts: [{ text: 'A sourced fact.' }],
+    });
+    const turn = server.requests.find(({ method }) => method === 'turn/start');
+    const serialized = JSON.stringify(turn);
+    expect(Buffer.byteLength(serialized, 'utf8')).toBeGreaterThan(64 * 1024);
+    expect(serialized).toContain('User preference data:');
+  });
+
+  it('rejects failed turns and releases the ephemeral thread', async () => {
+    const server = researchServer();
+    server.researchNotifications = [{
+      method: 'turn/completed',
+      params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'failed', items: [], error: { message: 'raw provider detail' } } },
+    }];
+    const service = createService([server], { generationEnabled: true });
+    const key = await service.getResearchAccountKey();
+    await expect(service.research(researchRequest(key))).rejects.toMatchObject({ name: 'CodexResearchError', code: 'invalid-output' });
+    expect(server.count('turn/interrupt')).toBe(1);
+    expect(server.count('thread/unsubscribe')).toBe(1);
+  });
+
+  it('interrupts timed out and aborted turns and never accepts their late facts', async () => {
+    const timedOut = researchServer();
+    const timeoutService = createService([timedOut], { generationEnabled: true, researchTimeoutMs: 10 });
+    const timeoutKey = await timeoutService.getResearchAccountKey();
+    await expect(timeoutService.research(researchRequest(timeoutKey))).rejects.toMatchObject({ name: 'CodexResearchError', code: 'timeout' });
+    expect(timedOut.count('turn/interrupt')).toBe(1);
+
+    const aborted = researchServer();
+    const abortService = createService([aborted], { generationEnabled: true });
+    const abortKey = await abortService.getResearchAccountKey();
+    const controller = new AbortController();
+    const pending = abortService.research(researchRequest(abortKey, { signal: controller.signal }));
+    await vi.waitFor(() => expect(aborted.count('turn/start')).toBe(1));
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: 'CodexResearchError', code: 'canceled' });
+    for (const notification of successfulResearchNotifications()) aborted.notify(notification.method, notification.params);
+    expect(aborted.count('turn/interrupt')).toBe(1);
+  });
+
+  it('applies the research deadline to model discovery without blocking logout', async () => {
+    const timedOut = researchServer();
+    timedOut.hold.add('model/list');
+    const timeoutService = createService([timedOut], {
+      generationEnabled: true,
+      researchTimeoutMs: 10,
+      requestTimeoutMs: 1_000,
+    });
+    const timeoutKey = await timeoutService.getResearchAccountKey();
+    await expect(timeoutService.research(researchRequest(timeoutKey))).rejects.toMatchObject({
+      name: 'CodexResearchError', code: 'timeout',
+    });
+    expect(timedOut.kill).not.toHaveBeenCalled();
+
+    const loggingOut = researchServer();
+    loggingOut.hold.add('model/list');
+    const logoutService = createService([loggingOut], { generationEnabled: true });
+    const logoutKey = await logoutService.getResearchAccountKey();
+    const pending = logoutService.research(researchRequest(logoutKey));
+    const canceled = expect(pending).rejects.toMatchObject({ name: 'CodexResearchError', code: 'canceled' });
+    await vi.waitFor(() => expect(loggingOut.count('model/list')).toBe(1));
+    await expect(logoutService.logout()).resolves.toMatchObject({ state: 'signed-out', error: null });
+    await canceled;
+    expect(loggingOut.count('account/logout')).toBe(1);
+  });
+
+  it('unsubscribes a thread whose start response arrives after explicit cancellation', async () => {
+    const server = researchServer();
+    server.hold.add('thread/start');
+    const service = createService([server], { generationEnabled: true });
+    const key = await service.getResearchAccountKey();
+    const pending = service.research(researchRequest(key));
+    const canceled = expect(pending).rejects.toMatchObject({ name: 'CodexResearchError', code: 'canceled' });
+    await vi.waitFor(() => expect(server.count('thread/start')).toBe(1));
+    await service.cancelResearch();
+    await canceled;
+    expect(server.kill).not.toHaveBeenCalled();
+
+    server.respondToLatest('thread/start', { thread: { id: 'thread-1' } });
+    await vi.waitFor(() => expect(server.count('thread/unsubscribe')).toBe(1));
+    expect(server.kill).not.toHaveBeenCalled();
+  });
+
+  it('rejects overlap and logout invalidates an active generation without waiting for completion', async () => {
+    const server = researchServer();
+    const service = createService([server], { generationEnabled: true });
+    const key = await service.getResearchAccountKey();
+    const pending = service.research(researchRequest(key));
+    const canceled = expect(pending).rejects.toMatchObject({ name: 'CodexResearchError', code: 'canceled' });
+    await vi.waitFor(() => expect(server.count('turn/start')).toBe(1));
+    await expect(service.research(researchRequest(key))).rejects.toMatchObject({ name: 'CodexResearchError', code: 'busy' });
+    await expect(service.logout()).resolves.toMatchObject({ state: 'signed-out' });
+    await canceled;
+    for (const notification of successfulResearchNotifications()) server.notify(notification.method, notification.params);
+  });
+
+  it('cancels active work when account polling observes a different account', async () => {
+    const server = researchServer();
+    const service = createService([server], { generationEnabled: true });
+    const key = await service.getResearchAccountKey();
+    const pending = service.research(researchRequest(key));
+    const canceled = expect(pending).rejects.toMatchObject({ name: 'CodexResearchError', code: 'canceled' });
+    await vi.waitFor(() => expect(server.count('turn/start')).toBe(1));
+    server.account = { type: 'chatgpt', email: 'other@example.com', planType: 'plus' };
+    await expect(service.getStatus()).resolves.toMatchObject({ state: 'signed-in', account: { email: 'other@example.com' } });
+    await canceled;
+    expect(server.count('turn/interrupt')).toBe(1);
+    expect(await service.getResearchAccountKey()).not.toBe(key);
+  });
+
   function createService(servers: FakeAppServer[], overrides: Partial<CodexAuthServiceOptions> = {}): CodexAuthService {
     const spawn = overrides.spawn ?? (() => {
       const server = servers.shift();
@@ -488,5 +760,38 @@ describe('CodexAuthService', () => {
     const service = new CodexAuthService({ homeDir, ...overrides, spawn });
     services.push(service);
     return service;
+  }
+
+  function researchServer(): FakeAppServer {
+    const server = new FakeAppServer();
+    server.account = { type: 'chatgpt', email: 'listener@example.com', planType: 'plus' };
+    return server;
+  }
+
+  function researchRequest(accountKey: string, overrides: Partial<CodexResearchRequest> = {}): CodexResearchRequest {
+    return {
+      artist: 'Artist', album: 'Album', title: 'Track', accountKey,
+      model: 'gpt-5.6-luna', prompt: 'Prefer recording history', factsCount: 4, focus: 'album',
+      ...overrides,
+    };
+  }
+
+  function successfulResearchNotifications(): Array<{ method: string; params: unknown }> {
+    const output = JSON.stringify({
+      facts: [{ text: 'A sourced fact.', scope: 'album', trackTitle: null, sourceUrls: ['https://example.com/source'] }],
+      sources: [{ url: 'https://example.com/source', title: 'Source' }],
+    });
+    const common = { threadId: 'thread-1', turnId: 'turn-1' };
+    return [
+      { method: 'item/completed', params: { ...common, completedAtMs: 1, item: { id: 'search-1', type: 'webSearch', query: 'album history', action: { type: 'search', query: 'album history' } } } },
+      { method: 'item/completed', params: { ...common, completedAtMs: 2, item: { id: 'open-1', type: 'webSearch', query: '', action: { type: 'openPage', url: 'https://example.com/source' } } } },
+      { method: 'item/completed', params: { ...common, completedAtMs: 3, item: { id: 'commentary', type: 'agentMessage', phase: 'commentary', text: '{"facts":[]}' } } },
+      { method: 'item/completed', params: { ...common, completedAtMs: 4, item: { id: 'final', type: 'agentMessage', phase: 'final_answer', text: output } } },
+      { method: 'thread/tokenUsage/updated', params: { ...common, tokenUsage: {
+        last: { inputTokens: 2, outputTokens: 3 },
+        total: { inputTokens: 42, outputTokens: 17 },
+      } } },
+      { method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed', items: [], durationMs: 321 } } },
+    ];
   }
 });

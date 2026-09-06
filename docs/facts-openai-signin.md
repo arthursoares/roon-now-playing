@@ -1,6 +1,6 @@
 # ChatGPT sign-in for facts: design boundary
 
-Issue #33 includes sign-in research as well as API model support. The app now has an optional [device-code account connection](codex-device-login.md), with protected status, cancellation, and logout controls. Facts generation still uses the API-key provider. ChatGPT subscription generation remains a separate runtime integration, not a token substituted into `new OpenAI({ apiKey })`.
+Issue #33 includes sign-in research as well as API model support. The app now has an optional [device-code connection and Codex research provider](codex-device-login.md), with protected account controls and source-backed cached facts. Subscription research uses its own runtime integration; it does not substitute an OAuth token into `new OpenAI({ apiKey })`.
 
 ## Supported candidate
 
@@ -17,7 +17,7 @@ For a Docker/NAS deployment, prefer managed device-code login, subject to its ac
 5. Start isolated generation contexts, require the facts output contract, and enforce request deadlines and bounded local response handling. A hard output-token cap is not required for the Codex provider. Preserve request sharing, configuration/account isolation, refusal/incomplete-turn handling, and cache behavior.
 6. Test login cancellation/expiry, refresh, restarts, unavailable models, exhausted quotas, and logout. Show whether requests consume subscription entitlements or metered API billing. Never fall back silently to a billed API key.
 
-API-key Luna remains usable independently. The initial offline spike below did not establish the originally proposed tool-free generation contract. A subsequent investigation identified a restricted web-search capability configuration, and the requested design now uses web sources and cached research without requiring a hard output-token cap. See [the follow-up research design and evidence](plans/2026-09-06-codex-web-facts.md). The generation adapter and authenticated source behavior still need implementation and verification.
+API-key Luna remains usable independently. The initial offline spike below did not establish the originally proposed tool-free generation contract. A subsequent investigation identified the restricted hosted-web configuration now used by the generation adapter. It caches source-backed research without requiring a hard output-token cap. See [the follow-up design and evidence](plans/2026-09-06-codex-web-facts.md). Authenticated model entitlement, public retrieval, and real-account refresh still require live verification.
 
 ## Offline protocol spike: Codex 0.153.4, 2026-09-06
 

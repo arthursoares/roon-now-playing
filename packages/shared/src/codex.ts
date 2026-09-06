@@ -1,7 +1,7 @@
-/** Account connection only; subscription facts generation is not enabled yet. */
+/** Account connection and optional subscription research capabilities. */
 export interface CodexCapabilities {
   enabled: boolean;
-  generationEnabled: false;
+  generationEnabled: boolean;
 }
 
 export interface CodexAccountStatus {
@@ -15,5 +15,5 @@ export interface CodexAccountStatus {
     expiresAt: string;
   } | null;
   error: string | null;
-  generationEnabled: false;
+  generationEnabled: boolean;
 }

@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import type { Track, PlaybackState, BackgroundType } from '@roon-screen-cover/shared';
 import { useFacts } from '../composables/useFacts';
+import FactSources from '../components/FactSources.vue';
 
 const props = defineProps<{
   track: Track | null;
@@ -18,7 +19,7 @@ const props = defineProps<{
 const trackRef = computed(() => props.track);
 const stateRef = computed(() => props.state);
 
-const { facts, currentFactIndex, currentFact, isLoading, error } = useFacts(trackRef, stateRef);
+const { facts, currentFactIndex, currentFact, currentFactSources, isLoading, error } = useFacts(trackRef, stateRef);
 
 // Track previous artwork for crossfade
 const displayedArtwork = ref<string | null>(null);
@@ -77,7 +78,10 @@ watch(
 
           <template v-else>
             <p v-if="isLoading" class="loading-hint">Loading facts...</p>
-            <p v-else-if="currentFact" class="fact-text">{{ currentFact }}</p>
+            <template v-else-if="currentFact">
+              <p class="fact-text">{{ currentFact }}</p>
+              <FactSources :sources="currentFactSources" />
+            </template>
             <p v-else-if="error && error.type === 'no-key'" class="error-hint">
               Configure API key in <a href="/admin">Admin</a>
             </p>

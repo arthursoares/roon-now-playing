@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { CodexAccountStatus, CodexCapabilities } from '@roon-screen-cover/shared';
 
 const DEVICE_VERIFICATION_URL = 'https://auth.openai.com/codex/device';
 const POLL_INTERVAL_MS = 2_000;
+const props = withDefaults(defineProps<{ active?: boolean }>(), { active: true });
+const emit = defineEmits<{ capabilities: [value: CodexCapabilities] }>();
 
 const capabilities = ref<CodexCapabilities | null>(null);
 const tokenInput = ref('');
@@ -96,7 +98,7 @@ function applyStatus(status: CodexAccountStatus): void {
 
 async function refreshStatus(): Promise<void> {
   const token = adminToken.value;
-  if (!mounted || !enabled.value || !token || document.hidden || statusController || busyAction.value) return;
+  if (!mounted || !props.active || !enabled.value || !token || document.hidden || statusController || busyAction.value) return;
 
   const epoch = requestEpoch;
   const currentStatusEpoch = statusEpoch;
@@ -131,7 +133,7 @@ async function refreshStatus(): Promise<void> {
 
 function startPolling(immediate = true): void {
   stopPolling();
-  if (!mounted || !enabled.value || !adminToken.value || document.hidden) return;
+  if (!mounted || !props.active || !enabled.value || !adminToken.value || document.hidden) return;
   if (immediate) void refreshStatus();
   pollTimer = setInterval(() => { void refreshStatus(); }, POLL_INTERVAL_MS);
 }
@@ -148,6 +150,13 @@ function unlockControls(): void {
   message.value = null;
   startPolling();
 }
+
+function getAuthorizationHeaders(): Record<string, string> {
+  return adminToken.value ? { Authorization: `Bearer ${adminToken.value}` } : {};
+}
+
+defineExpose({ getAuthorizationHeaders });
+watch(() => props.active, active => { if (active) startPolling(); else stopPolling(); });
 
 async function mutateAccount(
   action: 'login' | 'cancel' | 'logout',
@@ -250,8 +259,9 @@ onMounted(async () => {
     const payload = await responsePayload(response);
     if (!mounted || !response.ok || !payload || typeof payload !== 'object') return;
     const candidate = payload as Partial<CodexCapabilities>;
-    if (typeof candidate.enabled === 'boolean' && candidate.generationEnabled === false) {
+    if (typeof candidate.enabled === 'boolean' && typeof candidate.generationEnabled === 'boolean') {
       capabilities.value = candidate as CodexCapabilities;
+      emit('capabilities', capabilities.value);
     }
   } catch {
     // Capability discovery is intentionally silent so existing installations are unaffected.
@@ -274,7 +284,8 @@ onBeforeUnmount(() => {
     </header>
 
     <p class="availability-note">
-      Account connection is ready. Using a ChatGPT subscription to generate facts is not available yet.
+      <template v-if="capabilities?.generationEnabled">Select ChatGPT (Codex) below to research music facts from web sources using this account. Research is cached and reused across tracks.</template>
+      <template v-else>Account connection is ready. Using a ChatGPT subscription to generate facts is not available yet.</template>
     </p>
 
     <p v-if="message" role="alert" class="account-message">{{ message }}</p>

@@ -9,32 +9,14 @@ export function isValidCodexAdminToken(token: string | undefined): token is stri
   return typeof token === 'string' && /^[\x21-\x7e]{32,256}$/.test(token);
 }
 
-/** This bearer token protects Codex account controls only, not the entire app. */
-export function createCodexAccountRouter(options: {
-  service: AccountService | null;
-  adminToken?: string;
-}): Router {
-  const router = Router();
-  const { service, adminToken } = options;
-  const enabled = service !== null && isValidCodexAdminToken(adminToken);
-  const expectedHash = enabled ? createHash('sha256').update(adminToken!).digest() : null;
-
-  router.use((_req, res, next) => {
-    res.set('Cache-Control', 'no-store');
-    res.set('Referrer-Policy', 'no-referrer');
-    res.vary('Authorization');
-    next();
-  });
-
-  // No subprocess is started and no account details are exposed by discovery.
-  router.get('/capabilities', (_req, res) => {
-    res.json({ enabled, generationEnabled: false });
-  });
-
-  router.use((req, res, next) => {
-    if (!enabled || !expectedHash) {
-      res.status(503).json({ error: 'Unavailable', message: 'ChatGPT account connection is not configured.' });
-      return;
+/** Reused by account controls and subscription-provider configuration. */
+export function createCodexAuthorization(adminToken?: string): (req: Request, res: Response) => boolean {
+  const expectedHash = isValidCodexAdminToken(adminToken)
+    ? createHash('sha256').update(adminToken).digest() : null;
+  return (req, res) => {
+    if (!expectedHash) {
+      res.status(503).json({ error: 'Unavailable', message: 'ChatGPT administrator access is not configured.' });
+      return false;
     }
     const authorization = req.get('Authorization') ?? '';
     const supplied = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
@@ -42,7 +24,7 @@ export function createCodexAccountRouter(options: {
       createHash('sha256').update(supplied).digest(), expectedHash,
     )) {
       res.status(401).json({ error: 'Unauthorized', message: 'Invalid or missing account administrator token.' });
-      return;
+      return false;
     }
 
     // Cookie-free authorization already prevents ambient CSRF. Also reject
@@ -56,9 +38,42 @@ export function createCodexAccountRouter(options: {
         }
       } catch {
         res.status(403).json({ error: 'Forbidden', message: 'Account controls require a same-origin request.' });
-        return;
+        return false;
       }
     }
+    return true;
+  };
+}
+
+/** This bearer token protects Codex account controls only, not the entire app. */
+export function createCodexAccountRouter(options: {
+  service: AccountService | null;
+  adminToken?: string;
+  generationEnabled?: boolean;
+}): Router {
+  const router = Router();
+  const { service, adminToken } = options;
+  const enabled = service !== null && isValidCodexAdminToken(adminToken);
+  const authorize = createCodexAuthorization(adminToken);
+
+  router.use((_req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+    res.set('Referrer-Policy', 'no-referrer');
+    res.vary('Authorization');
+    next();
+  });
+
+  // No subprocess is started and no account details are exposed by discovery.
+  router.get('/capabilities', (_req, res) => {
+    res.json({ enabled, generationEnabled: enabled && options.generationEnabled === true });
+  });
+
+  router.use((req, res, next) => {
+    if (!enabled) {
+      res.status(503).json({ error: 'Unavailable', message: 'ChatGPT account connection is not configured.' });
+      return;
+    }
+    if (!authorize(req, res)) return;
     next();
   });
 

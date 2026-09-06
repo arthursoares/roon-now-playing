@@ -1,6 +1,6 @@
 # Connect ChatGPT with a device code
 
-This optional integration connects a ChatGPT account to the server. It supports sign-in, cancellation, account status, and logout. **Subscription-powered facts generation is not enabled yet.** Existing facts generation continues to use the independently configured API provider.
+This optional integration connects a ChatGPT account to the server and provides the **ChatGPT (Codex)** facts provider. It researches web sources, saves attributed artist/album facts, and reuses them across tracks. API-key providers remain independently selectable, with no automatic billing fallback.
 
 The server displays a verification link and one-time code. Open the link on your phone or computer, sign in to OpenAI, and enter the displayed code there. The server receives the completed login automatically; do not paste OAuth tokens into the facts API-key field.
 
@@ -15,7 +15,7 @@ export CODEX_ADMIN_TOKEN="$(openssl rand -hex 32)"
 docker compose -f docker-compose.yml -f docker-compose.codex.yml up -d --build
 ```
 
-Keep that token in your deployment's secret configuration for subsequent restarts. Enter the same token in the account panel to unlock its controls. It is separate from source API keys and OpenAI API keys; it protects only the Codex account endpoints, not the whole Admin page. Use HTTPS when administering over an untrusted network.
+Keep that token in your deployment's secret configuration for subsequent restarts. Enter the same token in the account panel to unlock its controls. It is separate from source API keys and OpenAI API keys; it protects Codex account controls, subscription-provider settings, and fresh research tests, not the whole Admin page. Use HTTPS when administering over an untrusted network.
 
 If using a reverse proxy, preserve the browser's original `Host` header (including a non-default port). Account endpoints check browser origins against it. The development proxy preserves this header for account routes.
 
@@ -27,7 +27,7 @@ Install the pinned Codex runtime on the server, then configure these environment
 
 | Variable | Meaning |
 | --- | --- |
-| `CODEX_ENABLED=true` | Opt in to account connection. Defaults to disabled. |
+| `CODEX_ENABLED=true` | Make account connection and the Codex provider available. Defaults to disabled. |
 | `CODEX_ADMIN_TOKEN` | Dedicated random bearer token; 32–256 non-space ASCII characters. Missing or invalid values disable the integration. |
 | `CODEX_BINARY` | Optional trusted executable path; defaults to `codex` on the server's PATH. |
 | `CODEX_ACCOUNT_DIR` | Optional private persistent directory; defaults to `DATA_DIR/codex-account` (`./config/codex-account` without DATA_DIR). |
@@ -42,21 +42,31 @@ Default local credential directories are excluded from git and Docker build cont
 2. Enter the dedicated administrator token and choose **Unlock account controls**.
 3. Choose **Connect ChatGPT**. Open the displayed OpenAI verification link on another device and enter the code.
 4. Complete sign-in on OpenAI's page. The account panel updates to show the connected account.
+5. Select **ChatGPT (Codex)** as the AI provider, choose a model (Luna is the default), and save. The administrator token must still be unlocked for this change.
+6. Open **Test** within the same Admin page to research a sample track. A test forces fresh research and reports source links, search/page-open counts, and latency. Normal display requests reuse cached work.
 
 If device-code login is unavailable, enable it in your ChatGPT security settings or ask your workspace administrator to enable it. OpenAI documents this requirement in its [headless authentication guide](https://learn.chatgpt.com/docs/auth#login-on-headless-devices).
 
-An attempt has a local ten-minute deadline; OpenAI may expire its code earlier. Cancel and request a new code if needed. Leaving the page or locking the controls forgets the browser's administrator token but does not cancel the server's pending login or sign out the account. Unlock again to resume viewing the current state. **Sign out** ends the saved account connection.
+An attempt has a local ten-minute deadline; OpenAI may expire its code earlier. Cancel and request a new code if needed. Leaving the Admin page or locking the controls forgets the browser's administrator token but does not cancel the server's pending login or sign out the account. Moving between AI Facts and Test within Admin retains it. Unlock again to resume viewing the current state. **Sign out** ends the saved connection and cancels its active research.
+
+## Research and reuse
+
+The provider uses low reasoning, validates the exact selected model against the connected account's catalog, and performs one research job at a time with a bounded queue. It applies a three-minute whole-operation deadline and local response-size limits. There is no hard model output-token cap. Saved API-provider caps and credentials remain independent.
+
+Historical research is cached for 30 days, with up to 500 records. Selected track results are cached for 72 hours, with up to 1,000 records; combined serialized entries are capped at 16 MiB. Different tracks on an album share the same research job and reuse artist/album facts. Track-specific facts are used only for their matching title. Forced research refreshes the album pool, and sibling track selections are refreshed from that pool without another model call. Cache contents survive ordinary server restarts.
+
+Facts retain source links through the cache and all three facts layouts. Links must match observed public-HTTPS page-open events. This is source attribution, not independent proof that every claim is supported. Ambiguous album editions and compilation artists remain a limitation of the current artist/album/title metadata.
 
 ## Account API and validation
 
 `GET /api/codex/capabilities` exposes only enablement flags. Account status and login/cancel/logout endpoints require the dedicated bearer token, return uncacheable responses, and reject foreign browser origins. The browser keeps its token only in component memory. Tokens are never sent to display WebSockets or persisted in browser storage.
 
-The backend exposes a fixed set of account operations through stdio App Server. It exposes no raw RPC endpoint and never starts a generation thread or turn. Protocol errors and child stderr are not returned to browsers. Device verification links must match the documented OpenAI HTTPS endpoint.
+The backend exposes narrow account and research operations through stdio App Server, with no raw RPC or process-control HTTP endpoint. Research uses ephemeral isolated threads, private homes, empty runtime workspaces, disabled agents/skills, and the restricted hosted-web tool configuration. Protocol errors and child stderr are not returned to browsers. Device verification links must match the documented OpenAI HTTPS endpoint.
 
-Automated fixtures verify the login lifecycle, authorization, stale responses, and UI states. The optional runtime CI checks the pinned binary in both architecture builds. Real account approval, token refresh over time, quota/model entitlement, and restart persistence with a real account still require a live integration check; mocked success does not prove them.
+Automated fixtures verify the login/research lifecycle, authorization, stale responses, cache reuse, and UI states. The optional runtime CI runs a complete offline research check with the real Codex binary on both architectures. Real account approval, token refresh over time, quota/model entitlement, public source retrieval, and restart persistence with a real account still require a live integration check; mocked success does not prove them.
 
 A local smoke check with the actual Codex 0.153.4 binary verified initialization, signed-out account status from an empty isolated home, and terminal process shutdown. It requested no login or generation and accessed no existing credentials.
 
 A second isolated check successfully issued and cancelled a real OpenAI device code without approving an account or requesting generation. The runtime created private SQLite state/log files; a literal scan of the files present during that attempt found no copy of the device code. The temporary profile was removed afterward. This is evidence for that specific attempt, not a guarantee about every runtime log path or authenticated-account event; keep the entire persistent volume private.
 
-The next provider will use [web sources and cached research](plans/2026-09-06-codex-web-facts.md); it does not require a hard output-token cap. The [sign-in design and protocol findings](facts-openai-signin.md) record the remaining generation work. Connecting an account does not enable that provider or silently switch facts billing.
+The [research design](plans/2026-09-06-codex-web-facts.md) and [protocol findings](facts-openai-signin.md) record the implementation decisions. Connecting an account does not select the provider automatically; explicitly save the provider choice to change how facts are generated.

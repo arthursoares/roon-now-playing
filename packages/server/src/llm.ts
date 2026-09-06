@@ -361,6 +361,8 @@ export class LocalLLMProvider implements LLMProvider {
 
 export function createLLMProvider(config: FactsConfig): LLMProvider {
   switch (config.provider) {
+    case 'codex':
+      throw new Error('Codex facts require the managed research service');
     case 'openai':
       return new OpenAIProvider(config);
     case 'openrouter':

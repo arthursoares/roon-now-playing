@@ -6,6 +6,7 @@ import { useBackgroundStyle } from '../composables/useBackgroundStyle';
 import { useFacts } from '../composables/useFacts';
 import ProgressBar from '../components/ProgressBar.vue';
 import DynamicBackground from '../components/DynamicBackground.vue';
+import FactSources from '../components/FactSources.vue';
 import { isDynamicBackground } from '../utils/backgrounds';
 
 const props = defineProps<{
@@ -27,12 +28,12 @@ const artworkUrlRef = computed(() => props.artworkUrl);
 
 const { colors, vibrantGradient, palette } = useColorExtraction(artworkUrlRef);
 const { style: backgroundStyle } = useBackgroundStyle(backgroundRef, colors, vibrantGradient);
-const { facts, currentFactIndex, currentFact, isLoading, error } = useFacts(trackRef, stateRef);
+const { facts, currentFactIndex, currentFact, currentFactSources, isLoading, error } = useFacts(trackRef, stateRef);
 
 // Refs for height matching and overflow detection
 const artworkWrapperRef = ref<HTMLDivElement | null>(null);
 const factsColumnRef = ref<HTMLDivElement | null>(null);
-const factTextRef = ref<HTMLParagraphElement | null>(null);
+const factTextRef = ref<HTMLDivElement | null>(null);
 const factContainerRef = ref<HTMLDivElement | null>(null);
 const needsScroll = ref(false);
 const scrollDuration = ref(12);
@@ -70,7 +71,7 @@ function onArtworkLoad() {
   updateLayout();
 }
 
-watch(currentFact, updateLayout);
+watch([currentFact, currentFactSources], updateLayout);
 watch(() => props.track, updateLayout);
 watch(() => props.artworkUrl, () => {
   // Reset height when artwork changes, will be recalculated after image loads
@@ -187,13 +188,16 @@ watch(
 
             <template v-else>
               <p v-if="isLoading" class="loading-hint">Loading facts...</p>
-              <p
+              <div
                 v-else-if="currentFact"
                 ref="factTextRef"
-                class="fact-text"
+                class="fact-content"
                 :class="{ 'fact-text--scrolling': needsScroll }"
                 :style="needsScroll ? { '--scroll-duration': scrollDuration + 's' } : {}"
-              >{{ currentFact }}</p>
+              >
+                <p class="fact-text">{{ currentFact }}</p>
+                <FactSources :sources="currentFactSources" />
+              </div>
               <p v-else-if="error && error.type === 'no-key'" class="error-message">
                 Configure API key in <a href="/admin">Admin Panel</a>
               </p>
@@ -285,13 +289,16 @@ watch(
 
             <template v-else>
               <p v-if="isLoading" class="loading-hint">Loading facts...</p>
-              <p
+              <div
                 v-else-if="currentFact"
                 ref="factTextRef"
-                class="fact-text"
+                class="fact-content"
                 :class="{ 'fact-text--scrolling': needsScroll }"
                 :style="needsScroll ? { '--scroll-duration': scrollDuration + 's' } : {}"
-              >{{ currentFact }}</p>
+              >
+                <p class="fact-text">{{ currentFact }}</p>
+                <FactSources :sources="currentFactSources" />
+              </div>
               <p v-else-if="error && error.type === 'no-key'" class="error-message">
                 Configure API key in <a href="/admin">Admin Panel</a>
               </p>
@@ -499,13 +506,17 @@ watch(
   position: relative;
 }
 
+.fact-content {
+  max-width: 100%;
+  animation: fadeIn 0.5s ease-out;
+}
+
 .fact-text {
   font-size: calc(var(--text-lg) * var(--font-scale, 1));
   font-weight: var(--font-normal);
   line-height: var(--leading-snug);
   margin: 0;
   color: var(--text-color);
-  animation: fadeIn 0.5s ease-out;
 
   /* Typography improvements */
   hyphens: auto;

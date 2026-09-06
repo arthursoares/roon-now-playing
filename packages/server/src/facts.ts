@@ -6,6 +6,9 @@ import { FactsCache } from './factsCache.js';
 import { createLLMProvider } from './llm.js';
 import { logger } from './logger.js';
 import { OutputLimitError } from './llmErrors.js';
+import type { CodexFactsService } from './codexFacts.js';
+import { CodexResearchError } from './codexResearchTypes.js';
+import { createCodexAuthorization } from './routes/codex.js';
 
 const MAX_METADATA_LENGTH = 500;
 
@@ -40,6 +43,12 @@ function validateMetadata(input: unknown): ValidatedMetadata | null {
 }
 
 function sendGenerationError(res: Response, error: unknown, context: string): void {
+  if (error instanceof CodexResearchError) {
+    const status = error.code === 'timeout' ? 504
+      : ['not-connected', 'unavailable', 'busy', 'model-unavailable', 'canceled'].includes(error.code) ? 503 : 502;
+    res.status(status).json({ error: { type: 'api-error', message: error.message } });
+    return;
+  }
   if (error instanceof OutputLimitError) {
     logger.warn(`${context} reached the configured output limit`);
     res.status(502).json({ error: { type: 'api-error', message: error.message } });
@@ -51,11 +60,15 @@ function sendGenerationError(res: Response, error: unknown, context: string): vo
   });
 }
 
-export function createFactsRouter(): Router {
+export function createFactsRouter(options: {
+  codexFacts?: Pick<CodexFactsService, 'generate' | 'invalidate'>;
+  codexAdminToken?: string;
+} = {}): Router {
   const router = Router();
   const configStore = new FactsConfigStore();
   const cache = new FactsCache();
   const inFlight = new Map<string, Promise<GeneratedFacts>>();
+  const authorizeCodex = createCodexAuthorization(options.codexAdminToken);
 
   router.post('/facts', async (req, res) => {
     const metadata = validateMetadata(req.body);
@@ -67,6 +80,17 @@ export function createFactsRouter(): Router {
     }
 
     const config: FactsConfig = { ...configStore.get() };
+    if (config.provider === 'codex') {
+      try {
+        if (!options.codexFacts) throw new CodexResearchError('unavailable');
+        // The research service checks account identity before any cache hit.
+        res.set('Cache-Control', 'no-store');
+        res.json(await options.codexFacts.generate(metadata, config));
+      } catch (error) {
+        sendGenerationError(res, error, 'ChatGPT research');
+      }
+      return;
+    }
     const cached = cache.getEntry(metadata.artist, metadata.album, metadata.title, config);
     if (cached) {
       const response: FactsResponse = {
@@ -129,7 +153,7 @@ export function createFactsRouter(): Router {
     });
   });
 
-  router.post('/facts/config', (req, res) => {
+  router.post('/facts/config', async (req, res) => {
     const validation = validateFactsConfigUpdate(req.body);
     if ('error' in validation) {
       res.status(400).json({ error: validation.error });
@@ -137,9 +161,21 @@ export function createFactsRouter(): Router {
     }
 
     const updates = { ...validation.value };
+    const previous = configStore.get();
+    if (updates.provider === 'codex' && !options.codexFacts) {
+      res.status(503).json({ error: 'ChatGPT research is not enabled on this server.' });
+      return;
+    }
+    // An explicitly disabled runtime can be recovered by selecting an API provider.
+    const recoveringDisabledRuntime = !options.codexFacts && updates.provider !== undefined && updates.provider !== 'codex';
+    if ((previous.provider === 'codex' || updates.provider === 'codex') && !recoveringDisabledRuntime
+      && !authorizeCodex(req, res)) return;
     if (updates.apiKey?.includes('••••')) delete updates.apiKey;
     try {
       configStore.update(updates);
+      const changed = (['provider', 'model', 'prompt', 'factsCount'] as const)
+        .some(key => updates[key] !== undefined && updates[key] !== previous[key]);
+      if (previous.provider === 'codex' && changed) await options.codexFacts?.invalidate();
     } catch (error) {
       res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid facts config update' });
       return;
@@ -158,6 +194,19 @@ export function createFactsRouter(): Router {
     }
 
     const config = { ...configStore.get() };
+    if (config.provider === 'codex') {
+      if (!authorizeCodex(req, res)) return;
+      const startedAt = Date.now();
+      try {
+        if (!options.codexFacts) throw new CodexResearchError('unavailable');
+        const result = await options.codexFacts.generate(metadata, config, { force: true });
+        res.set('Cache-Control', 'no-store');
+        res.json({ ...result, durationMs: Date.now() - startedAt } satisfies FactsTestResponse);
+      } catch (error) {
+        sendGenerationError(res, error, 'ChatGPT research test');
+      }
+      return;
+    }
     if (!config.apiKey && config.provider !== 'local') {
       res.status(400).json({ error: 'No API key configured' });
       return;

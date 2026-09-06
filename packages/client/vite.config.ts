@@ -26,6 +26,11 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      '/api/facts': {
+        target: 'http://localhost:3000',
+        // Subscription settings and fresh research tests use the same origin check.
+        changeOrigin: false,
+      },
       '/api/codex': {
         target: 'http://localhost:3000',
         // Account routes compare the browser Origin with the original Host.

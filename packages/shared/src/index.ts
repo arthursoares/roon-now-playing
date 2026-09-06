@@ -126,7 +126,7 @@ export const BACKGROUND_CONFIG: Record<BackgroundType, { displayName: string; ca
 };
 
 // LLM Provider options
-export const LLM_PROVIDERS = ['anthropic', 'openai', 'openrouter', 'local'] as const;
+export const LLM_PROVIDERS = ['anthropic', 'openai', 'codex', 'openrouter', 'local'] as const;
 export type LLMProvider = (typeof LLM_PROVIDERS)[number];
 
 export const OPENAI_GPT56_MODELS = ['gpt-5.6-luna', 'gpt-5.6-terra', 'gpt-5.6-sol'] as const;
@@ -174,6 +174,7 @@ export function getRecommendedFactsOutputTokens(provider: LLMProvider, model: st
 export const LLM_MODELS = {
   anthropic: ['claude-haiku-4-5', 'claude-sonnet-4-6', 'claude-opus-4-8'] as const,
   openai: OPENAI_FACTS_MODELS,
+  codex: OPENAI_FACTS_MODELS,
   openrouter: [
     'anthropic/claude-sonnet-4.5',
     'openai/gpt-4.1',
@@ -213,6 +214,23 @@ export interface FactsResponse {
   facts: string[];
   cached: boolean;
   generatedAt: number;
+  /** Source links aligned with the facts array; absent for unsourced providers. */
+  sources?: FactSource[][];
+  research?: FactsResearchMetrics;
+}
+
+export interface FactSource {
+  url: string;
+  title: string;
+}
+
+export interface FactsResearchMetrics {
+  cache: 'track' | 'album' | 'miss';
+  webSearches: number;
+  openPages: number;
+  durationMs: number;
+  inputTokens?: number;
+  outputTokens?: number;
 }
 
 export interface FactsTestRequest {
@@ -224,6 +242,8 @@ export interface FactsTestRequest {
 export interface FactsTestResponse {
   facts: string[];
   durationMs: number;
+  sources?: FactSource[][];
+  research?: FactsResearchMetrics;
 }
 
 export type FactsErrorType = 'no-key' | 'api-error' | 'empty';
@@ -480,3 +500,4 @@ export type ServerMessage =
   | DisplaySettingsUpdateMessage;
 
 export type { CodexAccountStatus, CodexCapabilities } from './codex.js';
+export { normalizeFactSourceUrl } from './factSources.js';
