@@ -13,7 +13,7 @@ A now-playing display for Roon and other music sources. Shows real-time album ar
 - Eleven display layouts including Album Wall, Album Gallery, and AI-powered Facts layouts
 - Fourteen background options with dynamic color extraction
 - Seventeen customizable font families
-- AI-generated facts about currently playing music (Anthropic/OpenAI/OpenRouter/Local LLM)
+- AI-generated facts through Anthropic, OpenAI, OpenRouter, or a local model, plus optional ChatGPT (Codex) web research with sources
 - **Self-service onboarding** — displays auto-generate friendly names and show QR codes linking to per-screen config
 - **Kiosk tap lock** — disable layout taps and zone double-taps per display from Admin or its screen configuration; Smart Idle wake gestures remain available
 - Admin panel for managing connected clients and AI configuration
@@ -106,7 +106,7 @@ Example: `http://localhost:3000/?zone=Office&layout=detailed&background=gradient
 | `album-wall` | A prominent current album with a gallery of recent albums from the selected zone. History persists across restarts and supports Roon and external sources. |
 | `album-gallery` | Covers-only mosaic using up to 12 recent albums. Square artwork repeats to fill a dense screen-wide grid; the viewport clips the outer tiles. |
 
-**Note:** Facts layouts require an LLM provider configured in the Admin panel. Supported providers: Anthropic, OpenAI, OpenRouter, or Local LLM (Ollama/LM Studio).
+**Note:** Facts layouts require an LLM provider configured in the Admin panel. Supported providers: Anthropic, OpenAI, OpenRouter, Local LLM (Ollama/LM Studio), and ChatGPT (Codex) when the [optional runtime](docs/codex-device-login.md) is enabled.
 
 **Note:** The `basic` layout is designed for older browsers like iOS 12 Safari. It avoids modern CSS features (gap, aspect-ratio, backdrop-filter) for maximum compatibility on legacy devices used as dedicated displays.
 
@@ -234,12 +234,12 @@ Optional night dimming reduces the brightness of the web page during a schedule 
 
 ### Facts Configuration
 Configure AI-powered facts generation for the facts layouts:
-- Choose from four providers: Anthropic, OpenAI, OpenRouter, or Local LLM
+- Choose Anthropic, OpenAI, OpenRouter, Local LLM, or the optional ChatGPT (Codex) provider
 - Select model from curated list or enter custom model name
-- Set API key (or use environment variables)
+- Set a provider API key (or use environment variables), or connect ChatGPT through the optional account setup
 - Configure local LLM base URL for Ollama/LM Studio
 - Configure facts count per track (1-10)
-- Set reasoning and maximum output tokens in Advanced Settings (1–65,536). Luna starts at 2,048 with no reasoning; model-specific recommendations and saved custom limits are preserved. Provider and model limits still apply.
+- For Anthropic, OpenAI, OpenRouter, and Local LLM, set maximum output tokens in Advanced Settings (1–65,536); supported OpenAI models also expose reasoning. Luna starts at 2,048 with no reasoning; model-specific recommendations and saved custom limits are preserved. Provider and model limits still apply.
 - Customize rotation interval
 - Test configuration with sample track data
 
@@ -615,7 +615,7 @@ Pre-built images are available from GitHub Container Registry:
 docker pull ghcr.io/arthursoares/roon-now-playing:latest
 
 # Specific version
-docker pull ghcr.io/arthursoares/roon-now-playing:1.10.0
+docker pull ghcr.io/arthursoares/roon-now-playing:1.11.0
 ```
 
 Supported platforms:

@@ -25,7 +25,7 @@ const backgrounds = [
 const features = [
   { t: '11 display layouts', d: 'Show the current album, recent listening history, an edge-to-edge cover gallery, or AI facts — choose a layout from the display or admin panel.', i: 'layout' },
   { t: '14 dynamic backgrounds', d: 'Colors and gradients extracted live from the album artwork — radial, linear, mesh, duotone, blurred, posterized and more.', i: 'palette' },
-  { t: 'AI-generated facts', d: 'Surface lesser-known facts about the playing track using Anthropic, OpenAI, OpenRouter, or a fully local model.', i: 'spark' },
+  { t: 'AI facts with sources', d: 'Research the playing album through an optional ChatGPT connection, or generate facts with Anthropic, OpenAI, OpenRouter, or a local model. Reuse cached facts across displays.', i: 'spark' },
   { t: 'Multi-zone, multi-client', d: 'Run as many displays as you like, each on its own Roon zone, all updating in real time over WebSockets.', i: 'grid' },
   { t: 'Roon-optional', d: 'Use it with Roon, or run external-sources-only via a simple HTTP API — push now-playing from anything.', i: 'plug' },
   { t: 'Self-service onboarding', d: 'New screens auto-generate a friendly name and show a QR code that opens their own config page on your phone.', i: 'qr' },
@@ -44,7 +44,8 @@ const useCases = [
 
 const providers = [
   { t: 'Anthropic', d: 'Claude Haiku 4.5 (default), Sonnet 4.6, Opus 4.8.' },
-  { t: 'OpenAI', d: 'GPT-5 family (GPT-5 / mini / nano) plus GPT-4.1 and GPT-4o.' },
+  { t: 'OpenAI', d: 'Luna is the app default, with Terra, Sol, GPT-5.5, Astra, and custom model IDs available.' },
+  { t: 'ChatGPT (Codex)', d: 'Optional account connection for web research with source links and reusable album facts. Requires the optional server runtime.' },
   { t: 'OpenRouter', d: 'One API key, 200+ models — pick by cost or capability.' },
   { t: 'Local (Ollama / LM Studio)', d: 'Run a model on your own hardware — no cloud, no API keys, no cost.' },
 ];
@@ -67,7 +68,7 @@ const icon: Record<string, string> = {
     <div class="aura"></div>
     <div class="container hero__inner">
       <div class="hero__copy">
-        <p class="eyebrow">Self-hosted · Open source · v1.10.0</p>
+        <p class="eyebrow">Self-hosted · Open source · v1.11.0</p>
         <h1 class="hero__title">
           Your music, <span class="grad-text">beautifully</span> on screen.
         </h1>
@@ -245,13 +246,13 @@ pnpm start</code></pre>
         <p class="text-muted">
           The facts layouts surface lesser-known details about whatever’s playing —
           recording history, chart trivia, the people behind it. Bring your own
-          provider and key, or run a model entirely on your own hardware.
+          provider and key, connect ChatGPT with the optional runtime, or run a model on your own hardware.
         </p>
         <ol class="facts__steps">
           <li>Open <code>/admin</code> → <strong>AI Facts</strong>.</li>
           <li>Choose a provider and model.</li>
-          <li>Paste an API key (or set it via an environment variable). Local models need no key.</li>
-          <li>Pick a <code>facts-*</code> layout on any screen.</li>
+          <li>Add your provider's key, or <a href={`${repo}/blob/main/docs/codex-device-login.md`}>set up ChatGPT account access</a>. Local servers may not need a key.</li>
+          <li>Save your settings and pick a <code>facts-*</code> layout on any screen.</li>
         </ol>
       </div>
       <div class="facts__providers">
