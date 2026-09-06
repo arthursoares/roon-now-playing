@@ -471,6 +471,32 @@ describe('CodexAuthService', () => {
     });
   });
 
+  it('rearms login expiry when the timer fires before the clock reaches the deadline', async () => {
+    let now = 1_000;
+    const server = new FakeAppServer();
+    const service = createService([server], { now: () => now, loginTimeoutMs: 15 });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      await service.startLogin();
+      now = 1_014;
+      await vi.advanceTimersByTimeAsync(15);
+      expect(server.count('account/login/cancel')).toBe(0);
+      expect(server.count('account/logout')).toBe(0);
+
+      now = 1_015;
+      await vi.advanceTimersByTimeAsync(1);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    await vi.waitFor(() => expect(server.kill).toHaveBeenCalledOnce());
+    expect(server.count('account/login/cancel')).toBe(1);
+    expect(server.count('account/logout')).toBe(1);
+    expect(await service.cancelLogin('stale')).toMatchObject({
+      state: 'signed-out', error: 'ChatGPT sign-in expired',
+    });
+  });
+
   it('accepts a null completion id for the sole live attempt', async () => {
     const server = new FakeAppServer();
     const service = createService([server]);

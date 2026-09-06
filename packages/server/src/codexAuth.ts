@@ -1029,7 +1029,11 @@ export class CodexAuthService implements CodexResearchClient {
     if (this.loginTimer) clearTimeout(this.loginTimer);
     this.loginTimer = setTimeout(() => {
       void this.enqueue(async () => {
-        if (!this.disposed && this.login === attempt) await this.expireLogin();
+        if (!this.disposed && this.login === attempt) {
+          const expired = await this.expireLogin();
+          // Timer callbacks can arrive before the wall clock reaches the deadline.
+          if (!expired && !this.disposed && this.login === attempt) this.scheduleLoginExpiry(attempt);
+        }
         return this.snapshot();
       });
     }, Math.max(0, attempt.expiresAtMs - this.now()));
