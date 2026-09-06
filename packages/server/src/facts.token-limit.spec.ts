@@ -134,4 +134,31 @@ describe('facts token limit API', () => {
       expect(mockConfigUpdate).not.toHaveBeenCalled();
     },
   );
+
+  it.each([
+    [{ factsCount: 0 }, 'factsCount must be an integer between 1 and 10'],
+    [{ rotationInterval: 61 }, 'rotationInterval must be an integer between 5 and 60'],
+    [{ provider: 'invalid' }, 'provider must be one of'],
+    [{ prompt: '' }, 'prompt must be a non-empty string'],
+    [{ extra: true }, 'Unknown facts config field: extra'],
+  ])('rejects invalid config without updating: %j', async (update, error) => {
+    const response = await fetch(`${baseUrl}/api/facts/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(update),
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: expect.stringContaining(error) });
+    expect(mockConfigUpdate).not.toHaveBeenCalled();
+  });
+
+  it('drops the read-only hasApiKey field before updating', async () => {
+    const response = await fetch(`${baseUrl}/api/facts/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hasApiKey: true, factsCount: 6 }),
+    });
+    expect(response.status).toBe(200);
+    expect(mockConfigUpdate).toHaveBeenCalledWith({ factsCount: 6 });
+  });
 });

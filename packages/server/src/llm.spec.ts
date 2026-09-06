@@ -153,7 +153,7 @@ describe('LLM Providers', () => {
     });
 
     it.each([
-      { maxOutputTokens: undefined, expected: 1024 },
+      { maxOutputTokens: undefined, expected: 8192 },
       { maxOutputTokens: 4096, expected: 4096 },
     ])('should request $expected maximum output tokens', async ({ maxOutputTokens, expected }) => {
       const provider = new OpenAIProvider({
@@ -232,6 +232,7 @@ describe('LLM Providers', () => {
         'https://openrouter.ai/api/v1/chat/completions',
         expect.objectContaining({
           method: 'POST',
+          signal: expect.any(AbortSignal),
           headers: expect.objectContaining({
             'Authorization': `Bearer ${config.apiKey}`,
             'HTTP-Referer': expect.any(String),
@@ -320,6 +321,7 @@ describe('LLM Providers', () => {
         'http://localhost:11434/v1/chat/completions',
         expect.objectContaining({
           method: 'POST',
+          signal: expect.any(AbortSignal),
         })
       );
       expect(facts).toEqual(['Local fact']);

@@ -48,12 +48,13 @@ describe('facts response validation', () => {
     expect(result.facts.value).toEqual(['A complete fact.']);
   });
 
-  it('clears loading after finding valid cached facts', async () => {
-    sessionStorage.setItem(storageKey, JSON.stringify({ facts: ['Cached fact.'], generatedAt: 123 }));
+  it('clears loading after the server returns cached facts', async () => {
+    payload = { facts: ['Cached fact.'], cached: true, generatedAt: 123 };
     await mount();
     expect(result.isLoading.value).toBe(false);
     expect(result.facts.value).toEqual(['Cached fact.']);
-    expect(fetch).not.toHaveBeenCalledWith('/api/facts', expect.anything());
+    expect(result.cached.value).toBe(true);
+    expect(fetch).toHaveBeenCalledWith('/api/facts', expect.anything());
   });
 
   it('handles legacy HTTP-200 errors without assigning undefined facts or caching them', async () => {
@@ -92,6 +93,6 @@ describe('facts response validation', () => {
     expect(result.facts.value).toEqual(['A complete fact.']);
     expect(result.error.value).toBeNull();
     expect(fetch).toHaveBeenCalledWith('/api/facts', expect.anything());
-    expect(JSON.parse(sessionStorage.getItem(storageKey)!)).toEqual({ facts: ['A complete fact.'], generatedAt: 123 });
+    expect(result.cached.value).toBe(false);
   });
 });

@@ -129,10 +129,51 @@ export const BACKGROUND_CONFIG: Record<BackgroundType, { displayName: string; ca
 export const LLM_PROVIDERS = ['anthropic', 'openai', 'openrouter', 'local'] as const;
 export type LLMProvider = (typeof LLM_PROVIDERS)[number];
 
+export const OPENAI_GPT56_MODELS = ['gpt-5.6-luna', 'gpt-5.6-terra', 'gpt-5.6-sol'] as const;
+export const OPENAI_FACTS_MODELS = [...OPENAI_GPT56_MODELS, 'gpt-5.5', 'gpt-6-astra'] as const;
+const DEPRECATED_OPENAI_FACTS_MODELS: readonly string[] = [
+  'gpt-5-mini', 'gpt-5', 'gpt-5-nano', 'gpt-4.1', 'gpt-4o', 'gpt-4o-mini', 'gpt-5.4', 'gpt-5.4-mini',
+];
+
+export function migrateOpenAIFactsModel(model: string): string {
+  if (model === 'gpt-5.6') return 'gpt-5.6-sol';
+  return DEPRECATED_OPENAI_FACTS_MODELS.includes(model) ? 'gpt-5.6-luna' : model;
+}
+
+export const OPENAI_REASONING_EFFORTS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'] as const;
+export type OpenAIReasoningEffort = (typeof OPENAI_REASONING_EFFORTS)[number];
+export const DEFAULT_OPENAI_REASONING_EFFORT: OpenAIReasoningEffort = 'none';
+
+export function isGpt56Model(model: string): boolean {
+  return model === 'gpt-5.6' || (OPENAI_GPT56_MODELS as readonly string[]).includes(model);
+}
+
+export function isOriginalGpt5Model(model: string): boolean {
+  return /^(gpt-5|gpt-5-mini|gpt-5-nano)(?:-\d{4}-\d{2}-\d{2})?$/.test(model);
+}
+
+export function getOpenAIReasoningEfforts(model: string): readonly OpenAIReasoningEffort[] {
+  if (isGpt56Model(model) || model === 'gpt-5.5') return ['none', 'low', 'medium', 'high', 'xhigh'];
+  if (model === 'gpt-6-astra') return ['low', 'medium', 'high', 'xhigh'];
+  if (isOriginalGpt5Model(model)) return ['minimal', 'low', 'medium', 'high'];
+  return [];
+}
+
+export function getOpenAIReasoningEffort(model: string, requested?: OpenAIReasoningEffort): OpenAIReasoningEffort | undefined {
+  const supported = getOpenAIReasoningEfforts(model);
+  return requested && supported.includes(requested) ? requested : supported[0];
+}
+
+export function getRecommendedFactsOutputTokens(provider: LLMProvider, model: string): number {
+  if (provider === 'openai' && (isOriginalGpt5Model(model) || model === 'gpt-6-astra')) return 8192;
+  if (provider === 'openai' && (isGpt56Model(model) || model === 'gpt-5.5')) return 2048;
+  return DEFAULT_MAX_OUTPUT_TOKENS;
+}
+
 // Model options per provider
 export const LLM_MODELS = {
   anthropic: ['claude-haiku-4-5', 'claude-sonnet-4-6', 'claude-opus-4-8'] as const,
-  openai: ['gpt-5-mini', 'gpt-5', 'gpt-5-nano', 'gpt-4.1', 'gpt-4o', 'gpt-4o-mini'] as const,
+  openai: OPENAI_FACTS_MODELS,
   openrouter: [
     'anthropic/claude-sonnet-4.5',
     'openai/gpt-4.1',
@@ -153,6 +194,7 @@ export interface FactsConfig {
   rotationInterval: number;
   prompt: string;
   maxOutputTokens?: number;
+  openaiReasoningEffort?: OpenAIReasoningEffort;
   localBaseUrl?: string; // Only used for 'local' provider
 }
 
@@ -192,27 +234,14 @@ export interface FactsError {
 }
 
 // Default prompt template
-export const DEFAULT_FACTS_PROMPT = `Generate {factsCount} interesting, lesser-known facts about this music:
-
+export const DEFAULT_FACTS_PROMPT = `Give up to {factsCount} concise, accurate music facts about:
 Artist: {artist}
 Album: {album}
 Track: {title}
 
-Focus on:
-- Recording history or interesting production details
-- Historical context or cultural impact
-- Connections to other artists or musical movements
-- Awards, chart positions, or notable achievements
-- Personal stories from the artist about this work
+Focus on recording details, historical context, musical connections, or achievements. Prefer specific information over generic praise. Omit uncertain claims; do not invent quotes, sources, dates, or awards.
 
-When possible, include attribution (e.g., "In a 1985 interview..." or "According to Songfacts...").
-
-Keep each fact concise (2-3 sentences max). Prioritize surprising or educational information over common knowledge.
-
-IMPORTANT: Return ONLY a valid JSON array of strings with no additional text, markdown, or explanation.
-
-Example format:
-["Fact one goes here.", "Fact two goes here.", "Fact three goes here."]`;
+Return only a JSON array of strings, one fact per string, with 1-2 sentences per fact.`;
 
 // WebSocket message types
 export interface ClientSubscribeMessage {

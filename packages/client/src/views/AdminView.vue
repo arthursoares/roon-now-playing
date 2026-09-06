@@ -12,8 +12,13 @@ import {
   DEFAULT_FACTS_PROMPT,
   DEFAULT_DISPLAY_SETTINGS,
   DEFAULT_MAX_OUTPUT_TOKENS,
+  DEFAULT_OPENAI_REASONING_EFFORT,
   MAX_OUTPUT_TOKENS,
   MIN_OUTPUT_TOKENS,
+  getOpenAIReasoningEffort,
+  getOpenAIReasoningEfforts,
+  getRecommendedFactsOutputTokens,
+  type OpenAIReasoningEffort,
   type LayoutType,
   type FontType,
   type BackgroundType,
@@ -40,6 +45,7 @@ const factsConfig = ref<FactsConfig>({
   rotationInterval: 25,
   prompt: DEFAULT_FACTS_PROMPT,
   maxOutputTokens: DEFAULT_MAX_OUTPUT_TOKENS,
+  openaiReasoningEffort: DEFAULT_OPENAI_REASONING_EFFORT,
   localBaseUrl: 'http://localhost:11434/v1',
 });
 const factsConfigLoading = ref(true);
@@ -290,6 +296,36 @@ const availableModels = computed(() => {
   return LLM_MODELS[factsConfig.value.provider] || [];
 });
 
+const availableReasoningEfforts = computed(() => factsConfig.value.provider === 'openai'
+  ? getOpenAIReasoningEfforts(factsConfig.value.model) : []);
+const selectedReasoningEffort = computed({
+  get: () => getOpenAIReasoningEffort(factsConfig.value.model, factsConfig.value.openaiReasoningEffort),
+  set: (value: OpenAIReasoningEffort | undefined) => { factsConfig.value.openaiReasoningEffort = value; },
+});
+const recommendedOutputTokens = computed(() => getRecommendedFactsOutputTokens(factsConfig.value.provider, factsConfig.value.model));
+const reasoningLabels: Record<OpenAIReasoningEffort, string> = {
+  none: 'None', minimal: 'Minimal', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high',
+};
+
+function applyModelSelection(provider: FactsConfig['provider'], model: string): void {
+  const wasRecommended = factsConfig.value.maxOutputTokens === undefined
+    || factsConfig.value.maxOutputTokens === recommendedOutputTokens.value;
+  const previousEffort = getOpenAIReasoningEffort(factsConfig.value.model, factsConfig.value.openaiReasoningEffort);
+  const usedRecommendedEffort = previousEffort === getOpenAIReasoningEffort(factsConfig.value.model);
+  factsConfig.value.provider = provider;
+  factsConfig.value.model = model;
+  if (wasRecommended) factsConfig.value.maxOutputTokens = getRecommendedFactsOutputTokens(provider, model);
+  factsConfig.value.openaiReasoningEffort = provider === 'openai'
+    ? getOpenAIReasoningEffort(model, usedRecommendedEffort ? undefined : factsConfig.value.openaiReasoningEffort) : undefined;
+}
+
+function onFactsModelChange(event: Event): void {
+  applyModelSelection(factsConfig.value.provider, (event.target as HTMLSelectElement).value);
+}
+
+const hasUnlistedModel = computed(() => Boolean(factsConfig.value.model)
+  && !(availableModels.value as readonly string[]).includes(factsConfig.value.model));
+
 const isCustomModel = computed(() =>
   factsConfig.value.provider === 'openrouter' &&
   !(LLM_MODELS.openrouter as readonly string[]).includes(factsConfig.value.model) &&
@@ -315,7 +351,7 @@ async function loadFactsConfig(): Promise<void> {
       factsConfig.value = {
         ...factsConfig.value,
         ...config,
-        maxOutputTokens: config.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
+        maxOutputTokens: config.maxOutputTokens ?? getRecommendedFactsOutputTokens(config.provider ?? factsConfig.value.provider, config.model ?? factsConfig.value.model),
       };
     }
   } catch (error) {
@@ -362,17 +398,14 @@ function resetFactsConfig(): void {
     rotationInterval: 25,
     prompt: DEFAULT_FACTS_PROMPT,
     maxOutputTokens: DEFAULT_MAX_OUTPUT_TOKENS,
+    openaiReasoningEffort: DEFAULT_OPENAI_REASONING_EFFORT,
     localBaseUrl: 'http://localhost:11434/v1',
   };
 }
 
-function onProviderChange(): void {
-  const models = LLM_MODELS[factsConfig.value.provider];
-  if (models && models.length > 0) {
-    factsConfig.value.model = models[0] as string;
-  } else {
-    factsConfig.value.model = '';
-  }
+function onProviderChange(event: Event): void {
+  const provider = (event.target as HTMLSelectElement).value as FactsConfig['provider'];
+  applyModelSelection(provider, LLM_MODELS[provider][0] || '');
 }
 
 function getProviderDisplayName(provider: string): string {
@@ -902,7 +935,7 @@ onMounted(() => {
               <div class="form-grid">
                 <div class="form-field">
                   <label for="provider">Provider</label>
-                  <select id="provider" v-model="factsConfig.provider" @change="onProviderChange">
+                  <select id="provider" :value="factsConfig.provider" @change="onProviderChange">
                     <option v-for="p in LLM_PROVIDERS" :key="p" :value="p">
                       {{ getProviderDisplayName(p) }}
                     </option>
@@ -948,9 +981,10 @@ onMounted(() => {
 
                   <!-- Anthropic/OpenAI: Standard dropdown -->
                   <template v-else>
-                    <select id="model" v-model="factsConfig.model">
+                    <select id="model" :value="factsConfig.model" @change="onFactsModelChange">
+                      <option v-if="hasUnlistedModel" :value="factsConfig.model">{{ factsConfig.model }} (saved custom model)</option>
                       <option v-for="m in availableModels" :key="m" :value="m">
-                        {{ m }}
+                        {{ m === 'gpt-5.6-luna' ? 'gpt-5.6-luna (recommended)' : m }}
                       </option>
                     </select>
                   </template>
@@ -1048,6 +1082,16 @@ onMounted(() => {
               </button>
 
               <div v-if="showAdvanced" class="card-content">
+                <div v-if="availableReasoningEfforts.length" class="form-field">
+                  <label for="openaiReasoningEffort">Reasoning effort</label>
+                  <select id="openaiReasoningEffort" v-model="selectedReasoningEffort">
+                    <option v-for="effort in availableReasoningEfforts" :key="effort" :value="effort">
+                      {{ reasoningLabels[effort] }}{{ effort === availableReasoningEfforts[0] ? ' (recommended)' : '' }}
+                    </option>
+                  </select>
+                  <p class="field-hint">Use the recommended setting for short facts. Reasoning consumes the same token budget as the answer.</p>
+                </div>
+
                 <div class="form-field">
                   <label for="maxOutputTokens">Maximum output tokens</label>
                   <div class="number-input">
@@ -1062,8 +1106,12 @@ onMounted(() => {
                     <span class="number-hint">1-65,536</span>
                   </div>
                   <p class="field-hint">
-                    Increase this if responses are cut off before all facts are returned. Provider and model limits still apply.
+                    This is a ceiling, not a target. For reasoning models it includes reasoning and visible output. Provider and model limits still apply.
                   </p>
+                </div>
+
+                <div class="form-field">
+                  <button type="button" class="btn-secondary" @click="factsConfig.maxOutputTokens = recommendedOutputTokens">Use recommended ({{ recommendedOutputTokens }})</button>
                 </div>
 
                 <div class="form-field full-width">

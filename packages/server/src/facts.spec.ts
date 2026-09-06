@@ -10,7 +10,11 @@ const mocks = vi.hoisted(() => ({
   config: { provider: 'local', apiKey: '', model: 'test-model', prompt: '', factsCount: 5, rotationInterval: 25 },
 }));
 vi.mock('./factsConfig.js', () => ({ FactsConfigStore: class { get() { return mocks.config; } } }));
-vi.mock('./factsCache.js', () => ({ FactsCache: class { get = mocks.cacheGet; set = mocks.cacheSet; } }));
+vi.mock('./factsCache.js', () => ({ FactsCache: class {
+  getEntry = mocks.cacheGet;
+  set = mocks.cacheSet;
+  makeKey(artist: string, album: string, title: string) { return JSON.stringify([artist, album, title]); }
+} }));
 vi.mock('./llm.js', () => ({ createLLMProvider: () => ({ generateFacts: mocks.generate }) }));
 
 describe('facts API failure contract', () => {

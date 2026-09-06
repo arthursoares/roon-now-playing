@@ -1,160 +1,183 @@
-import { Router } from 'express';
-import type { FactsConfig, FactsRequest, FactsResponse, FactsTestResponse } from '@roon-screen-cover/shared';
-import { FactsConfigStore, isValidMaxOutputTokens } from './factsConfig.js';
+import { Router, type Response } from 'express';
+import { createHash } from 'node:crypto';
+import type { FactsConfig, FactsResponse, FactsTestResponse } from '@roon-screen-cover/shared';
+import { FactsConfigStore, validateFactsConfigUpdate } from './factsConfig.js';
 import { FactsCache } from './factsCache.js';
 import { createLLMProvider } from './llm.js';
 import { logger } from './logger.js';
 import { OutputLimitError } from './llmErrors.js';
 
+const MAX_METADATA_LENGTH = 500;
+
+interface ValidatedMetadata {
+  artist: string;
+  album: string;
+  title: string;
+}
+
+interface GeneratedFacts {
+  facts: string[];
+  generatedAt: number;
+}
+
+function makeInFlightKey(cacheKey: string, config: FactsConfig): string {
+  const authFingerprint = createHash('sha256').update(config.apiKey).digest('hex');
+  return `${cacheKey}:${authFingerprint}`;
+}
+
+function validateMetadata(input: unknown): ValidatedMetadata | null {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) return null;
+  const body = input as Record<string, unknown>;
+  const fields = [body.artist, body.album, body.title];
+  if (fields.some((field) => typeof field !== 'string'
+    || field.trim().length === 0
+    || field.length > MAX_METADATA_LENGTH)) return null;
+  return {
+    artist: (body.artist as string).trim(),
+    album: (body.album as string).trim(),
+    title: (body.title as string).trim(),
+  };
+}
+
+function sendGenerationError(res: Response, error: unknown, context: string): void {
+  if (error instanceof OutputLimitError) {
+    logger.warn(`${context} reached the configured output limit`);
+    res.status(502).json({ error: { type: 'api-error', message: error.message } });
+    return;
+  }
+  logger.error(`${context} failed`);
+  res.status(500).json({
+    error: { type: 'api-error', message: 'Failed to generate facts. Please try again.' },
+  });
+}
+
 export function createFactsRouter(): Router {
   const router = Router();
   const configStore = new FactsConfigStore();
   const cache = new FactsCache();
+  const inFlight = new Map<string, Promise<GeneratedFacts>>();
 
-  // Get facts for a track
   router.post('/facts', async (req, res) => {
-    const { artist, album, title } = req.body as FactsRequest;
-
-    if (!artist || !album || !title) {
-      res.status(400).json({ error: 'artist, album, and title are required' });
-      return;
-    }
-
-    const config = configStore.get();
-
-    if (!config.apiKey && config.provider !== 'local') {
-      res.status(503).json({
-        error: { type: 'no-key', message: 'No API key configured' },
+    const metadata = validateMetadata(req.body);
+    if (!metadata) {
+      res.status(400).json({
+        error: `artist, album, and title must be non-empty strings no longer than ${MAX_METADATA_LENGTH} characters`,
       });
       return;
     }
 
-    // Check cache first
-    const cached = cache.get(artist, album, title);
+    const config: FactsConfig = { ...configStore.get() };
+    const cached = cache.getEntry(metadata.artist, metadata.album, metadata.title, config);
     if (cached) {
-      const timestamp = cache.getTimestamp(artist, album, title);
       const response: FactsResponse = {
-        facts: cached,
+        facts: cached.facts,
         cached: true,
-        generatedAt: timestamp || Date.now(),
+        generatedAt: cached.timestamp,
       };
       res.json(response);
       return;
     }
 
-    // Generate new facts
-    try {
-      const provider = createLLMProvider(config);
-      const facts = await provider.generateFacts(artist, album, title);
+    if (!config.apiKey && config.provider !== 'local') {
+      res.status(503).json({ error: { type: 'no-key', message: 'No API key configured' } });
+      return;
+    }
 
-      if (facts.length === 0) {
+    const cacheKey = cache.makeKey(metadata.artist, metadata.album, metadata.title, config);
+    const key = makeInFlightKey(cacheKey, config);
+    let generation = inFlight.get(key);
+    if (!generation) {
+      generation = Promise.resolve().then(async () => {
+        const provider = createLLMProvider(config);
+        const facts = await provider.generateFacts(metadata.artist, metadata.album, metadata.title);
+        if (facts.length === 0) return { facts, generatedAt: Date.now() };
+        const generatedAt = Date.now();
+        cache.set(metadata.artist, metadata.album, metadata.title, facts, config, generatedAt);
+        return { facts, generatedAt };
+      });
+      inFlight.set(key, generation);
+      void generation.finally(() => {
+        if (inFlight.get(key) === generation) inFlight.delete(key);
+      }).catch(() => undefined);
+    }
+
+    try {
+      const generated = await generation;
+      if (generated.facts.length === 0) {
         res.status(502).json({
           error: { type: 'empty', message: 'No usable facts could be generated. Please try again.' },
         });
         return;
       }
-
-      // Cache the result
-      cache.set(artist, album, title, facts);
-
       const response: FactsResponse = {
-        facts,
+        facts: generated.facts,
         cached: false,
-        generatedAt: Date.now(),
+        generatedAt: generated.generatedAt,
       };
       res.json(response);
     } catch (error) {
-      if (error instanceof OutputLimitError) {
-        logger.warn('Facts generation reached the configured output limit');
-        res.status(502).json({
-          error: { type: 'api-error', message: error.message },
-        });
-        return;
-      }
-      logger.error('Facts generation failed');
-      res.status(500).json({
-        error: { type: 'api-error', message: 'Failed to generate facts. Please try again.' },
-      });
+      sendGenerationError(res, error, 'Facts generation');
     }
   });
 
-  // Get facts configuration
   router.get('/facts/config', (_req, res) => {
     const config = configStore.get();
-    // Don't expose full API key
     res.json({
       ...config,
-      apiKey: config.apiKey ? '••••••••' + config.apiKey.slice(-4) : '',
+      apiKey: config.apiKey ? `••••••••${config.apiKey.slice(-4)}` : '',
       hasApiKey: !!config.apiKey,
     });
   });
 
-  // Update facts configuration
   router.post('/facts/config', (req, res) => {
-    const updates = req.body as Partial<FactsConfig>;
-
-    if (updates.maxOutputTokens !== undefined && !isValidMaxOutputTokens(updates.maxOutputTokens)) {
-      res.status(400).json({
-        error: 'maxOutputTokens must be an integer between 1 and 65536',
-      });
+    const validation = validateFactsConfigUpdate(req.body);
+    if ('error' in validation) {
+      res.status(400).json({ error: validation.error });
       return;
     }
 
-    // Don't save masked API key (contains bullet points from UI display)
-    if (updates.apiKey && updates.apiKey.includes('••••')) {
-      delete updates.apiKey;
+    const updates = { ...validation.value };
+    if (updates.apiKey?.includes('••••')) delete updates.apiKey;
+    try {
+      configStore.update(updates);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid facts config update' });
+      return;
     }
-
-    configStore.update(updates);
     logger.info('Facts config updated');
     res.json({ success: true });
   });
 
-  // Test facts generation
   router.post('/facts/test', async (req, res) => {
-    const { artist, album, title } = req.body as FactsRequest;
-
-    if (!artist || !album || !title) {
-      res.status(400).json({ error: 'artist, album, and title are required' });
+    const metadata = validateMetadata(req.body);
+    if (!metadata) {
+      res.status(400).json({
+        error: `artist, album, and title must be non-empty strings no longer than ${MAX_METADATA_LENGTH} characters`,
+      });
       return;
     }
 
-    const config = configStore.get();
-
-    // API key is required for cloud providers, but optional for local LLM
+    const config = { ...configStore.get() };
     if (!config.apiKey && config.provider !== 'local') {
       res.status(400).json({ error: 'No API key configured' });
       return;
     }
 
     const startTime = Date.now();
-
     try {
       const provider = createLLMProvider(config);
-      const facts = await provider.generateFacts(artist, album, title);
+      const facts = await provider.generateFacts(metadata.artist, metadata.album, metadata.title);
       const durationMs = Date.now() - startTime;
-
       if (facts.length === 0) {
         res.status(502).json({
           error: { type: 'empty', message: 'No usable facts could be generated. Please try again.' },
         });
         return;
       }
-
       const response: FactsTestResponse = { facts, durationMs };
       res.json(response);
     } catch (error) {
-      if (error instanceof OutputLimitError) {
-        logger.warn('Facts test reached the configured output limit');
-        res.status(502).json({
-          error: { type: 'api-error', message: error.message },
-        });
-        return;
-      }
-      logger.error('Facts test failed');
-      res.status(500).json({
-        error: { type: 'api-error', message: 'Failed to generate facts. Please try again.' },
-      });
+      sendGenerationError(res, error, 'Facts test');
     }
   });
 
