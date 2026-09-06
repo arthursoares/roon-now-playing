@@ -96,11 +96,17 @@ export function useNowPlaying(nowPlaying: () => NowPlaying | null) {
     { immediate: true }
   );
 
-  // Watch for track changes - reset seek position
+  // Reset for semantic track changes, not repeated metadata or delayed artwork.
   watch(
-    () => track.value?.title,
+    [
+      () => track.value?.title,
+      () => track.value?.artist,
+      () => track.value?.album,
+      () => track.value?.duration_seconds,
+    ],
     () => {
       const serverPosition = nowPlaying()?.seek_position ?? 0;
+      lastServerSeekPosition = serverPosition;
       syncWithServer(serverPosition);
     }
   );
