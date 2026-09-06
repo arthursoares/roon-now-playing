@@ -35,3 +35,6 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: Verify subscription development proxy
+        run: node --test packages/client/scripts/codexProxy.test.mjs

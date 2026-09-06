@@ -1,12 +1,27 @@
 import { ref, computed, watch, onUnmounted, type Ref, type ComputedRef } from 'vue';
-import type { Track, PlaybackState, FactsError } from '@roon-screen-cover/shared';
+import type { Track, PlaybackState, FactsError, FactSource } from '@roon-screen-cover/shared';
+import { readFactSourceGroup } from '../utils/factSources';
 
 const DEBOUNCE_DELAY = 500;
 const DEFAULT_ROTATION_INTERVAL = 25; // seconds, can be overridden by server config
 
-function readFacts(value: unknown): string[] | null {
-  if (!Array.isArray(value) || !value.every((item): item is string => typeof item === 'string')) return null;
-  return value.map((fact) => fact.trim()).filter(Boolean);
+function readFactsAndSources(
+  factsValue: unknown,
+  sourcesValue: unknown,
+): { facts: string[]; sources: FactSource[][] } | null {
+  if (!Array.isArray(factsValue)
+    || !factsValue.every((item): item is string => typeof item === 'string')) return null;
+
+  const hasAlignedSources = Array.isArray(sourcesValue) && sourcesValue.length === factsValue.length;
+  const facts: string[] = [];
+  const sources: FactSource[][] = [];
+  factsValue.forEach((fact, originalIndex) => {
+    const trimmed = fact.trim();
+    if (!trimmed) return;
+    facts.push(trimmed);
+    sources.push(hasAlignedSources ? readFactSourceGroup(sourcesValue[originalIndex]) : []);
+  });
+  return { facts, sources };
 }
 
 function readError(value: unknown): FactsError {
@@ -24,8 +39,10 @@ function readError(value: unknown): FactsError {
 
 export interface UseFactsReturn {
   facts: Ref<string[]>;
+  sources: Ref<FactSource[][]>;
   currentFactIndex: Ref<number>;
   currentFact: ComputedRef<string | null>;
+  currentFactSources: ComputedRef<FactSource[]>;
   isLoading: Ref<boolean>;
   error: Ref<FactsError | null>;
   cached: Ref<boolean>;
@@ -36,6 +53,7 @@ export function useFacts(
   playbackState: Ref<PlaybackState>
 ): UseFactsReturn {
   const facts = ref<string[]>([]);
+  const sources = ref<FactSource[][]>([]);
   const currentFactIndex = ref(0);
   const isLoading = ref(false);
   const error = ref<FactsError | null>(null);
@@ -71,6 +89,7 @@ export function useFacts(
     }
     return facts.value[currentFactIndex.value] ?? null;
   });
+  const currentFactSources = computed(() => sources.value[currentFactIndex.value] ?? []);
 
   function clearDebounceTimer(): void {
     if (debounceTimer !== null) {
@@ -139,20 +158,23 @@ export function useFacts(
       if (!response.ok || data.error) {
         error.value = readError(data.error);
         facts.value = [];
+        sources.value = [];
         cached.value = false;
         return;
       }
 
-      const parsedFacts = readFacts(data.facts);
-      if (!parsedFacts?.length) {
+      const parsed = readFactsAndSources(data.facts, data.sources);
+      if (!parsed?.facts.length) {
         facts.value = [];
+        sources.value = [];
         cached.value = false;
-        error.value = parsedFacts
+        error.value = parsed
           ? { type: 'empty', message: 'No usable facts could be generated. Please try again.' }
           : { type: 'api-error', message: 'The facts service returned an invalid response. Please try again.' };
         return;
       }
-      facts.value = parsedFacts;
+      facts.value = parsed.facts;
+      sources.value = parsed.sources;
       cached.value = data.cached === true;
       error.value = null;
     } catch (err) {
@@ -162,6 +184,7 @@ export function useFacts(
         message: err instanceof Error ? err.message : 'Unknown error',
       };
       facts.value = [];
+      sources.value = [];
     } finally {
       if (activeRequest === controller) activeRequest = null;
       if (active && generation === requestGeneration) {
@@ -200,6 +223,7 @@ export function useFacts(
       // Reset state when track changes
       if (trackActuallyChanged) {
         facts.value = [];
+        sources.value = [];
         currentFactIndex.value = 0;
         cached.value = false;
         error.value = null;
@@ -246,12 +270,16 @@ export function useFacts(
     clearDebounceTimer();
     clearRotationTimer();
     isLoading.value = false;
+    facts.value = [];
+    sources.value = [];
   });
 
   return {
     facts,
+    sources,
     currentFactIndex,
     currentFact,
+    currentFactSources,
     isLoading,
     error,
     cached,

@@ -6,12 +6,11 @@ import type { AddressInfo } from 'node:net';
 import type { CodexAccountStatus } from '@roon-screen-cover/shared';
 import { createCodexAccountRouter } from './codex.js';
 
-const adminToken = 'dedicated-account-admin-token-0123456789';
 const status: CodexAccountStatus = {
   state: 'signed-out', account: null, login: null, error: null, generationEnabled: false,
 };
 
-describe('Codex account route authorization', () => {
+describe('Codex account routes', () => {
   let server: Server | undefined;
   const service = {
     getStatus: vi.fn(async () => status), startLogin: vi.fn(async () => status),
@@ -22,15 +21,15 @@ describe('Codex account route authorization', () => {
     server = undefined;
     vi.clearAllMocks();
   });
-  async function start(token: string | undefined = adminToken, withService = true): Promise<string> {
+  async function start(withService = true): Promise<string> {
     const app = express();
     app.use(express.json());
-    app.use('/api/codex', createCodexAccountRouter({ service: withService ? service : null, adminToken: token }));
+    app.use('/api/codex', createCodexAccountRouter({ service: withService ? service : null }));
     server = createServer(app);
     await new Promise<void>(resolve => server!.listen(0, '127.0.0.1', resolve));
     return `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/codex`;
   }
-  const headers = { authorization: `Bearer ${adminToken}`, 'content-type': 'application/json' };
+  const headers = { 'content-type': 'application/json' };
 
   it('exposes only capability flags without starting Codex', async () => {
     const base = await start();
@@ -40,28 +39,19 @@ describe('Codex account route authorization', () => {
     expect(service.getStatus).not.toHaveBeenCalled();
   });
 
-  it.each(['/account', '/login', '/login/cancel', '/logout'])('protects %s against public or source-key access', async endpoint => {
+  it.each(['/account', '/login', '/login/cancel', '/logout'])('allows direct administrator access to %s without a bearer token', async endpoint => {
     const base = await start();
-    const credentials: Record<string, string>[] = [{}, { 'x-api-key': adminToken }, { authorization: 'Bearer wrong-token' }];
-    for (const key of credentials) {
-      const response = await fetch(`${base}${endpoint}`, {
-        method: endpoint === '/account' ? 'GET' : 'POST', headers: key,
-      });
-      expect(response.status).toBe(401);
-    }
-    for (const method of Object.values(service)) expect(method).not.toHaveBeenCalled();
-  });
-
-  it.each(['', 'too-short', 'contains whitespace token of enough length'])('fails closed for invalid administrator token %j', async token => {
-    const base = await start(token);
-    expect(await (await fetch(`${base}/capabilities`)).json()).toEqual({ enabled: false, generationEnabled: false });
-    expect((await fetch(`${base}/login`, { method: 'POST', headers })).status).toBe(503);
-    expect(service.startLogin).not.toHaveBeenCalled();
+    const response = await fetch(`${base}${endpoint}`, {
+      method: endpoint === '/account' ? 'GET' : 'POST', headers,
+      body: endpoint === '/login/cancel' ? '{"loginId":"attempt-1"}' : endpoint === '/account' ? undefined : '{}',
+    });
+    expect(response.status).toBe(200);
   });
 
   it('keeps endpoints unavailable without an enabled service', async () => {
-    const base = await start(adminToken, false);
-    expect((await fetch(`${base}/account`, { headers })).status).toBe(503);
+    const base = await start(false);
+    expect(await (await fetch(`${base}/capabilities`)).json()).toEqual({ enabled: false, generationEnabled: false });
+    expect((await fetch(`${base}/account`)).status).toBe(503);
   });
 
   it('performs only the requested account operation and makes responses uncacheable', async () => {
@@ -69,7 +59,6 @@ describe('Codex account route authorization', () => {
     const response = await fetch(`${base}/account`, { headers });
     expect(await response.json()).toEqual(status);
     expect(response.headers.get('cache-control')).toBe('no-store');
-    expect(response.headers.get('vary')).toContain('Authorization');
     expect(service.getStatus).toHaveBeenCalledOnce();
     expect((await fetch(`${base}/login`, { method: 'POST', headers, body: '{}' })).status).toBe(200);
     expect((await fetch(`${base}/login/cancel`, { method: 'POST', headers, body: '{"loginId":"attempt-1"}' })).status).toBe(200);
@@ -79,7 +68,7 @@ describe('Codex account route authorization', () => {
     expect(service.logout).toHaveBeenCalledOnce();
   });
 
-  it('rejects foreign browser origins while accepting its own origin', async () => {
+  it('rejects foreign browser origins while accepting its own origin without a bearer token', async () => {
     const base = await start();
     for (const origin of ['https://foreign.example', 'null', `${new URL(base).origin}/extra`]) {
       expect((await fetch(`${base}/login`, { method: 'POST', headers: { ...headers, origin }, body: '{}' })).status).toBe(403);

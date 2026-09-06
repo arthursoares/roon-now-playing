@@ -16,7 +16,8 @@ import { createSourcesRouter } from './routes/sources.js';
 import { cacheBase64Artwork, cacheExternalArtwork } from './artwork.js';
 import { AlbumHistoryStore } from './albumHistory.js';
 import { CodexAuthService } from './codexAuth.js';
-import { createCodexAccountRouter, isValidCodexAdminToken } from './routes/codex.js';
+import { createCodexAccountRouter } from './routes/codex.js';
+import { CodexFactsService } from './codexFacts.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,17 +28,15 @@ const HOST = process.env.HOST || '0.0.0.0';
 async function main(): Promise<void> {
   const app = express();
   const server = createServer(app);
-  const codexAdminToken = process.env.CODEX_ADMIN_TOKEN;
   const codexRequested = process.env.CODEX_ENABLED === 'true';
-  const codexAuth = codexRequested && isValidCodexAdminToken(codexAdminToken)
+  const codexAuth = codexRequested
     ? new CodexAuthService({
       homeDir: path.resolve(process.env.CODEX_ACCOUNT_DIR || path.join(process.env.DATA_DIR || './config', 'codex-account')),
       binaryPath: process.env.CODEX_BINARY || 'codex',
+      generationEnabled: true,
     })
     : null;
-  if (codexRequested && !codexAuth) {
-    logger.warn('ChatGPT account connection disabled: configure a dedicated CODEX_ADMIN_TOKEN (32-256 non-space ASCII characters).');
-  }
+  const codexFacts = codexAuth ? new CodexFactsService({ client: codexAuth }) : undefined;
 
   // Initialize Roon client
   const roonClient = getRoonClient();
@@ -80,9 +79,9 @@ async function main(): Promise<void> {
   app.use(express.json({ limit: '5mb' }));
   app.use('/api', createArtworkRouter(roonClient));
   app.use('/api/admin', createAdminRouter(wsManager));
-  app.use('/api', createFactsRouter());
+  app.use('/api', createFactsRouter({ codexFacts }));
   app.use('/api/sources', createSourcesRouter(externalSourceManager, sourcesConfigStore));
-  app.use('/api/codex', createCodexAccountRouter({ service: codexAuth, adminToken: codexAdminToken }));
+  app.use('/api/codex', createCodexAccountRouter({ service: codexAuth, generationEnabled: !!codexFacts }));
 
   // Zones endpoint
   app.get('/api/zones', (_req, res) => {
@@ -155,6 +154,7 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     logger.info(`${signal} received, shutting down...`);
+    await codexFacts?.dispose();
     await codexAuth?.dispose();
     server.close(() => {
       logger.info('Server closed');

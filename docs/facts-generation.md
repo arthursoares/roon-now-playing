@@ -2,7 +2,7 @@
 
 For a new OpenAI configuration, select `gpt-5.6-luna` in Admin → AI Facts. It is the recommended inexpensive model for this short text task. Current models and custom IDs are preserved. The old OpenAI picker entries migrate to Luna on load and on submitted updates; custom prompts, credentials, and explicitly saved token caps remain intact.
 
-## Reasoning and output limits
+## API-provider reasoning and output limits
 
 The picker lists GPT-5.6 Luna/Terra/Sol, GPT-5.5, and GPT-6 Astra. GPT-5.6 and GPT-5.5 use `none` reasoning by default; Astra uses its minimum supported `low` setting. Availability still depends on the account. The original GPT-5 request path remains usable by the comparison script with `minimal` reasoning, because those models do not support `none`. Normal saved configurations for the retired app choices migrate to Luna. Supported reasoning models use strict structured output, converted back to the existing `facts: string[]` response.
 
@@ -58,9 +58,28 @@ Review the saved facts and language manually. Schema/count checks do not prove f
 
 The [recorded live smoke results](evaluations/2026-09-06-facts-luna.md) show the initial none/low comparison and the 4096-token GPT-5 Mini regression check.
 
-## Sign-in scope
+## ChatGPT subscription research
 
-Facts generation retains API-key authentication. Optional [device-code account connection](codex-device-login.md) now supports ChatGPT sign-in, status, cancellation, and logout. Generating facts through that subscription remains separate work; see [the design and runtime findings](facts-openai-signin.md). API billing is independent of a ChatGPT subscription.
+Use the optional [device-code integration](codex-device-login.md), then select **ChatGPT (Codex)** in AI Facts. This provider uses hosted web search and low reasoning with the selected account-accessible model. It does not use an API key or impose a hard output-token cap. Account controls, settings, and fresh research tests use the existing Admin access model, with no separate token step. Displays never receive OAuth credentials.
+
+The first track can trigger a larger reusable album research pool. Subsequent tracks select eligible artist/album facts locally, with track facts restricted to their exact matching title. Identical album misses share a job even across different tracks and displays. Research lasts 30 days and selected track results 72 hours, bounded separately and persisted atomically. A forced refresh replaces the album pool and invalidates stale sibling selections using a content revision, including when timestamps coincide.
+
+Responses retain `facts: string[]` and optionally add aligned `sources: {url,title}[][]` and `research` metrics. The metrics distinguish track cache, album cache, and fresh research; report web-search/page-open actions and latency; and include cumulative model input/output tokens when Codex reports them. A multi-job total is omitted if any contributing job's usage is unknown. Hosted-search usage may be separate from reported model tokens; these values are not a billing estimate.
+
+Source URLs must match the runtime's observed page-open events. This records attribution and attempted retrieval, not independent claim verification. Inspect sources when evaluating accuracy. Current metadata lacks canonical album/recording IDs; ambiguous editions and compilation artists remain a limitation. The cache namespace belongs to the managed account connection, uses hashed account identity, and is invalidated on account changes/logout. Generation fails closed if Codex cannot report an identity for safe cache isolation.
+
+API providers retain their original authentication, cache, prompts, and output limits. There is no silent fallback from subscription research to metered API-key generation.
+
+## Offline Codex runtime verification
+
+After building and installing the pinned Codex binary, this check exercises actual thread/turn handling, web-tool events, source parsing, restricted tool inventory, and cumulative usage with all provider traffic on loopback:
+
+```sh
+pnpm build
+node packages/server/scripts/verifyCodexResearch.mjs
+```
+
+Account/model metadata and provider responses are mocked; no existing credentials, public web request, or billed model call is used. The optional Docker target runs the same check. This does not verify a real account's entitlement, refresh lifecycle, or source accuracy.
 
 ## Official references
 

@@ -275,7 +275,13 @@ The facts feature supports multiple LLM providers for generating music facts:
 - Requires: `OPENAI_API_KEY` or API key in Admin panel
 - Best for: Fast, reliable generation
 - Uses strict structured facts output and explicit low-cost reasoning defaults. Older OpenAI picker choices migrate to Luna; custom prompts and explicit token caps are retained.
-- Facts generation uses API keys. Optional [ChatGPT device-code account connection](docs/codex-device-login.md) supports sign-in on another device, account status, cancellation, and logout; subscription facts generation is not enabled yet. See also [facts configuration and migration](docs/facts-generation.md).
+- Uses API-key authentication. See [facts configuration and migration](docs/facts-generation.md).
+
+### ChatGPT (Codex)
+- Sign in by approving a device code on your phone or computer, then explicitly select this provider in Admin.
+- Researches web sources and caches attributed artist/album facts for reuse across tracks, with source links in all facts layouts.
+- Uses low reasoning with an account-accessible model (Luna by default), without a hard output-token cap or automatic API-key fallback.
+- Requires the optional Codex runtime. Account controls use the existing Admin page, with no separate token. See [setup and verification](docs/codex-device-login.md).
 
 ### OpenRouter
 - Access 200+ models through a unified API

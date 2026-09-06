@@ -6,11 +6,18 @@ on:
       - 'Dockerfile'
       - 'docker-compose.codex.yml'
       - 'packages/server/src/codexAuth*'
+      - 'packages/server/src/codexResearch*'
+      - 'packages/server/scripts/verifyCodexResearch.mjs'
+      - 'packages/shared/src/factSources*'
       - '.github/workflows/codex-runtime.yml'
   push:
     branches: [main]
     paths:
       - 'Dockerfile'
+      - 'packages/server/src/codexAuth*'
+      - 'packages/server/src/codexResearch*'
+      - 'packages/server/scripts/verifyCodexResearch.mjs'
+      - 'packages/shared/src/factSources*'
       - '.github/workflows/codex-runtime.yml'
 
 permissions:

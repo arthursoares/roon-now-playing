@@ -2,13 +2,56 @@ import { spawn as nodeSpawn, type ChildProcessWithoutNullStreams, type SpawnOpti
 import { constants as fsConstants } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { createHash, randomUUID } from 'node:crypto';
 import type { CodexAccountStatus } from '@roon-screen-cover/shared';
+import type { CodexResearchClient, CodexResearchRequest, CodexResearchResult } from './codexResearchTypes.js';
+import { CodexResearchError } from './codexResearchTypes.js';
+import {
+  RESEARCH_BASE_INSTRUCTIONS,
+  RESEARCH_OUTPUT_SCHEMA,
+  collectResearchItem,
+  collectResearchUsage,
+  createResearchPrompt,
+  parseResearchResult,
+  type ResearchEvidence,
+} from './codexResearchProtocol.js';
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 const DEFAULT_LOGIN_TIMEOUT_MS = 10 * 60_000;
 const DEFAULT_TERMINATION_TIMEOUT_MS = 1_000;
 const DEFAULT_MAX_MESSAGE_BYTES = 64 * 1024;
+const DEFAULT_GENERATION_MAX_MESSAGE_BYTES = 1024 * 1024;
 const MAX_PENDING_REQUESTS = 16;
+const DEFAULT_RESEARCH_TIMEOUT_MS = 180_000;
+const DEFAULT_MAX_RESEARCH_RESPONSE_BYTES = 256 * 1024;
+const MODEL_PAGE_SIZE = 100;
+const MAX_MODEL_PAGES = 20;
+const RESEARCH_DISABLED_FEATURES = [
+  'apps',
+  'plugins',
+  'hooks',
+  'shell_snapshot',
+  'shell_tool',
+  'unified_exec',
+  'multi_agent',
+  'multi_agent_v2',
+  'code_mode',
+  'browser_use',
+  'browser_use_external',
+  'computer_use',
+  'image_generation',
+  'in_app_browser',
+  'view_image',
+  'memories',
+  'skill_search',
+  'skill_mcp_dependency_install',
+  'workspace_dependencies',
+  'goals',
+  'sleep_tool',
+  'tool_suggest',
+  'recommended_plugins',
+  'enable_request_compression',
+] as const;
 
 const UNAVAILABLE_ERROR = 'Codex account service is unavailable';
 const UNSUPPORTED_ACCOUNT_ERROR = 'Unsupported Codex account mode';
@@ -18,7 +61,8 @@ const LOGIN_EXPIRED_ERROR = 'ChatGPT sign-in expired';
 const CANCEL_ERROR = 'Unable to cancel ChatGPT sign-in';
 const LOGOUT_ERROR = 'Unable to sign out from ChatGPT';
 
-type RpcMethod = 'initialize' | 'account/read' | 'account/login/start' | 'account/login/cancel' | 'account/logout';
+type RpcMethod = 'initialize' | 'account/read' | 'account/login/start' | 'account/login/cancel' | 'account/logout'
+  | 'model/list' | 'thread/start' | 'turn/start' | 'turn/interrupt' | 'thread/unsubscribe';
 type NotificationMethod = 'initialized';
 
 type SpawnFunction = (
@@ -40,6 +84,12 @@ export interface CodexAuthServiceOptions {
   maxMessageBytes?: number;
   /** Test seam for supervised SIGTERM/SIGKILL waits. */
   terminationTimeoutMs?: number;
+  /** Account connection remains available when research generation is disabled. */
+  generationEnabled?: boolean;
+  /** Test seam for the bounded end-to-end research turn. */
+  researchTimeoutMs?: number;
+  /** Test seam for the locally accepted final JSON size. */
+  maxResearchResponseBytes?: number;
 }
 
 interface PendingRequest {
@@ -66,10 +116,35 @@ interface LoginAttempt {
   expiresAtMs: number;
 }
 
+interface ResearchNotification {
+  method: string;
+  params: unknown;
+}
+
+interface ActiveResearch {
+  session: ProcessSession;
+  generation: number;
+  accountKey: string;
+  request: CodexResearchRequest;
+  startedAtMs: number;
+  threadId: string | null;
+  turnId: string | null;
+  evidence: ResearchEvidence;
+  earlyNotifications: ResearchNotification[];
+  resolveCompletion: (turn: Record<string, unknown>) => void;
+  rejectCompletion: (error: Error) => void;
+  completion: Promise<Record<string, unknown>>;
+  rejectInterruption: (error: Error) => void;
+  interruption: Promise<never>;
+  settled: boolean;
+  failureReason?: CodexResearchError;
+  cleanupPromise?: Promise<void>;
+}
+
 class RpcFailure extends Error {}
 class ProtocolFailure extends Error {}
 
-export class CodexAuthService {
+export class CodexAuthService implements CodexResearchClient {
   private readonly homeDir: string;
   private readonly codexHomeDir: string;
   private readonly isolatedHomeDir: string;
@@ -81,6 +156,9 @@ export class CodexAuthService {
   private readonly terminationTimeoutMs: number;
   private readonly spawnProcess: SpawnFunction;
   private readonly now: () => number;
+  private readonly generationEnabled: boolean;
+  private readonly researchTimeoutMs: number;
+  private readonly maxResearchResponseBytes: number;
 
   private session: ProcessSession | null = null;
   private nextRequestId = 1;
@@ -92,6 +170,10 @@ export class CodexAuthService {
   private terminationFailed = false;
   private mutationTail: Promise<void> = Promise.resolve();
   private status: CodexAccountStatus = unavailable(UNAVAILABLE_ERROR);
+  private researchGeneration = 0;
+  private researchIdentityHash: string | null = null;
+  private researchAccountKey: string | null = null;
+  private activeResearch: ActiveResearch | null = null;
 
   constructor(options: CodexAuthServiceOptions) {
     this.homeDir = path.resolve(options.homeDir);
@@ -101,10 +183,19 @@ export class CodexAuthService {
     this.binaryPath = options.binaryPath?.trim() || 'codex';
     this.requestTimeoutMs = positiveDuration(options.requestTimeoutMs, DEFAULT_REQUEST_TIMEOUT_MS);
     this.loginTimeoutMs = positiveDuration(options.loginTimeoutMs, DEFAULT_LOGIN_TIMEOUT_MS);
-    this.maxMessageBytes = positiveDuration(options.maxMessageBytes, DEFAULT_MAX_MESSAGE_BYTES);
+    this.generationEnabled = options.generationEnabled ?? false;
+    this.maxMessageBytes = positiveDuration(
+      options.maxMessageBytes,
+      this.generationEnabled ? DEFAULT_GENERATION_MAX_MESSAGE_BYTES : DEFAULT_MAX_MESSAGE_BYTES,
+    );
     this.terminationTimeoutMs = positiveDuration(options.terminationTimeoutMs, DEFAULT_TERMINATION_TIMEOUT_MS);
     this.spawnProcess = options.spawn ?? nodeSpawn;
     this.now = options.now ?? Date.now;
+    this.researchTimeoutMs = positiveDuration(options.researchTimeoutMs, DEFAULT_RESEARCH_TIMEOUT_MS);
+    this.maxResearchResponseBytes = positiveDuration(
+      options.maxResearchResponseBytes,
+      DEFAULT_MAX_RESEARCH_RESPONSE_BYTES,
+    );
   }
 
   async getStatus(): Promise<CodexAccountStatus> {
@@ -138,6 +229,7 @@ export class CodexAuthService {
         }));
         const attempt = parseLoginAttempt(result, this.now() + this.loginTimeoutMs);
         this.authGeneration += 1;
+        await this.rotateResearchAccount();
         this.login = attempt;
         this.scheduleLoginExpiry(attempt);
         this.status = {
@@ -177,6 +269,7 @@ export class CodexAuthService {
       if (this.disposed) return this.disposedStatus();
       const attempt = this.login;
       this.authGeneration += 1;
+      await this.rotateResearchAccount();
       this.clearLogin();
       let session: ProcessSession | null = null;
       try {
@@ -198,10 +291,122 @@ export class CodexAuthService {
     });
   }
 
+  async getResearchAccountKey(): Promise<string> {
+    try {
+      return await this.enqueueValue(async () => {
+        const { identityHash } = await this.confirmResearchAccount();
+        if (this.researchAccountKey) return this.researchAccountKey;
+        const stored = await this.readResearchAccountMetadata();
+        const accountKey = stored?.identityHash === identityHash ? stored.accountKey : randomUUID();
+        await this.writeResearchAccountMetadata({ identityHash, accountKey });
+        this.researchAccountKey = accountKey;
+        return accountKey;
+      });
+    } catch (error) {
+      if (error instanceof CodexResearchError) throw error;
+      throw new CodexResearchError('unavailable');
+    }
+  }
+
+  async research(request: CodexResearchRequest): Promise<CodexResearchResult> {
+    let run: ActiveResearch;
+    try {
+      run = await this.enqueueValue(async () => {
+        if (!this.generationEnabled || this.disposed) throw new CodexResearchError('unavailable');
+        if (this.status.state === 'unavailable') throw new CodexResearchError('unavailable');
+        if (this.status.state !== 'signed-in' || !this.researchIdentityHash || !this.researchAccountKey || !this.session) {
+          throw new CodexResearchError('not-connected');
+        }
+        if (request.accountKey !== this.researchAccountKey) throw new CodexResearchError('canceled');
+        if (this.activeResearch) throw new CodexResearchError('busy');
+        const active = createActiveResearch(
+          this.session,
+          this.researchGeneration,
+          this.researchAccountKey,
+          request,
+          this.now(),
+        );
+        this.activeResearch = active;
+        return active;
+      });
+    } catch (error) {
+      if (error instanceof CodexResearchError) throw error;
+      throw new CodexResearchError('unavailable');
+    }
+
+    const abort = () => { void this.terminateResearch(run, true, new CodexResearchError('canceled')); };
+    request.signal?.addEventListener('abort', abort, { once: true });
+    try {
+      if (request.signal?.aborted) throw new CodexResearchError('canceled');
+      const operation = this.performResearch(run).catch(async (error: unknown) => {
+        await this.terminateResearch(run, true, error instanceof CodexResearchError ? error : undefined);
+        throw error;
+      });
+      return await withDeadline(Promise.race([operation, run.interruption]), this.researchTimeoutMs);
+    } catch (error) {
+      await this.terminateResearch(run, true, error instanceof CodexResearchError ? error : undefined);
+      if (error instanceof CodexResearchError) throw error;
+      if (run.failureReason) throw run.failureReason;
+      throw new CodexResearchError('invalid-output');
+    } finally {
+      request.signal?.removeEventListener('abort', abort);
+      if (this.activeResearch === run) this.activeResearch = null;
+    }
+  }
+
+  private async performResearch(run: ActiveResearch): Promise<CodexResearchResult> {
+    const { request } = run;
+    this.assertResearchCurrent(run);
+    await this.requireResearchModel(run.session, request.model);
+    this.assertResearchCurrent(run);
+    const threadResult = asRecord(await this.researchRpc(run.session, 'thread/start', {
+      model: request.model,
+      cwd: this.workingDir,
+      ephemeral: true,
+      environments: [],
+      runtimeWorkspaceRoots: [],
+      sandbox: 'read-only',
+      approvalPolicy: 'never',
+      baseInstructions: RESEARCH_BASE_INSTRUCTIONS,
+    }));
+    run.threadId = boundedString(asRecord(threadResult.thread).id, 1, 128);
+    this.replayResearchNotifications(run);
+    this.assertResearchCurrent(run);
+
+    const turnResult = asRecord(await this.researchRpc(run.session, 'turn/start', {
+      threadId: run.threadId,
+      input: [{ type: 'text', text: createResearchPrompt(request) }],
+      effort: 'low',
+      outputSchema: RESEARCH_OUTPUT_SCHEMA,
+    }));
+    run.turnId = boundedString(asRecord(turnResult.turn).id, 1, 128);
+    this.replayResearchNotifications(run);
+    this.assertResearchCurrent(run);
+
+    const turn = await run.completion;
+    this.assertResearchCurrent(run);
+    if (turn.status !== 'completed') throw new CodexResearchError('invalid-output');
+    const durationMs = nonNegativeInteger(turn.durationMs) ?? Math.max(0, this.now() - run.startedAtMs);
+    const result = parseResearchResult(run.evidence, request, durationMs, this.maxResearchResponseBytes);
+    await this.terminateResearch(run, false);
+    this.assertResearchCurrent(run);
+    return result;
+  }
+
+  async cancelResearch(): Promise<void> {
+    const run = this.activeResearch;
+    if (!run) return;
+    await this.terminateResearch(run, true, new CodexResearchError('canceled'));
+    if (this.activeResearch === run) this.activeResearch = null;
+  }
+
   async dispose(): Promise<void> {
     if (this.disposed) return;
     this.disposed = true;
     this.authGeneration += 1;
+    this.researchGeneration += 1;
+    const research = this.activeResearch;
+    if (research) await this.terminateResearch(research, true, new CodexResearchError('canceled'));
     this.clearLogin();
     this.status = unavailable(UNAVAILABLE_ERROR);
     await this.stopSession(this.session);
@@ -209,6 +414,12 @@ export class CodexAuthService {
   }
 
   private enqueue(operation: () => Promise<CodexAccountStatus>): Promise<CodexAccountStatus> {
+    const result = this.mutationTail.then(operation, operation);
+    this.mutationTail = result.then(() => undefined, () => undefined);
+    return result;
+  }
+
+  private enqueueValue<T>(operation: () => Promise<T>): Promise<T> {
     const result = this.mutationTail.then(operation, operation);
     this.mutationTail = result.then(() => undefined, () => undefined);
     return result;
@@ -260,6 +471,7 @@ export class CodexAuthService {
           title: 'Roon Now Playing',
           version: '1.0.0',
         },
+        ...(this.generationEnabled ? { capabilities: { experimentalApi: true } } : {}),
       });
       if (!isRecord(initialized)) throw new ProtocolFailure();
       this.notify(session, 'initialized', {});
@@ -279,13 +491,25 @@ export class CodexAuthService {
       'cli_auth_credentials_store = "file"',
       'project_doc_max_bytes = 0',
       'check_for_update_on_startup = false',
+      ...(this.generationEnabled ? [
+        'web_search = "live"',
+        'include_environment_context = false',
+        'include_collaboration_mode_instructions = false',
+        'include_apps_instructions = false',
+      ] : []),
       '',
+      ...(this.generationEnabled ? ['[agents]', 'enabled = false', ''] : []),
       '[skills]',
       'include_instructions = false',
       '',
       '[skills.bundled]',
       'enabled = false',
       '',
+      ...(this.generationEnabled ? [
+        '[features]',
+        ...RESEARCH_DISABLED_FEATURES.map((feature) => `${feature} = false`),
+        '',
+      ] : []),
       '[analytics]',
       'enabled = false',
       '',
@@ -423,6 +647,10 @@ export class CodexAuthService {
 
   private handleNotification(session: ProcessSession, method: string, params: unknown): void {
     void this.secureCredentialFile().catch(() => this.failSession(session));
+    if (method === 'item/completed' || method === 'turn/completed' || method === 'thread/tokenUsage/updated') {
+      this.handleResearchNotification(session, method, params);
+      return;
+    }
     if (method === 'account/login/completed') {
       if (!isRecord(params)) throw new ProtocolFailure();
       if (params.loginId !== undefined && params.loginId !== null && typeof params.loginId !== 'string') {
@@ -451,6 +679,7 @@ export class CodexAuthService {
       } else if (typeof params.authMode === 'string') {
         void this.enqueueNotification(session, async () => {
           this.authGeneration += 1;
+          await this.rotateResearchAccount();
           this.clearLogin();
           this.status = unavailable(UNSUPPORTED_ACCOUNT_ERROR);
           await this.stopSession(session);
@@ -477,6 +706,7 @@ export class CodexAuthService {
     const result = asRecord(await this.request(session, 'account/read', { refreshToken: false }));
     if (generation !== this.authGeneration || session !== this.session) return;
     if (result.account === null) {
+      if (this.researchIdentityHash !== null) await this.rotateResearchAccount();
       this.status = this.login ? {
         state: 'signing-in',
         account: null,
@@ -489,6 +719,7 @@ export class CodexAuthService {
     const account = asRecord(result.account);
     if (account.type !== 'chatgpt') {
       this.authGeneration += 1;
+      await this.rotateResearchAccount();
       this.clearLogin();
       this.status = unavailable(UNSUPPORTED_ACCOUNT_ERROR);
       await this.stopSession(session);
@@ -496,6 +727,11 @@ export class CodexAuthService {
     }
     const email = nullableBoundedString(account.email, 320);
     const planType = nullableBoundedString(account.planType, 64);
+    const identityHash = email === null ? null : hashAccountEmail(email);
+    if (this.researchIdentityHash !== null && this.researchIdentityHash !== identityHash) {
+      await this.rotateResearchAccount();
+    }
+    this.researchIdentityHash = identityHash;
     this.authGeneration += 1;
     this.clearLogin();
     this.status = {
@@ -503,8 +739,197 @@ export class CodexAuthService {
       account: { email, planType },
       login: null,
       error: null,
-      generationEnabled: false,
+      generationEnabled: this.generationEnabled,
     };
+  }
+
+  private async confirmResearchAccount(): Promise<{ session: ProcessSession; identityHash: string }> {
+    if (!this.generationEnabled || this.disposed) throw new CodexResearchError('unavailable');
+    const session = await this.ensureSession();
+    await this.readAccount(session, this.authGeneration);
+    if (this.status.state !== 'signed-in' || !this.researchIdentityHash || !this.status.account?.email) {
+      throw new CodexResearchError('not-connected');
+    }
+    return { session, identityHash: this.researchIdentityHash };
+  }
+
+  private async accountKeyForIdentity(identityHash: string): Promise<string> {
+    if (this.researchAccountKey) return this.researchAccountKey;
+    const stored = await this.readResearchAccountMetadata();
+    const accountKey = stored?.identityHash === identityHash ? stored.accountKey : randomUUID();
+    await this.writeResearchAccountMetadata({ identityHash, accountKey });
+    this.researchAccountKey = accountKey;
+    return accountKey;
+  }
+
+  private async requireResearchModel(session: ProcessSession, requestedModel: string): Promise<void> {
+    const seenCursors = new Set<string>();
+    let cursor: string | null = null;
+    for (let page = 0; page < MAX_MODEL_PAGES; page += 1) {
+      const result = asRecord(await this.researchRpc(session, 'model/list', {
+        cursor,
+        limit: MODEL_PAGE_SIZE,
+        includeHidden: true,
+      }));
+      if (!Array.isArray(result.data)) throw new CodexResearchError('model-unavailable');
+      for (const value of result.data) {
+        const model = asRecord(value);
+        if (model.model !== requestedModel) continue;
+        if (!Array.isArray(model.supportedReasoningEfforts) || !model.supportedReasoningEfforts.some((option) =>
+          isRecord(option) && option.reasoningEffort === 'low')) {
+          throw new CodexResearchError('model-unavailable');
+        }
+        return;
+      }
+      if (result.nextCursor === null || result.nextCursor === undefined) break;
+      const nextCursor = boundedString(result.nextCursor, 1, 512);
+      if (seenCursors.has(nextCursor)) break;
+      seenCursors.add(nextCursor);
+      cursor = nextCursor;
+    }
+    throw new CodexResearchError('model-unavailable');
+  }
+
+  private async researchRpc(session: ProcessSession, method: RpcMethod, params: unknown): Promise<unknown> {
+    try {
+      return await this.request(session, method, params);
+    } catch {
+      throw new CodexResearchError('unavailable');
+    }
+  }
+
+  private handleResearchNotification(session: ProcessSession, method: string, params: unknown): void {
+    const run = this.activeResearch;
+    if (!run || run.session !== session || run.settled) return;
+    if (!run.threadId || !run.turnId) {
+      if (run.earlyNotifications.length >= 512) {
+        run.failureReason = new CodexResearchError('invalid-output');
+        run.rejectCompletion(run.failureReason);
+        run.settled = true;
+      } else {
+        run.earlyNotifications.push({ method, params });
+      }
+      return;
+    }
+    this.applyResearchNotification(run, method, params);
+  }
+
+  private replayResearchNotifications(run: ActiveResearch): void {
+    if (!run.threadId || !run.turnId || run.settled) return;
+    const notifications = run.earlyNotifications.splice(0);
+    for (const { method, params } of notifications) this.applyResearchNotification(run, method, params);
+  }
+
+  private applyResearchNotification(run: ActiveResearch, method: string, value: unknown): void {
+    const params = asRecord(value);
+    if (params.threadId !== run.threadId) return;
+    if (method === 'item/completed') {
+      if (params.turnId !== run.turnId) return;
+      collectResearchItem(run.evidence, params.item);
+      return;
+    }
+    if (method === 'thread/tokenUsage/updated') {
+      if (params.turnId !== run.turnId) return;
+      collectResearchUsage(run.evidence, params);
+      return;
+    }
+    if (method !== 'turn/completed') return;
+    const turn = asRecord(params.turn);
+    if (turn.id !== run.turnId) return;
+    run.settled = true;
+    if (turn.status === 'completed') run.resolveCompletion(turn);
+    else {
+      run.failureReason = new CodexResearchError('invalid-output');
+      run.rejectCompletion(run.failureReason);
+    }
+  }
+
+  private assertResearchCurrent(run: ActiveResearch): void {
+    if (run.failureReason) throw run.failureReason;
+    if (run.generation !== this.researchGeneration || run !== this.activeResearch ||
+        run.session !== this.session || run.accountKey !== this.researchAccountKey) {
+      throw new CodexResearchError('canceled');
+    }
+  }
+
+  private terminateResearch(run: ActiveResearch, interrupt: boolean, reason?: CodexResearchError): Promise<void> {
+    if (run.cleanupPromise) return run.cleanupPromise;
+    if (reason && !run.failureReason) {
+      run.failureReason = reason;
+      run.rejectInterruption(reason);
+    }
+    run.settled = true;
+    run.rejectCompletion(reason ?? new CodexResearchError('invalid-output'));
+    // A thread/start response can arrive after cancellation. Leave cleanup open
+    // so performResearch can unsubscribe the newly known thread at that point.
+    if (!run.threadId) return Promise.resolve();
+    run.cleanupPromise = (async () => {
+      if (run.session !== this.session || run.session.stopped) return;
+      try {
+        if (interrupt && run.threadId && run.turnId) {
+          await this.request(run.session, 'turn/interrupt', { threadId: run.threadId, turnId: run.turnId });
+        }
+        await this.request(run.session, 'thread/unsubscribe', { threadId: run.threadId });
+      } catch {
+        await this.stopSession(run.session);
+      }
+    })();
+    return run.cleanupPromise;
+  }
+
+  private async rotateResearchAccount(): Promise<void> {
+    this.researchGeneration += 1;
+    const run = this.activeResearch;
+    this.activeResearch = null;
+    this.researchIdentityHash = null;
+    this.researchAccountKey = null;
+    if (run) void this.terminateResearch(run, true, new CodexResearchError('canceled'));
+    try { await fs.unlink(path.join(this.homeDir, 'research-account.json')); } catch (error) {
+      if (!isMissingFile(error)) throw error;
+    }
+  }
+
+  private async readResearchAccountMetadata(): Promise<{ identityHash: string; accountKey: string } | null> {
+    let file: fs.FileHandle | undefined;
+    try {
+      file = await fs.open(path.join(this.homeDir, 'research-account.json'), fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+      await ensurePrivateFile(file);
+      if ((await file.stat()).size > 4_096) throw new ProtocolFailure();
+      const value: unknown = JSON.parse(await file.readFile('utf8'));
+      const metadata = asRecord(value);
+      return {
+        identityHash: boundedString(metadata.identityHash, 64, 64, /^[a-f0-9]{64}$/),
+        accountKey: boundedString(
+          metadata.accountKey,
+          36,
+          36,
+          /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/,
+        ),
+      };
+    } catch (error) {
+      if (isMissingFile(error)) return null;
+      throw error;
+    } finally {
+      await file?.close();
+    }
+  }
+
+  private async writeResearchAccountMetadata(metadata: { identityHash: string; accountKey: string }): Promise<void> {
+    const target = path.join(this.homeDir, 'research-account.json');
+    const temporary = path.join(this.homeDir, `.research-account-${randomUUID()}.tmp`);
+    const file = await fs.open(temporary, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL, 0o600);
+    try {
+      await file.writeFile(`${JSON.stringify(metadata)}\n`);
+      await file.chmod(0o600);
+    } finally {
+      await file.close();
+    }
+    try {
+      await fs.rename(temporary, target);
+    } catch (error) {
+      await fs.unlink(temporary).catch(() => undefined);
+      throw error;
+    }
   }
 
   private async expireLogin(): Promise<boolean> {
@@ -540,6 +965,10 @@ export class CodexAuthService {
 
   private async failOperation(error: string): Promise<void> {
     this.authGeneration += 1;
+    this.researchGeneration += 1;
+    const research = this.activeResearch;
+    this.activeResearch = null;
+    if (research) void this.terminateResearch(research, true, new CodexResearchError('unavailable'));
     this.clearLogin();
     await this.stopSession(this.session);
     this.status = unavailable(error);
@@ -551,6 +980,10 @@ export class CodexAuthService {
     void this.stopSession(session);
     if (wasCurrent && !this.disposed) {
       this.authGeneration += 1;
+      this.researchGeneration += 1;
+      const research = this.activeResearch;
+      this.activeResearch = null;
+      if (research) void this.terminateResearch(research, true, new CodexResearchError('unavailable'));
       this.clearLogin();
       this.status = unavailable(UNAVAILABLE_ERROR);
     }
@@ -617,6 +1050,7 @@ export class CodexAuthService {
   private snapshot(): CodexAccountStatus {
     return {
       ...this.status,
+      generationEnabled: this.generationEnabled,
       account: this.status.account ? { ...this.status.account } : null,
       login: this.status.login ? { ...this.status.login } : null,
     };
@@ -733,4 +1167,66 @@ async function waitForExit(session: ProcessSession, timeoutMs: number): Promise<
   const result = await Promise.race([exited, timedOut]);
   if (timer) clearTimeout(timer);
   return result;
+}
+
+function createActiveResearch(
+  session: ProcessSession,
+  generation: number,
+  accountKey: string,
+  request: CodexResearchRequest,
+  startedAtMs: number,
+): ActiveResearch {
+  let resolveCompletion!: (turn: Record<string, unknown>) => void;
+  let rejectCompletion!: (error: Error) => void;
+  const completion = new Promise<Record<string, unknown>>((resolve, reject) => {
+    resolveCompletion = resolve;
+    rejectCompletion = reject;
+  });
+  void completion.catch(() => undefined);
+  let rejectInterruption!: (error: Error) => void;
+  const interruption = new Promise<never>((_resolve, reject) => { rejectInterruption = reject; });
+  void interruption.catch(() => undefined);
+  return {
+    session,
+    generation,
+    accountKey,
+    request,
+    startedAtMs,
+    threadId: null,
+    turnId: null,
+    evidence: {
+      finalMessages: [],
+      openedUrls: new Set(),
+      webSearches: 0,
+      openPages: 0,
+    },
+    earlyNotifications: [],
+    resolveCompletion,
+    rejectCompletion,
+    completion,
+    rejectInterruption,
+    interruption,
+    settled: false,
+  };
+}
+
+async function withDeadline<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new CodexResearchError('timeout')), timeoutMs);
+    timer.unref?.();
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function hashAccountEmail(email: string): string {
+  return createHash('sha256').update(email.trim().toLowerCase(), 'utf8').digest('hex');
+}
+
+function nonNegativeInteger(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
 }

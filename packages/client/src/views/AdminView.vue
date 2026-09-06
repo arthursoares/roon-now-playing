@@ -2,6 +2,7 @@
 import { computed, ref, onMounted } from 'vue';
 import { useWebSocket } from '../composables/useWebSocket';
 import CodexAccountPanel from '../components/CodexAccountPanel.vue';
+import FactSources from '../components/FactSources.vue';
 import {
   LAYOUTS,
   FONTS,
@@ -25,6 +26,9 @@ import {
   type BackgroundType,
   type ClientMetadata,
   type FactsConfig,
+  type FactSource,
+  type FactsResearchMetrics,
+  type CodexCapabilities,
   type DisplaySettings,
 } from '@roon-screen-cover/shared';
 
@@ -55,6 +59,9 @@ const showApiKey = ref(false);
 const showAdvanced = ref(false);
 const factsConfigError = ref<string | null>(null);
 const factsConfigSuccess = ref(false);
+const codexCapabilities = ref<CodexCapabilities | null>(null);
+const availableProviders = computed(() => LLM_PROVIDERS.filter(provider => provider !== 'codex'
+  || codexCapabilities.value?.generationEnabled === true || factsConfig.value.provider === 'codex'));
 
 // Test facts state
 const testArtist = ref('The Beatles');
@@ -64,6 +71,8 @@ const testRunning = ref(false);
 const testResult = ref<string[] | null>(null);
 const testError = ref<string | null>(null);
 const testDuration = ref<number | null>(null);
+const testSources = ref<FactSource[][]>([]);
+const testResearch = ref<FactsResearchMetrics | null>(null);
 
 // External sources state
 interface SourcesConfig {
@@ -315,7 +324,7 @@ function applyModelSelection(provider: FactsConfig['provider'], model: string): 
   const usedRecommendedEffort = previousEffort === getOpenAIReasoningEffort(factsConfig.value.model);
   factsConfig.value.provider = provider;
   factsConfig.value.model = model;
-  if (wasRecommended) factsConfig.value.maxOutputTokens = getRecommendedFactsOutputTokens(provider, model);
+  if (wasRecommended && provider !== 'codex') factsConfig.value.maxOutputTokens = getRecommendedFactsOutputTokens(provider, model);
   factsConfig.value.openaiReasoningEffort = provider === 'openai'
     ? getOpenAIReasoningEffort(model, usedRecommendedEffort ? undefined : factsConfig.value.openaiReasoningEffort) : undefined;
 }
@@ -381,7 +390,7 @@ async function saveFactsConfig(): Promise<void> {
       }, 3000);
     } else {
       const data = await response.json();
-      factsConfigError.value = data.error || 'Failed to save configuration';
+      factsConfigError.value = data.message || (typeof data.error === 'string' ? data.error : 'Failed to save configuration');
     }
   } catch {
     factsConfigError.value = 'Network error';
@@ -413,6 +422,7 @@ function getProviderDisplayName(provider: string): string {
   switch (provider) {
     case 'anthropic': return 'Anthropic (Claude)';
     case 'openai': return 'OpenAI (GPT)';
+    case 'codex': return 'ChatGPT (Codex)';
     case 'openrouter': return 'OpenRouter';
     case 'local': return 'Local LLM (Ollama/LM Studio)';
     default: return provider;
@@ -424,6 +434,8 @@ async function runFactsTest(): Promise<void> {
   testResult.value = null;
   testError.value = null;
   testDuration.value = null;
+  testSources.value = [];
+  testResearch.value = null;
 
   const artist = testArtist.value;
   const album = testAlbum.value;
@@ -447,8 +459,10 @@ async function runFactsTest(): Promise<void> {
     if (response.ok) {
       testResult.value = data.facts;
       testDuration.value = data.durationMs;
+      testSources.value = Array.isArray(data.sources) ? data.sources : [];
+      testResearch.value = data.research ?? null;
     } else {
-      testError.value = data.error?.message || 'Test failed';
+      testError.value = data.message || data.error?.message || (typeof data.error === 'string' ? data.error : 'Test failed');
     }
   } catch {
     testError.value = 'Network error';
@@ -929,7 +943,7 @@ onMounted(() => {
 
         <div v-else class="config-layout">
           <div class="config-main">
-            <CodexAccountPanel />
+            <CodexAccountPanel :active="activeSection === 'facts' || activeSection === 'test'" @capabilities="codexCapabilities = $event" />
             <!-- Provider Card -->
             <div class="config-card">
               <h2 class="card-title">AI Provider</h2>
@@ -938,7 +952,7 @@ onMounted(() => {
                 <div class="form-field">
                   <label for="provider">Provider</label>
                   <select id="provider" :value="factsConfig.provider" @change="onProviderChange">
-                    <option v-for="p in LLM_PROVIDERS" :key="p" :value="p">
+                    <option v-for="p in availableProviders" :key="p" :value="p">
                       {{ getProviderDisplayName(p) }}
                     </option>
                   </select>
@@ -993,7 +1007,7 @@ onMounted(() => {
                 </div>
               </div>
 
-              <div class="form-field full-width">
+              <div v-if="factsConfig.provider !== 'codex'" class="form-field full-width">
                 <label for="apiKey">
                   API Key
                   <span class="label-hint">
@@ -1022,6 +1036,11 @@ onMounted(() => {
                   </button>
                 </div>
               </div>
+
+              <p v-if="factsConfig.provider === 'codex'" class="field-hint">
+                Uses the connected ChatGPT account and web sources. Album research is reused across tracks.
+                No API key or output-token cap applies; account model access and usage limits still apply.
+              </p>
 
               <!-- Local LLM Base URL -->
               <div v-if="factsConfig.provider === 'local'" class="form-field full-width">
@@ -1094,7 +1113,7 @@ onMounted(() => {
                   <p class="field-hint">Use the recommended setting for short facts. Reasoning consumes the same token budget as the answer.</p>
                 </div>
 
-                <div class="form-field">
+                <div v-if="factsConfig.provider !== 'codex'" class="form-field">
                   <label for="maxOutputTokens">Maximum output tokens</label>
                   <div class="number-input">
                     <input
@@ -1112,7 +1131,7 @@ onMounted(() => {
                   </p>
                 </div>
 
-                <div class="form-field">
+                <div v-if="factsConfig.provider !== 'codex'" class="form-field">
                   <button type="button" class="btn-secondary" @click="factsConfig.maxOutputTokens = recommendedOutputTokens">Use recommended ({{ recommendedOutputTokens }})</button>
                 </div>
 
@@ -1243,13 +1262,14 @@ onMounted(() => {
                 <div class="results-meta">
                   <span class="result-count">{{ testResult.length }} facts</span>
                   <span v-if="testDuration" class="result-time">{{ (testDuration / 1000).toFixed(1) }}s</span>
+                  <span v-if="testResearch" class="result-time">{{ testResearch.cache === 'miss' ? 'Fresh research' : `${testResearch.cache} cache` }} · {{ testResearch.webSearches }} searches · {{ testResearch.openPages }} pages opened</span>
                 </div>
               </header>
 
               <ul class="facts-list">
                 <li v-for="(fact, index) in testResult" :key="index">
                   <span class="fact-number">{{ index + 1 }}</span>
-                  <span class="fact-text">{{ fact }}</span>
+                  <div class="fact-text">{{ fact }}<FactSources :sources="testSources[index] ?? []" /></div>
                 </li>
               </ul>
             </div>
@@ -2548,6 +2568,7 @@ onMounted(() => {
 }
 
 .facts-list {
+  --fact-source-font-size: 0.8rem;
   list-style: none;
   margin: 0;
   padding: 0;
