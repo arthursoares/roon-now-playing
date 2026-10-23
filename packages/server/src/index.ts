@@ -1,5 +1,6 @@
 import express from 'express';
 import { createServer } from 'http';
+import type { Socket } from 'net';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getRoonClient, isRoonEnabled } from './roon.js';
@@ -28,6 +29,20 @@ const HOST = process.env.HOST || '0.0.0.0';
 async function main(): Promise<void> {
   const app = express();
   const server = createServer(app);
+  const sockets = new Set<Socket>();
+  let shuttingDown = false;
+  server.on('connection', (socket) => {
+    sockets.add(socket);
+    socket.once('close', () => sockets.delete(socket));
+  });
+  // Existing keep-alive connections must not start new writes during disposal.
+  app.use((_req, res, next) => {
+    if (shuttingDown) {
+      res.set('Connection', 'close').status(503).json({ error: 'Server shutting down' });
+      return;
+    }
+    next();
+  });
   const codexRequested = process.env.CODEX_ENABLED === 'true';
   const codexAuth = codexRequested
     ? new CodexAuthService({
@@ -149,17 +164,43 @@ async function main(): Promise<void> {
   });
 
   // Graceful shutdown
-  let shuttingDown = false;
   const shutdown = async (signal: string): Promise<void> => {
     if (shuttingDown) return;
     shuttingDown = true;
     logger.info(`${signal} received, shutting down...`);
-    await codexFacts?.dispose();
-    await codexAuth?.dispose();
-    server.close(() => {
-      logger.info('Server closed');
-      process.exit(0);
-    });
+    // Arm the deadline before awaiting any service. Keep existing serialized
+    // persistence/disposal paths; shutdown does not introduce another writer.
+    const deadline = setTimeout(() => {
+      logger.error('Shutdown deadline reached; forcing exit');
+      for (const socket of sockets) socket.destroy();
+      process.exit(1);
+    }, 3000);
+    const httpClosed = new Promise<void>((resolve) => server.close(() => resolve()));
+    server.closeIdleConnections();
+    const wsClosed = wsManager.close();
+    // Includes incomplete HTTP requests and upgraded sockets, which
+    // closeAllConnections alone cannot cover.
+    const drainDeadline = setTimeout(() => {
+      for (const socket of sockets) socket.destroy();
+    }, 750);
+    let exitCode = 0;
+    try {
+      await codexFacts?.dispose();
+    } catch {
+      logger.error('Failed to dispose Codex facts during shutdown');
+      exitCode = 1;
+    }
+    try {
+      await codexAuth?.dispose();
+    } catch {
+      logger.error('Failed to dispose Codex account during shutdown');
+      exitCode = 1;
+    }
+    await Promise.all([httpClosed, wsClosed]);
+    clearTimeout(drainDeadline);
+    clearTimeout(deadline);
+    logger.info('Server closed');
+    process.exit(exitCode);
   };
   process.on('SIGTERM', () => { void shutdown('SIGTERM'); });
   process.on('SIGINT', () => { void shutdown('SIGINT'); });
