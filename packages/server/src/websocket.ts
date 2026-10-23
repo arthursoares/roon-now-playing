@@ -64,6 +64,8 @@ export class WebSocketManager {
   private albumHistoryStore: AlbumHistoryStore | null = null;
   private friendlyNames: Map<string, string> = new Map();
   private onFriendlyNameChange?: (clientId: string, name: string | null) => void;
+  private closing = false;
+  private closePromise?: Promise<void>;
 
   constructor(server: Server, roonClient: RoonClient | null) {
     this.roonClient = roonClient;
@@ -96,8 +98,30 @@ export class WebSocketManager {
     this.friendlyNames = names;
   }
 
+  /** Stop upgrades and metadata writes, then bound the WebSocket close handshake. */
+  close(): Promise<void> {
+    if (this.closePromise) return this.closePromise;
+    this.closing = true;
+    this.closePromise = new Promise<void>((resolve) => {
+      const timer = setTimeout(() => {
+        // wss also owns sockets already removed from the display registry.
+        for (const ws of this.wss.clients) ws.terminate();
+      }, 250);
+      this.wss.close(() => {
+        clearTimeout(timer);
+        resolve();
+      });
+      for (const ws of this.wss.clients) ws.close(1001, 'Server shutting down');
+    });
+    return this.closePromise;
+  }
+
   private setupWebSocketServer(): void {
     this.wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
+      if (this.closing) {
+        ws.close(1001, 'Server shutting down');
+        return;
+      }
       const url = new URL(req.url || '', `http://${req.headers.host}`);
       const isAdmin = url.searchParams.get('admin') === 'true';
       const userAgent = req.headers['user-agent'] || null;
@@ -156,39 +180,34 @@ export class WebSocketManager {
 
       ws.on('close', () => {
         logger.info('WebSocket connection closed');
-        const state = this.clients.get(ws);
-        if (state?.clientId) {
-          this.clientsById.delete(state.clientId);
-        }
-        this.clients.delete(ws);
-
-        // Only notify admins if no other connections remain for this device
-        if (state?.deviceId && !this.hasActiveConnectionsForDevice(state.deviceId)) {
-          this.broadcastToAdmins({
-            type: 'client_disconnected',
-            clientId: state.clientId,
-          });
-        } else if (state?.deviceId) {
-          // Another connection exists — send an update with the remaining one
-          const remaining = this.getLatestClientForDevice(state.deviceId);
-          if (remaining) {
-            this.broadcastToAdmins({
-              type: 'client_updated',
-              client: this.getClientMetadata(remaining),
-            });
-          }
-        }
+        this.removeConnection(ws);
       });
 
       ws.on('error', (error: Error) => {
         logger.error(`WebSocket error: ${error.message}`);
-        const state = this.clients.get(ws);
-        if (state?.clientId) {
-          this.clientsById.delete(state.clientId);
-        }
-        this.clients.delete(ws);
+        this.removeConnection(ws);
       });
     });
+  }
+
+  private removeConnection(ws: WebSocket): void {
+    const state = this.clients.get(ws);
+    if (!state) return;
+    if (this.clientsById.get(state.clientId) === state) {
+      this.clientsById.delete(state.clientId);
+    }
+    this.clients.delete(ws);
+    if (!state.isAdmin) this.notifyDisplayDeparture(state);
+  }
+
+  private notifyDisplayDeparture(state: ClientState): void {
+    if (!state.deviceId || this.closing) return;
+    const remaining = this.getLatestClientForDevice(state.deviceId);
+    if (remaining) {
+      this.broadcastToAdmins({ type: 'client_updated', client: this.getClientMetadata(remaining) });
+    } else {
+      this.broadcastToAdmins({ type: 'client_disconnected', clientId: state.clientId });
+    }
   }
 
   private setupRoonListeners(): void {
@@ -282,6 +301,7 @@ export class WebSocketManager {
   }
 
   private recordAlbumHistory(nowPlaying: NowPlaying): void {
+    if (this.closing) return;
     if (this.albumHistoryStore?.record(nowPlaying)) {
       this.broadcastToZoneSubscribers(nowPlaying.zone_id, {
         type: 'album_history',
@@ -292,6 +312,7 @@ export class WebSocketManager {
   }
 
   private handleClientMessage(ws: WebSocket, data: Buffer): void {
+    if (this.closing) return;
     const clientState = this.clients.get(ws);
     if (!clientState) return;
 
@@ -336,6 +357,7 @@ export class WebSocketManager {
   ): void {
     const isNewClient = !clientState.clientId;
     const oldClientId = clientState.clientId;
+    const previousState = { ...clientState };
 
     // Extract device ID from client ID (format: "deviceId:sessionSuffix")
     const deviceId = extractDeviceId(message.clientId);
@@ -351,30 +373,34 @@ export class WebSocketManager {
     if (message.userAgent) {
       clientState.userAgent = message.userAgent;
     }
-    if (message.isAdmin !== undefined) {
-      clientState.isAdmin = message.isAdmin;
-    }
+    // Either existing role signal can declare an observer. Metadata cannot turn
+    // an admin socket into a display; open a new display connection instead.
+    clientState.isAdmin = clientState.isAdmin || message.isAdmin === true;
 
     // Load or auto-generate friendly name (keyed by deviceId for persistence)
-    const storedName = this.friendlyNames.get(deviceId);
-    if (storedName) {
-      clientState.friendlyName = storedName;
-    } else {
-      const existingNames = new Set(this.friendlyNames.values());
-      const generated = generateFriendlyName(existingNames);
-      clientState.friendlyName = generated;
-      this.friendlyNames.set(deviceId, generated);
-      if (this.onFriendlyNameChange) {
-        this.onFriendlyNameChange(deviceId, generated);
+    clientState.friendlyName = null;
+    if (!clientState.isAdmin) {
+      const storedName = this.friendlyNames.get(deviceId);
+      if (storedName) {
+        clientState.friendlyName = storedName;
+      } else {
+        const existingNames = new Set(this.friendlyNames.values());
+        const generated = generateFriendlyName(existingNames);
+        clientState.friendlyName = generated;
+        this.friendlyNames.set(deviceId, generated);
+        this.onFriendlyNameChange?.(deviceId, generated);
+        logger.info(`Auto-assigned friendly name: ${generated} to device ${deviceId}`);
       }
-      logger.info(`Auto-assigned friendly name: ${generated} to device ${deviceId}`);
     }
 
     // Update clientsById map
-    if (oldClientId && oldClientId !== message.clientId) {
+    if (oldClientId && this.clientsById.get(oldClientId) === clientState) {
       this.clientsById.delete(oldClientId);
     }
-    this.clientsById.set(message.clientId, clientState);
+    if (!clientState.isAdmin) this.clientsById.set(message.clientId, clientState);
+    if (!previousState.isAdmin && (clientState.isAdmin || previousState.deviceId !== deviceId)) {
+      this.notifyDisplayDeparture(previousState);
+    }
 
     logger.info(
       `Client metadata: ${message.clientId} (${clientState.friendlyName || 'unnamed'}) - ` +
@@ -389,6 +415,8 @@ export class WebSocketManager {
       roon_enabled: this.roonClient !== null,
       friendly_name: clientState.friendlyName ?? undefined,
     });
+
+    if (clientState.isAdmin) return;
 
     // Server-authoritative config — display clients only. Admin connections are
     // skipped: they aren't displays and, if they share a device ID with the
@@ -492,7 +520,7 @@ export class WebSocketManager {
     });
 
     // Notify admins about the update
-    if (clientState.clientId) {
+    if (clientState.clientId && !clientState.isAdmin) {
       this.broadcastToAdmins({
         type: 'client_updated',
         client: this.getClientMetadata(clientState),
@@ -506,7 +534,7 @@ export class WebSocketManager {
     clientState.subscribedZoneName = null;
 
     // Notify admins about the update
-    if (clientState.clientId) {
+    if (clientState.clientId && !clientState.isAdmin) {
       this.broadcastToAdmins({
         type: 'client_updated',
         client: this.getClientMetadata(clientState),
@@ -579,7 +607,7 @@ export class WebSocketManager {
     // Deduplicate by deviceId — keep the most recently connected per device
     const byDevice = new Map<string, ClientState>();
     for (const clientState of this.clients.values()) {
-      if (!clientState.clientId || !clientState.deviceId) continue;
+      if (clientState.isAdmin || !clientState.clientId || !clientState.deviceId) continue;
       const existing = byDevice.get(clientState.deviceId);
       if (!existing || clientState.connectedAt > existing.connectedAt) {
         byDevice.set(clientState.deviceId, clientState);
@@ -594,16 +622,9 @@ export class WebSocketManager {
 
   private hasOtherConnectionsForDevice(deviceId: string, excludeClientId: string): boolean {
     for (const state of this.clients.values()) {
-      if (state.deviceId === deviceId && state.clientId && state.clientId !== excludeClientId) {
+      if (!state.isAdmin && state.deviceId === deviceId && state.clientId && state.clientId !== excludeClientId) {
         return true;
       }
-    }
-    return false;
-  }
-
-  private hasActiveConnectionsForDevice(deviceId: string): boolean {
-    for (const state of this.clients.values()) {
-      if (state.deviceId === deviceId) return true;
     }
     return false;
   }
@@ -611,7 +632,7 @@ export class WebSocketManager {
   private getLatestClientForDevice(deviceId: string): ClientState | undefined {
     let latest: ClientState | undefined;
     for (const state of this.clients.values()) {
-      if (state.deviceId === deviceId && state.clientId) {
+      if (!state.isAdmin && state.deviceId === deviceId && state.clientId) {
         if (!latest || state.connectedAt > latest.connectedAt) {
           latest = state;
         }
@@ -623,7 +644,7 @@ export class WebSocketManager {
   private getAllConnectionsForDevice(deviceId: string): ClientState[] {
     const connections: ClientState[] = [];
     for (const state of this.clients.values()) {
-      if (state.deviceId === deviceId && state.clientId) {
+      if (!state.isAdmin && state.deviceId === deviceId && state.clientId) {
         connections.push(state);
       }
     }
@@ -731,7 +752,7 @@ export class WebSocketManager {
 
     // Also update any other connections from the same device
     for (const state of this.clients.values()) {
-      if (state.deviceId === deviceId) {
+      if (!state.isAdmin && state.deviceId === deviceId) {
         state.friendlyName = name;
       }
     }
@@ -802,7 +823,7 @@ export class WebSocketManager {
 
   getClientByFriendlyName(name: string): ClientMetadata | null {
     for (const state of this.clients.values()) {
-      if (state.friendlyName === name) {
+      if (!state.isAdmin && state.friendlyName === name) {
         return this.getClientMetadata(state);
       }
     }
